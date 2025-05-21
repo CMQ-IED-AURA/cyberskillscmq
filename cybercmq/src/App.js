@@ -16,7 +16,7 @@ function App() {
   // Inscription
   const handleRegister = async (e) => {
     e.preventDefault();
-    const res = await fetch('http://localhost:4000/auth/register', {
+    const res = await fetch('https://cyberskills.onrender.com/auth/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: regEmail, password: regPassword, username: regUsername }),
@@ -33,7 +33,7 @@ function App() {
   // Connexion
   const handleLogin = async (e) => {
     e.preventDefault();
-    const res = await fetch('http://localhost:4000/auth/login', {
+    const res = await fetch('https://cyberskills.onrender.com/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: logEmail, password: logPassword }),
