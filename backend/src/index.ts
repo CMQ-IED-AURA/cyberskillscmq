@@ -10,7 +10,6 @@ const app: Application = express();
 app.use(cors());
 app.use(express.json());
 
-// Ici, on passe bien le Router, pas une fonction handler
 app.use('/auth', authRoutes);
 
 const PORT = process.env.PORT || 4000;
