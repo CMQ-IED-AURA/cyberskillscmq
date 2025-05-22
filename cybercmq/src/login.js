@@ -4,7 +4,7 @@ import Cookies from 'js-cookie';
 import './styles.css';
 
 function Login() {
-    const [email, setEmail] = useState('');
+    const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const navigate = useNavigate();
 
@@ -13,7 +13,7 @@ function Login() {
         const res = await fetch('https://cyberskills.onrender.com/auth/login', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password })
+            body: JSON.stringify({ username, password })
         });
         const data = await res.json();
         if (data.success) {
@@ -28,8 +28,19 @@ function Login() {
         <div className="page">
             <h2>Connexion</h2>
             <form onSubmit={handleLogin}>
-                <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-                <input type="password" placeholder="Mot de passe" value={password} onChange={(e) => setPassword(e.target.value)} required />
+                <input
+                    placeholder="Nom d'utilisateur"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    required
+                />
+                <input
+                    type="password"
+                    placeholder="Mot de passe"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                />
                 <button type="submit">Se connecter</button>
             </form>
         </div>

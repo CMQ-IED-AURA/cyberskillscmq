@@ -4,9 +4,8 @@ import Cookies from 'js-cookie';
 import './styles.css';
 
 function Register() {
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
     const [username, setUsername] = useState('');
+    const [password, setPassword] = useState('');
     const navigate = useNavigate();
 
     const handleRegister = async (e) => {
@@ -14,14 +13,14 @@ function Register() {
         const res = await fetch('https://cyberskills.onrender.com/auth/register', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password, username })
+            body: JSON.stringify({ username, password })
         });
         const data = await res.json();
         if (data.success) {
             Cookies.set('token', data.token, { secure: true, sameSite: 'Strict' });
             navigate('/game');
         } else {
-            alert(data.message || 'Erreur lors de l\'inscription');
+            alert(data.message || "Erreur lors de l'inscription");
         }
     };
 
@@ -29,9 +28,19 @@ function Register() {
         <div className="page">
             <h2>Inscription</h2>
             <form onSubmit={handleRegister}>
-                <input placeholder="Nom d'utilisateur" value={username} onChange={(e) => setUsername(e.target.value)} required />
-                <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-                <input type="password" placeholder="Mot de passe" value={password} onChange={(e) => setPassword(e.target.value)} required />
+                <input
+                    placeholder="Nom d'utilisateur"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    required
+                />
+                <input
+                    type="password"
+                    placeholder="Mot de passe"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                />
                 <button type="submit">S'inscrire</button>
             </form>
         </div>
