@@ -1,0 +1,433 @@
+/* styles.css - Version modernisée et harmonisée */
+
+/* Couleurs principales CMQ iEDURA + ajout de nuances pour un style moderne */
+:root {
+    --primary-dark: #151857;
+    --primary-light: #617f99;
+    --accent-red: #cf3e3e;
+    --accent-blue: #3e70cf;
+    --background: #0f1326;
+    --text-light: #ffffff;
+    --text-dark: #d0d6f9;
+    --shadow: rgba(0, 0, 0, 0.3);
+    --neon-blue: #617f99;
+    --hover-glow: #8ab0ff;
+    --card-bg: rgba(32, 41, 79, 0.8);
+    --form-bg: rgba(21, 28, 58, 0.9);
+    --input-bg: #1c254f;
+    --border-radius: 16px;
+    --border-radius-large: 24px;
+    --transition: all 0.3s ease;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    font-family: 'Inter', 'Segoe UI', sans-serif;
+    background: linear-gradient(135deg, #0f1326 0%, #1a2051 100%);
+    color: var(--text-dark);
+    min-height: 100vh;
+    overflow-x: hidden;
+    position: relative;
+}
+
+/* Fond animé style matrice */
+body::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-image: repeating-linear-gradient(
+            to bottom,
+            rgba(255,255,255,0.02) 0px,
+            transparent 2px,
+            transparent 4px
+    );
+    animation: scrollBg 20s linear infinite;
+    z-index: 0;
+    pointer-events: none;
+}
+
+@keyframes scrollBg {
+    from { background-position: 0 0; }
+    to { background-position: 0 1000px; }
+}
+
+/* Structure de base des pages */
+.page {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    z-index: 1;
+}
+
+/* Header unifié */
+.header, header {
+    background: rgba(15, 19, 38, 0.9);
+    backdrop-filter: blur(10px);
+    color: var(--text-light);
+    padding: 1rem 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    border-bottom: 1px solid rgba(97, 127, 153, 0.2);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+.header h1, header h1 {
+    margin: 0;
+    font-size: 2.5rem;
+    color: var(--hover-glow);
+    text-shadow: 0 0 15px var(--hover-glow);
+    letter-spacing: 0.1em;
+    font-weight: 800;
+}
+
+.nav, nav {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+/* Boutons modernisés */
+.btn-modern, nav button, button[type="submit"] {
+    background: linear-gradient(135deg, var(--primary-light) 0%, var(--primary-dark) 100%);
+    color: var(--text-light);
+    padding: 0.75rem 1.25rem;
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    font-size: 0.95rem;
+    font-weight: 600;
+    border: none;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    box-shadow: 0 4px 15px rgba(97, 127, 153, 0.3);
+    transition: var(--transition);
+    position: relative;
+    overflow: hidden;
+}
+
+.btn-modern::before, nav button::before, button[type="submit"]::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+    transition: left 0.5s;
+}
+
+.btn-modern:hover, nav button:hover, button[type="submit"]:hover {
+    background: linear-gradient(135deg, var(--hover-glow) 0%, #4056f7 100%);
+    box-shadow: 0 6px 25px rgba(138, 176, 255, 0.4);
+    transform: translateY(-2px);
+}
+
+.btn-modern:hover::before, nav button:hover::before, button[type="submit"]:hover::before {
+    left: 100%;
+}
+
+/* Variantes de boutons */
+.btn-accent {
+    background: linear-gradient(135deg, var(--accent-blue) 0%, #2a5cbf 100%);
+}
+
+.btn-outline {
+    background: transparent;
+    border: 2px solid var(--primary-light);
+}
+
+.btn-outline:hover {
+    background: var(--primary-light);
+    border-color: var(--hover-glow);
+}
+
+.launch-button {
+    background: linear-gradient(135deg, var(--accent-red) 0%, #a03030 100%);
+    padding: 1rem 2rem;
+    font-size: 1.1rem;
+    border-radius: var(--border-radius-large);
+    box-shadow: 0 6px 20px rgba(207, 62, 62, 0.3);
+}
+
+.launch-button:hover {
+    background: linear-gradient(135deg, #ff4444 0%, var(--accent-red) 100%);
+    box-shadow: 0 8px 30px rgba(255, 68, 68, 0.4);
+}
+
+/* Container principal */
+.container, main {
+    flex: 1;
+    padding: 2rem;
+    max-width: 1200px;
+    margin: 0 auto;
+    width: 100%;
+    position: relative;
+    z-index: 1;
+}
+
+/* Formulaires stylisés */
+form {
+    background: var(--form-bg);
+    backdrop-filter: blur(15px);
+    padding: 3rem 2.5rem;
+    border-radius: var(--border-radius-large);
+    box-shadow:
+            0 8px 32px rgba(0, 0, 0, 0.3),
+            inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    margin: 2rem auto;
+    max-width: 450px;
+    border: 1px solid rgba(97, 127, 153, 0.2);
+}
+
+form h2 {
+    margin: 0 0 1.5rem 0;
+    font-size: 2rem;
+    color: var(--text-light);
+    text-shadow: 0 0 10px var(--hover-glow);
+    text-align: center;
+    font-weight: 700;
+}
+
+/* Inputs modernisés */
+input {
+    padding: 1rem 1.25rem;
+    font-size: 1rem;
+    border: 2px solid transparent;
+    border-radius: var(--border-radius);
+    background: var(--input-bg);
+    color: var(--text-light);
+    transition: var(--transition);
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+input:focus {
+    outline: none;
+    border-color: var(--primary-light);
+    box-shadow:
+            inset 0 2px 4px rgba(0, 0, 0, 0.2),
+            0 0 0 3px rgba(97, 127, 153, 0.2);
+}
+
+input::placeholder {
+    color: #7789b8;
+    opacity: 0.8;
+}
+
+/* Page de connexion et inscription centrées */
+.page:has(form) {
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+}
+
+.page h2:not(form h2) {
+    color: var(--text-light);
+    font-size: 2.5rem;
+    margin-bottom: 2rem;
+    text-shadow: 0 0 15px var(--hover-glow);
+}
+
+/* Section hero pour la page d'accueil */
+.hero {
+    text-align: center;
+    padding: 4rem 0;
+}
+
+.hero h1 {
+    font-size: 4rem;
+    color: var(--hover-glow);
+    text-shadow: 0 0 20px var(--hover-glow);
+    letter-spacing: 0.1em;
+    margin-bottom: 1rem;
+    font-weight: 900;
+}
+
+.hero p {
+    font-size: 1.3rem;
+    color: var(--text-dark);
+    margin: 1.5rem 0;
+    line-height: 1.6;
+    max-width: 600px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+/* Équipes pour la page Game */
+.teams {
+    display: flex;
+    justify-content: center;
+    gap: 2rem;
+    margin: 3rem 0;
+    flex-wrap: wrap;
+}
+
+.team-card {
+    width: 280px;
+    height: 200px;
+    border-radius: var(--border-radius-large);
+    color: var(--text-light);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+    transition: var(--transition);
+    font-weight: bold;
+    font-size: 1.1rem;
+    position: relative;
+    overflow: hidden;
+    backdrop-filter: blur(10px);
+}
+
+.team-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: inherit;
+    opacity: 0.9;
+    z-index: -1;
+}
+
+.team-card:hover {
+    transform: translateY(-8px) scale(1.02);
+    box-shadow: 0 12px 35px rgba(0, 0, 0, 0.4);
+}
+
+.red-team {
+    background: linear-gradient(135deg, var(--accent-red) 0%, #a03030 100%);
+}
+
+.blue-team {
+    background: linear-gradient(135deg, var(--accent-blue) 0%, #2a5cbf 100%);
+}
+
+.team-card h3 {
+    margin: 0 0 1rem 0;
+    font-size: 1.6rem;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.team-card .btn-modern {
+    margin-top: 1rem;
+    padding: 0.6rem 1.2rem;
+    font-size: 0.9rem;
+    background: rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(10px);
+}
+
+.team-card .btn-modern:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: scale(1.05);
+}
+
+/* Messages d'erreur/succès */
+.alert {
+    padding: 1rem;
+    border-radius: var(--border-radius);
+    margin: 1rem 0;
+    text-align: center;
+    font-weight: 500;
+}
+
+.alert-error {
+    background: rgba(207, 62, 62, 0.2);
+    border: 1px solid var(--accent-red);
+    color: #ff6b6b;
+}
+
+.alert-success {
+    background: rgba(62, 112, 207, 0.2);
+    border: 1px solid var(--accent-blue);
+    color: #4dabf7;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .header, header {
+        flex-direction: column;
+        gap: 1rem;
+        text-align: center;
+        padding: 1rem;
+    }
+
+    .header h1, header h1 {
+        font-size: 2rem;
+    }
+
+    .nav, nav {
+        justify-content: center;
+        width: 100%;
+    }
+
+    .teams {
+        flex-direction: column;
+        align-items: center;
+        gap: 1.5rem;
+    }
+
+    .team-card {
+        width: 90%;
+        max-width: 300px;
+        height: auto;
+        padding: 1.5rem;
+    }
+
+    .container, main {
+        padding: 1rem;
+    }
+
+    form {
+        padding: 2rem 1.5rem;
+        margin: 1rem;
+    }
+
+    .hero h1 {
+        font-size: 2.5rem;
+    }
+
+    .hero p {
+        font-size: 1.1rem;
+    }
+
+    .btn-modern, nav button, button[type="submit"] {
+        font-size: 0.9rem;
+        padding: 0.7rem 1rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .header h1, header h1 {
+        font-size: 1.8rem;
+    }
+
+    .hero h1 {
+        font-size: 2rem;
+    }
+
+    form {
+        padding: 1.5rem 1rem;
+    }
+
+    .team-card {
+        width: 95%;
+    }
+}
