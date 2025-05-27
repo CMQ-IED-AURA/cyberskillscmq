@@ -10,24 +10,29 @@ function Register() {
 
     const handleRegister = async (e) => {
         e.preventDefault();
-        const res = await fetch('https://cyberskills.onrender.com/auth/register', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username, password })
-        });
-        const data = await res.json();
-        if (data.success) {
-            Cookies.set('token', data.token, { secure: true, sameSite: 'Strict' });
-            navigate('/game');
-        } else {
-            alert(data.message || "Erreur lors de l'inscription");
+        try {
+            const res = await fetch('https://cyberskills.onrender.com/auth/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+            const data = await res.json();
+            if (data.success) {
+                Cookies.set('token', data.token, { secure: true, sameSite: 'Strict' });
+                navigate('/game');
+            } else {
+                alert(data.message || "Erreur lors de l'inscription");
+            }
+        } catch (error) {
+            console.error('Erreur:', error);
+            alert("Erreur lors de l'inscription");
         }
     };
 
     return (
         <div className="page">
-            <h2>Inscription</h2>
             <form onSubmit={handleRegister}>
+                <h2>Inscription</h2>
                 <input
                     placeholder="Nom d'utilisateur"
                     value={username}
@@ -41,7 +46,7 @@ function Register() {
                     onChange={(e) => setPassword(e.target.value)}
                     required
                 />
-                <button type="submit">S'inscrire</button>
+                <button type="submit" className="btn-modern">S'inscrire</button>
             </form>
         </div>
     );

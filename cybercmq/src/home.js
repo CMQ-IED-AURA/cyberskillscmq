@@ -22,7 +22,7 @@ function Home() {
                             Connexion
                         </button>
                         <button
-                            onClick={() => navigate('/signup')}
+                            onClick={() => navigate('/register')}
                             className="btn-modern btn-accent"
                         >
                             Inscription

@@ -9,13 +9,28 @@ function Game() {
     const [selectedMatch, setSelectedMatch] = useState(null);
     const [redTeamMembers, setRedTeamMembers] = useState([]);
     const [blueTeamMembers, setBlueTeamMembers] = useState([]);
+    const [users, setUsers] = useState([]);
+    const [role, setRole] = useState(null);
 
     useEffect(() => {
         const token = Cookies.get('token');
         if (!token) {
             navigate('/login');
-        } else {
-            fetchMatches();
+            return;
+        }
+
+        // Décoder le token pour obtenir le rôle
+        try {
+            const decoded = JSON.parse(atob(token.split('.')[1]));
+            setRole(decoded.role);
+        } catch (error) {
+            console.error('Erreur lors du décodage du token:', error);
+            navigate('/login');
+        }
+
+        fetchMatches();
+        if (decoded.role === 'ADMIN') {
+            fetchUsers();
         }
     }, [navigate]);
 
@@ -56,6 +71,22 @@ function Game() {
         }
     };
 
+    const fetchUsers = async () => {
+        try {
+            const res = await fetch('https://cyberskills.onrender.com/match/users', {
+                headers: { 'Authorization': `Bearer ${Cookies.get('token')}` },
+            });
+            const data = await res.json();
+            if (data.success) {
+                setUsers(data.users);
+            } else {
+                console.error('Erreur serveur:', data.message);
+            }
+        } catch (error) {
+            console.error('Erreur lors de la récupération des utilisateurs:', error);
+        }
+    };
+
     const handleCreateMatch = async () => {
         try {
             const res = await fetch('https://cyberskills.onrender.com/match/create', {
@@ -76,53 +107,11 @@ function Game() {
         }
     };
 
-    const handleJoinTeam = async (teamId, color) => {
-        try {
-            const res = await fetch('https://cyberskills.onrender.com/match/join', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${Cookies.get('token')}` },
-                body: JSON.stringify({ matchId: selectedMatch.id, teamId }),
-            });
-            const data = await res.json();
-            if (data.success) {
-                fetchTeamMembers(selectedMatch.id);
-            } else {
-                alert(data.message || 'Erreur lors de la jointure de l\'équipe');
-            }
-        } catch (error) {
-            console.error('Erreur:', error);
-            alert('Erreur lors de la jointure de l\'équipe');
-        }
-    };
-
-    const handleLeaveTeam = async () => {
-        try {
-            const res = await fetch('https://cyberskills.onrender.com/match/leave-team', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${Cookies.get('token')}` },
-            });
-            const data = await res.json();
-            if (data.success) {
-                fetchTeamMembers(selectedMatch.id);
-            } else {
-                alert(data.message || 'Erreur lors de la sortie de l\'équipe');
-            }
-        } catch (error) {
-            console.error('Erreur:', error);
-            alert('Erreur lors de la sortie de l\'équipe');
-        }
-    };
-
     const handleDeleteMatch = async (matchId) => {
         try {
             const res = await fetch(`https://cyberskills.onrender.com/match/${matchId}`, {
                 method: 'DELETE',
                 headers: {
-                    'Content-Type': 'application/json',
                     'Authorization': `Bearer ${Cookies.get('token')}` },
             });
             const data = await res.json();
@@ -138,6 +127,28 @@ function Game() {
         } catch (error) {
             console.error('Erreur lors de la suppression du match:', error);
             alert('Erreur lors de la suppression du match');
+        }
+    };
+
+    const handleAssignTeam = async (userId, teamId) => {
+        try {
+            const res = await fetch('https://cyberskills.onrender.com/match/assign-team', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${Cookies.get('token')}` },
+                body: JSON.stringify({ userId, teamId }),
+            });
+            const data = await res.json();
+            if (data.success) {
+                fetchTeamMembers(selectedMatch.id);
+                fetchUsers();
+            } else {
+                alert(data.message || 'Erreur lors de l\'assignation de l\'équipe');
+            }
+        } catch (error) {
+            console.error('Erreur:', error);
+            alert('Erreur lors de l\'assignation de l\'équipe');
         }
     };
 
@@ -158,91 +169,160 @@ function Game() {
                 </nav>
             </header>
             <main className="container">
-                <h2>Liste des matchs</h2>
-                <button onClick={handleCreateMatch} className="btn-modern" style={{ marginBottom: '2rem' }}>
-                    Créer un nouveau match
-                </button>
-                <div className="matches-container">
-                    {matches.length > 0 ? (
-                        matches.map((match) => (
-                            <div
-                                key={match.id}
-                                className={`match-card ${selectedMatch?.id === match.id ? 'selected' : ''}`}
-                                onClick={() => {
-                                    setSelectedMatch(match);
-                                    fetchTeamMembers(match.id);
-                                }}
-                            >
-                                <div className="match-header">
-                                    <h3>Match {match.id.slice(0, 8)}</h3>
-                                </div>
-                                <div className="teams">
-                                    <div className="team-card red-team">
-                                        <h4>Équipe Rouge</h4>
-                                        <ul>
-                                            {selectedMatch?.id === match.id &&
-                                            redTeamMembers.length > 0 ? (
-                                                redTeamMembers.map((user) => (
-                                                    <li key={user.id}>{user.username}</li>
-                                                ))
-                                            ) : (
-                                                <li>Aucun membre</li>
-                                            )}
-                                        </ul>
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                handleJoinTeam(match.redTeamId, 'red');
-                                            }}
-                                            className="btn-modern"
-                                        >
-                                            Rejoindre
-                                        </button>
+                {role === 'ADMIN' ? (
+                    <>
+                        <h2>Administration</h2>
+                        <button onClick={handleCreateMatch} className="btn-modern" style={{ marginBottom: '2rem' }}>
+                            Créer un nouveau match
+                        </button>
+                        <h3>Liste des utilisateurs</h3>
+                        <div className="users-container">
+                            {users.length > 0 ? (
+                                users.map((user) => (
+                                    <div key={user.id} className="user-card">
+                                        <p>{user.username} ({user.role})</p>
+                                        <p>Équipe actuelle: {user.teamId ? `ID ${user.teamId.slice(0, 8)}` : 'Aucune'}</p>
+                                        {selectedMatch && (
+                                            <div>
+                                                <button
+                                                    onClick={() => handleAssignTeam(user.id, selectedMatch.redTeamId)}
+                                                    className="btn-modern btn-accent"
+                                                >
+                                                    Placer dans Équipe Rouge
+                                                </button>
+                                                <button
+                                                    onClick={() => handleAssignTeam(user.id, selectedMatch.blueTeamId)}
+                                                    className="btn-modern btn-accent"
+                                                >
+                                                    Placer dans Équipe Bleue
+                                                </button>
+                                                <button
+                                                    onClick={() => handleAssignTeam(user.id, null)}
+                                                    className="btn-modern btn-delete"
+                                                >
+                                                    Retirer de l'équipe
+                                                </button>
+                                            </div>
+                                        )}
                                     </div>
-                                    <div className="team-card blue-team">
-                                        <h4>Équipe Bleue</h4>
-                                        <ul>
-                                            {selectedMatch?.id === match.id &&
-                                            blueTeamMembers.length > 0 ? (
-                                                blueTeamMembers.map((user) => (
-                                                    <li key={user.id}>{user.username}</li>
-                                                ))
-                                            ) : (
-                                                <li>Aucun membre</li>
-                                            )}
-                                        </ul>
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                handleJoinTeam(match.blueTeamId, 'blue');
-                                            }}
-                                            className="btn-modern"
-                                        >
-                                            Rejoindre
-                                        </button>
-                                    </div>
-                                </div>
-                                <div className="match-actions">
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleDeleteMatch(match.id);
+                                ))
+                            ) : (
+                                <p>Aucun utilisateur trouvé.</p>
+                            )}
+                        </div>
+                        <h2>Liste des matchs</h2>
+                        <div className="matches-container">
+                            {matches.length > 0 ? (
+                                matches.map((match) => (
+                                    <div
+                                        key={match.id}
+                                        className={`match-card ${selectedMatch?.id === match.id ? 'selected' : ''}`}
+                                        onClick={() => {
+                                            setSelectedMatch(match);
+                                            fetchTeamMembers(match.id);
                                         }}
-                                        className="btn-modern btn-delete"
                                     >
-                                        Supprimer
-                                    </button>
-                                </div>
-                            </div>
-                        ))
-                    ) : (
-                        <p>Aucun match disponible.</p>
-                    )}
-                </div>
-                {selectedMatch && (
-                    <button onClick={handleLeaveTeam} className="btn-modern" style={{ marginTop: '1rem' }}>
-                        Quitter l'équipe
-                    </button>
+                                        <div className="match-header">
+                                            <h3>Match {match.id.slice(0, 8)}</h3>
+                                        </div>
+                                        <div className="teams">
+                                            <div className="team-card red-team">
+                                                <h4>Équipe Rouge</h4>
+                                                <ul>
+                                                    {selectedMatch?.id === match.id &&
+                                                    redTeamMembers.length > 0 ? (
+                                                        redTeamMembers.map((user) => (
+                                                            <li key={user.id}>{user.username}</li>
+                                                        ))
+                                                    ) : (
+                                                        <li>Aucun membre</li>
+                                                    )}
+                                                </ul>
+                                            </div>
+                                            <div className="team-card blue-team">
+                                                <h4>Équipe Bleue</h4>
+                                                <ul>
+                                                    {selectedMatch?.id === match.id &&
+                                                    blueTeamMembers.length > 0 ? (
+                                                        redTeamMembers.map((user) => (
+                                                            <li key={user.id}>{user.username}</li>
+                                                        ))
+                                                    ) : (
+                                                        <li>Aucun membre</li>
+                                                    )}
+                                                </ul>
+                                            </div>
+                                        </div>
+                                        <div className="match-actions">
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleDeleteMatch(match.id);
+                                                }}
+                                                className="btn-modern btn-delete"
+                                            >
+                                                Supprimer
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))
+                            ) : (
+                                <p>Aucun match disponible.</p>
+                            )}
+                        </div>
+                    </>
+                ) : (
+                    <>
+                        <h2>Vos matchs</h2>
+                        <div className="matches-container">
+                            {matches.length > 0 ? (
+                                matches.map((match) => (
+                                    <div
+                                        key={match.id}
+                                        className={`match-card ${selectedMatch?.id === match.id ? 'selected' : ''}`}
+                                        onClick={() => {
+                                            setSelectedMatch(match);
+                                            fetchTeamMembers(match.id);
+                                        }}
+                                    >
+                                        <div className="match-header">
+                                            <h3>Match {match.id.slice(0, 8)}</h3>
+                                        </div>
+                                        <div className="teams">
+                                            <div className="team-card red-team">
+                                                <h4>Équipe Rouge</h4>
+                                                <ul>
+                                                    {selectedMatch?.id === match.id &&
+                                                    redTeamMembers.length > 0 ? (
+                                                        redTeamMembers.map((user) => (
+                                                            <li key={user.id}>{user.username}</li>
+                                                        ))
+                                                    ) : (
+                                                        <li>Aucun membre</li>
+                                                    )}
+                                                </ul>
+                                            </div>
+                                            <div className="team-card blue-team">
+                                                <h4>Équipe Bleue</h4>
+                                                <ul>
+                                                    {selectedMatch?.id === match.id &&
+                                                    blueTeamMembers.length > 0 ? (
+                                                        blueTeamMembers.map((user) => (
+                                                            <li key={user.id}>{user.username}</li>
+                                                        ))
+                                                    ) : (
+                                                        <li>Aucun membre</li>
+                                                    )}
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))
+                            ) : (
+                                <p>Aucun match disponible.</p>
+                            )}
+                        </div>
+                    </>
                 )}
             </main>
         </div>

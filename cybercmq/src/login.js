@@ -10,24 +10,29 @@ function Login() {
 
     const handleLogin = async (e) => {
         e.preventDefault();
-        const res = await fetch('https://cyberskills.onrender.com/auth/login', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username, password })
-        });
-        const data = await res.json();
-        if (data.success) {
-            Cookies.set('token', data.token, { secure: true, sameSite: 'Strict' });
-            navigate('/game');
-        } else {
-            alert(data.message || 'Erreur lors de la connexion');
+        try {
+            const res = await fetch('https://cyberskills.onrender.com/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+            const data = await res.json();
+            if (data.success) {
+                Cookies.set('token', data.token, { secure: true, sameSite: 'Strict' });
+                navigate('/game');
+            } else {
+                alert(data.message || 'Erreur lors de la connexion');
+            }
+        } catch (error) {
+            console.error('Erreur:', error);
+            alert('Erreur lors de la connexion');
         }
     };
 
     return (
         <div className="page">
-            <h2>Connexion</h2>
             <form onSubmit={handleLogin}>
+                <h2>Connexion</h2>
                 <input
                     placeholder="Nom d'utilisateur"
                     value={username}
@@ -41,7 +46,7 @@ function Login() {
                     onChange={(e) => setPassword(e.target.value)}
                     required
                 />
-                <button type="submit">Se connecter</button>
+                <button type="submit" className="btn-modern">Se connecter</button>
             </form>
         </div>
     );
