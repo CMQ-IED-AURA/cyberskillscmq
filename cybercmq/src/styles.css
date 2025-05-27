@@ -1,6 +1,6 @@
-/* styles.css - Restauré à partir de ton original avec ajouts pour admin et formulaires */
+/* styles.css - Restauré à partir de ton original avec corrections et ajouts pour admin et formulaires */
 
-/* Couleurs principales */
+/* Couleurs principales​ */
 :root {
     --primary-dark: #151857;
     --primary-light: #617f99;
@@ -78,7 +78,6 @@ body::before {
     align-items: center;
     flex-wrap: wrap;
     border-bottom: 1px solid rgba(97, 127, 153, 0.2);
-    border-bottom: 1px solid rgba(97, 127, 153);
     position: sticky;
     top: 0;
     z-index: 100;
@@ -132,8 +131,7 @@ body::before {
     width: 100%;
     height: 100%;
     background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-}
-transition: left 0.5s;
+    transition: left 0.5s;
 }
 
 .btn-modern:hover::before {
@@ -148,12 +146,14 @@ transition: left 0.5s;
     background: linear-gradient(135deg, #ff4444 0%, var(--accent-red) 100%);
     box-shadow: 0 6px 25px rgba(255, 68, 68, 0.5);
 }
+
 .btn-accent {
-    background: linear-gradient(135deg, var(--accent-blue) 0%, #45a 90);
+    background: linear-gradient(135deg, var(--accent-blue) 0%, #2a5cbf 90%);
 }
 
 .btn-accent:hover {
     background: linear-gradient(135deg, #4d8cff 0%, var(--accent-blue) 100%);
+    box-shadow: 0 6px 25px rgba(138, 176, 255, 0.5);
 }
 
 /* Container principal */
@@ -225,7 +225,7 @@ input::placeholder {
 
 .match-card:hover {
     transform: translateY(-5px);
-    box-shadow: translate 0(8px) 25px var(--shadow-shadow);
+    box-shadow: 0 8px 25px var(--shadow);
 }
 
 .match-card.matched {
@@ -273,7 +273,7 @@ input::placeholder {
 }
 
 .team-card.blue-team {
-    background: linear-gradient(45deg, var(--accent-blue) 0%, #2a5cbf 100%);
+    background: linear-gradient(135deg, var(--accent-blue) 0%, #2a5cbf 100%);
 }
 
 .team-card h4 {
@@ -358,7 +358,7 @@ input::placeholder {
 }
 
 .hero .btn-modern {
-    margin: 0 .5rem;
+    margin: 0 0.5rem;
 }
 
 /* Responsive Design */
@@ -417,7 +417,7 @@ input::placeholder {
         font-size: clamp(1.8rem, 4.5vw, 2rem);
     }
 
-    .form {
+    form {
         padding: 1.5rem;
         margin: 1rem;
     }
