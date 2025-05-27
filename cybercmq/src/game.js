@@ -31,6 +31,8 @@ function Game() {
                     setSelectedMatch(data.matches[0]);
                     fetchTeamMembers(data.matches[0].id);
                 }
+            } else {
+                console.error('Erreur serveur:', data.message);
             }
         } catch (error) {
             console.error('Erreur lors de la récupération des matchs:', error);
@@ -46,6 +48,8 @@ function Game() {
             if (data.success) {
                 setRedTeamMembers(data.redTeam.users || []);
                 setBlueTeamMembers(data.blueTeam.users || []);
+            } else {
+                console.error('Erreur serveur:', data.message);
             }
         } catch (error) {
             console.error('Erreur lors de la récupération des membres:', error);
@@ -68,6 +72,7 @@ function Game() {
             }
         } catch (error) {
             console.error('Erreur:', error);
+            alert('Erreur lors de la création du match');
         }
     };
 
@@ -88,6 +93,7 @@ function Game() {
             }
         } catch (error) {
             console.error('Erreur:', error);
+            alert('Erreur lors de la jointure de l\'équipe');
         }
     };
 
@@ -107,6 +113,7 @@ function Game() {
             }
         } catch (error) {
             console.error('Erreur:', error);
+            alert('Erreur lors de la sortie de l\'équipe');
         }
     };
 
@@ -115,6 +122,7 @@ function Game() {
             const res = await fetch(`https://cyberskills.onrender.com/match/${matchId}`, {
                 method: 'DELETE',
                 headers: {
+                    'Content-Type': 'application/json',
                     'Authorization': `Bearer ${Cookies.get('token')}` },
             });
             const data = await res.json();
@@ -124,29 +132,12 @@ function Game() {
                 setBlueTeamMembers([]);
                 fetchMatches();
             } else {
+                console.error('Erreur serveur:', data.message, data.error);
                 alert(data.message || 'Erreur lors de la suppression du match');
             }
         } catch (error) {
-            console.error('Erreur:', error);
-        }
-    };
-
-    const handleStartMatch = async (matchId) => {
-        try {
-            const res = await fetch(`https://cyberskills.onrender.com/match/${matchId}/start`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${Cookies.get('token')}` },
-            });
-            const data = await res.json();
-            if (data.success) {
-                fetchMatches();
-            } else {
-                alert(data.message || 'Erreur lors du lancement du match');
-            }
-        } catch (error) {
-            console.error('Erreur:', error);
+            console.error('Erreur lors de la suppression du match:', error);
+            alert('Erreur lors de la suppression du match');
         }
     };
 
@@ -184,11 +175,6 @@ function Game() {
                             >
                                 <div className="match-header">
                                     <h3>Match {match.id.slice(0, 8)}</h3>
-                                    {match.started ? (
-                                        <span className="status started">Lancé</span>
-                                    ) : (
-                                        <span className="status not-started">Non lancé</span>
-                                    )}
                                 </div>
                                 <div className="teams">
                                     <div className="team-card red-team">
@@ -203,17 +189,15 @@ function Game() {
                                                 <li>Aucun membre</li>
                                             )}
                                         </ul>
-                                        {!match.started && (
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    handleJoinTeam(match.redTeamId, 'red');
-                                                }}
-                                                className="btn-modern"
-                                            >
-                                                Rejoindre
-                                            </button>
-                                        )}
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleJoinTeam(match.redTeamId, 'red');
+                                            }}
+                                            className="btn-modern"
+                                        >
+                                            Rejoindre
+                                        </button>
                                     </div>
                                     <div className="team-card blue-team">
                                         <h4>Équipe Bleue</h4>
@@ -227,41 +211,28 @@ function Game() {
                                                 <li>Aucun membre</li>
                                             )}
                                         </ul>
-                                        {!match.started && (
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    handleJoinTeam(match.blueTeamId, 'blue');
-                                                }}
-                                                className="btn-modern"
-                                            >
-                                                Rejoindre
-                                            </button>
-                                        )}
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleJoinTeam(match.blueTeamId, 'blue');
+                                            }}
+                                            className="btn-modern"
+                                        >
+                                            Rejoindre
+                                        </button>
                                     </div>
                                 </div>
-                                {!match.started && (
-                                    <div className="match-actions">
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                handleDeleteMatch(match.id);
-                                            }}
-                                            className="btn-modern btn-delete"
-                                        >
-                                            Supprimer
-                                        </button>
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                handleStartMatch(match.id);
-                                            }}
-                                            className="btn-modern btn-start"
-                                        >
-                                            Lancer
-                                        </button>
-                                    </div>
-                                )}
+                                <div className="match-actions">
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleDeleteMatch(match.id);
+                                        }}
+                                        className="btn-modern btn-delete"
+                                    >
+                                        Supprimer
+                                    </button>
+                                </div>
                             </div>
                         ))
                     ) : (
