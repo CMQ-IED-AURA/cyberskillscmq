@@ -23,6 +23,7 @@ const authenticateToken = (req: AuthenticatedRequest, res: Response, next: NextF
 
     jwt.verify(token, JWT_SECRET, (err: any, user: any) => {
         if (err) {
+            console.error('Erreur de vérification du token:', err.message, err.stack);
             res.status(403).json({ success: false, message: 'Token invalide' });
             return;
         }
@@ -41,7 +42,6 @@ const requireAdmin = (req: AuthenticatedRequest, res: Response, next: NextFuncti
 };
 
 // Créer un match (admin uniquement)
-// @ts-ignore
 router.post('/create', authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
     try {
         const redTeam = await prisma.team.create({ data: { name: 'Équipe Rouge' } });
@@ -67,7 +67,6 @@ router.post('/create', authenticateToken, requireAdmin, async (req: Authenticate
 });
 
 // Liste des matchs
-// @ts-ignore
 router.get('/list', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
     try {
         const matches = await prisma.match.findMany({
@@ -87,7 +86,6 @@ router.get('/list', authenticateToken, async (req: AuthenticatedRequest, res: Re
 });
 
 // Obtenir les membres des équipes d'un match
-// @ts-ignore
 router.get('/:matchId/teams', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
     const { matchId } = req.params;
     try {
@@ -113,7 +111,6 @@ router.get('/:matchId/teams', authenticateToken, async (req: AuthenticatedReques
 });
 
 // Lister les utilisateurs (admin uniquement)
-// @ts-ignore
 router.get('/users', authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
     try {
         const users = await prisma.user.findMany({
@@ -136,7 +133,6 @@ router.get('/users', authenticateToken, requireAdmin, async (req: AuthenticatedR
 });
 
 // Placer/déplacer un utilisateur dans une équipe (admin uniquement)
-// @ts-ignore
 router.post('/assign-team', authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
     const { userId, teamId } = req.body;
 
@@ -164,44 +160,43 @@ router.post('/assign-team', authenticateToken, requireAdmin, async (req: Authent
 });
 
 // Rejoindre une équipe (désactivé pour les utilisateurs standards)
-// @ts-ignore
 router.post('/join', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
     return res.status(403).json({ success: false, message: 'Les utilisateurs ne peuvent pas rejoindre une équipe eux-mêmes' });
 });
 
 // Quitter une équipe (désactivé pour les utilisateurs standards)
-// @ts-ignore
 router.post('/leave-team', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
     return res.status(403).json({ success: false, message: 'Les utilisateurs ne peuvent pas quitter une équipe eux-mêmes' });
 });
 
 // Supprimer un match (admin uniquement)
-// @ts-ignore
 router.delete('/:matchId', authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
     const { matchId } = req.params;
 
     try {
+        console.log(`Tentative de suppression du match ID: ${matchId}`);
         const match = await prisma.match.findUnique({
             where: { id: matchId },
             include: { redTeam: true, blueTeam: true },
         });
 
         if (!match) {
+            console.log(`Match ID: ${matchId} non trouvé`);
             return res.status(404).json({ success: false, message: 'Match non trouvé' });
         }
 
-        // Dissocier les utilisateurs des équipes
+        console.log(`Dissociation des utilisateurs pour les équipes: ${match.redTeamId}, ${match.blueTeamId}`);
         await prisma.user.updateMany({
             where: { teamId: { in: [match.redTeamId, match.blueTeamId] } },
             data: { teamId: null },
         });
 
-        // Supprimer les équipes
+        console.log(`Suppression des équipes: ${match.redTeamId}, ${match.blueTeamId}`);
         await prisma.team.deleteMany({
             where: { id: { in: [match.redTeamId, match.blueTeamId] } },
         });
 
-        // Supprimer le match
+        console.log(`Suppression du match: ${matchId}`);
         await prisma.match.delete({
             where: { id: matchId },
         });

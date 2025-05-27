@@ -30,10 +30,14 @@ router.post('/register', async (req: Request, res: Response) => {
       },
     });
 
+    // Générer JWT
+    const token = jwt.sign({ userId: newUser.id, role: newUser.role }, JWT_SECRET, { expiresIn: '1h' });
+
     return res.status(201).json({
       success: true,
       message: 'Inscription réussie',
       user: { id: newUser.id, username: newUser.username, role: newUser.role },
+      token,
     });
   } catch (error: any) {
     console.error('Erreur lors de l\'inscription:', error.message, error.stack);

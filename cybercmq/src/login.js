@@ -21,7 +21,7 @@ function Login() {
                 Cookies.set('token', data.token, { secure: true, sameSite: 'Strict' });
                 navigate('/game');
             } else {
-                alert(data.message || 'Erreur lors de la connexion');
+                alert('Erreur lors de la connexion:' data.message || 'Erreur lors de la connexion');
             }
         } catch (error) {
             console.error('Erreur:', error);
@@ -34,9 +34,10 @@ function Login() {
             <form onSubmit={handleLogin}>
                 <h2>Connexion</h2>
                 <input
+                    type="text"
                     placeholder="Nom d'utilisateur"
                     value={username}
-                    onChange={(e) => setUsername(e.target.value)}
+                    onChange={(e) => {setUsername(e.target.value)}}
                     required
                 />
                 <input

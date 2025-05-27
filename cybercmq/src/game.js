@@ -21,16 +21,18 @@ function Game() {
 
         // Décoder le token pour obtenir le rôle
         try {
-            const decoded = JSON.parse(atob(token.split('.')[1]));
+            const payload = token.split('.')[1];
+            if (!payload) throw new Error('Payload du token manquant');
+            const decoded = JSON.parse(atob(payload));
             setRole(decoded.role);
+            fetchMatches();
+            if (decoded.role === 'ADMIN') {
+                fetchUsers();
+            }
         } catch (error) {
             console.error('Erreur lors du décodage du token:', error);
+            Cookies.remove('token');
             navigate('/login');
-        }
-
-        fetchMatches();
-        if (decoded.role === 'ADMIN') {
-            fetchUsers();
         }
     }, [navigate]);
 
@@ -207,7 +209,7 @@ function Game() {
                                     </div>
                                 ))
                             ) : (
-                                <p>Aucun utilisateur trouvé.</p>
+                                <p>Aucun utilisateur.</p>
                             )}
                         </div>
                         <h2>Liste des matchs</h2>
@@ -216,7 +218,7 @@ function Game() {
                                 matches.map((match) => (
                                     <div
                                         key={match.id}
-                                        className={`match-card ${selectedMatch?.id === match.id ? 'selected' : ''}`}
+                                        className={`match-card ${selectedMatch?.id === match.id ? 'matched' : ''}`}
                                         onClick={() => {
                                             setSelectedMatch(match);
                                             fetchTeamMembers(match.id);
@@ -235,7 +237,7 @@ function Game() {
                                                             <li key={user.id}>{user.username}</li>
                                                         ))
                                                     ) : (
-                                                        <li>Aucun membre</li>
+                                                        <li>Aucun joueur</li>
                                                     )}
                                                 </ul>
                                             </div>
@@ -244,11 +246,11 @@ function Game() {
                                                 <ul>
                                                     {selectedMatch?.id === match.id &&
                                                     blueTeamMembers.length > 0 ? (
-                                                        redTeamMembers.map((user) => (
+                                                        blueTeamMembers.map((user) => (
                                                             <li key={user.id}>{user.username}</li>
                                                         ))
                                                     ) : (
-                                                        <li>Aucun membre</li>
+                                                        <li>Aucun joueur</li>
                                                     )}
                                                 </ul>
                                             </div>
@@ -279,7 +281,7 @@ function Game() {
                                 matches.map((match) => (
                                     <div
                                         key={match.id}
-                                        className={`match-card ${selectedMatch?.id === match.id ? 'selected' : ''}`}
+                                        className={`match-card ${selectedMatch?.id === match.id ? 'matched' : ''}`}
                                         onClick={() => {
                                             setSelectedMatch(match);
                                             fetchTeamMembers(match.id);
@@ -298,7 +300,7 @@ function Game() {
                                                             <li key={user.id}>{user.username}</li>
                                                         ))
                                                     ) : (
-                                                        <li>Aucun membre</li>
+                                                        <li>Aucun joueur</li>
                                                     )}
                                                 </ul>
                                             </div>
@@ -311,7 +313,7 @@ function Game() {
                                                             <li key={user.id}>{user.username}</li>
                                                         ))
                                                     ) : (
-                                                        <li>Aucun membre</li>
+                                                        <li>Aucun joueur</li>
                                                     )}
                                                 </ul>
                                             </div>
