@@ -15,7 +15,6 @@ function Game() {
         if (!token) {
             navigate('/login');
         } else {
-            // Récupérer la liste des matchs
             fetchMatches();
         }
     }, [navigate]);
@@ -23,12 +22,12 @@ function Game() {
     const fetchMatches = async () => {
         try {
             const res = await fetch('https://cyberskills.onrender.com/match/list', {
-                headers: { 'Authorization': `Bearer ${Cookies.get('token')}` }
+                headers: { 'Authorization': `Bearer ${Cookies.get('token')}` },
             });
             const data = await res.json();
             if (data.success) {
                 setMatches(data.matches);
-                if (data.matches.length > 0) {
+                if (data.matches.length > 0 && !selectedMatch) {
                     setSelectedMatch(data.matches[0]);
                     fetchTeamMembers(data.matches[0].id);
                 }
@@ -41,12 +40,12 @@ function Game() {
     const fetchTeamMembers = async (matchId) => {
         try {
             const res = await fetch(`https://cyberskills.onrender.com/match/${matchId}/teams`, {
-                headers: { 'Authorization': `Bearer ${Cookies.get('token')}` }
+                headers: { 'Authorization': `Bearer ${Cookies.get('token')}` },
             });
             const data = await res.json();
             if (data.success) {
-                setRedTeamMembers(data.redTeam.users);
-                setBlueTeamMembers(data.blueTeam.users);
+                setRedTeamMembers(data.redTeam.users || []);
+                setBlueTeamMembers(data.blueTeam.users || []);
             }
         } catch (error) {
             console.error('Erreur lors de la récupération des membres:', error);
@@ -59,8 +58,7 @@ function Game() {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${Cookies.get('token')}`
-                }
+                    'Authorization': `Bearer ${Cookies.get('token')}` },
             });
             const data = await res.json();
             if (data.success) {
@@ -79,9 +77,8 @@ function Game() {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${Cookies.get('token')}`
-                },
-                body: JSON.stringify({ matchId: selectedMatch.id, teamId })
+                    'Authorization': `Bearer ${Cookies.get('token')}` },
+                body: JSON.stringify({ matchId: selectedMatch.id, teamId }),
             });
             const data = await res.json();
             if (data.success) {
@@ -94,71 +91,188 @@ function Game() {
         }
     };
 
+    const handleLeaveTeam = async () => {
+        try {
+            const res = await fetch('https://cyberskills.onrender.com/match/leave-team', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${Cookies.get('token')}` },
+            });
+            const data = await res.json();
+            if (data.success) {
+                fetchTeamMembers(selectedMatch.id);
+            } else {
+                alert(data.message || 'Erreur lors de la sortie de l\'équipe');
+            }
+        } catch (error) {
+            console.error('Erreur:', error);
+        }
+    };
+
+    const handleDeleteMatch = async (matchId) => {
+        try {
+            const res = await fetch(`https://cyberskills.onrender.com/match/${matchId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${Cookies.get('token')}` },
+            });
+            const data = await res.json();
+            if (data.success) {
+                setSelectedMatch(null);
+                setRedTeamMembers([]);
+                setBlueTeamMembers([]);
+                fetchMatches();
+            } else {
+                alert(data.message || 'Erreur lors de la suppression du match');
+            }
+        } catch (error) {
+            console.error('Erreur:', error);
+        }
+    };
+
+    const handleStartMatch = async (matchId) => {
+        try {
+            const res = await fetch(`https://cyberskills.onrender.com/match/${matchId}/start`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${Cookies.get('token')}` },
+            });
+            const data = await res.json();
+            if (data.success) {
+                fetchMatches();
+            } else {
+                alert(data.message || 'Erreur lors du lancement du match');
+            }
+        } catch (error) {
+            console.error('Erreur:', error);
+        }
+    };
+
     return (
         <div className="page">
             <header className="header">
                 <h1>CyberSkills</h1>
                 <nav>
-                    <button onClick={() => {
-                        Cookies.remove('token');
-                        navigate('/');
-                    }} className="btn-modern">Déconnexion</button>
+                    <button
+                        onClick={() => {
+                            Cookies.remove('token');
+                            navigate('/');
+                        }}
+                        className="btn-modern"
+                    >
+                        Déconnexion
+                    </button>
                 </nav>
             </header>
             <main className="container">
-                <h2>Choix des équipes</h2>
-                <button onClick={handleCreateMatch} className="btn-modern" style={{ marginBottom: '1rem' }}>
+                <h2>Liste des matchs</h2>
+                <button onClick={handleCreateMatch} className="btn-modern" style={{ marginBottom: '2rem' }}>
                     Créer un nouveau match
                 </button>
-                {matches.length > 0 && (
-                    <select
-                        value={selectedMatch?.id}
-                        onChange={(e) => {
-                            const match = matches.find(m => m.id === e.target.value);
-                            setSelectedMatch(match);
-                            fetchTeamMembers(match.id);
-                        }}
-                    >
-                        {matches.map(match => (
-                            <option key={match.id} value={match.id}>
-                                Match {match.id.slice(0, 8)}
-                            </option>
-                        ))}
-                    </select>
-                )}
+                <div className="matches-container">
+                    {matches.length > 0 ? (
+                        matches.map((match) => (
+                            <div
+                                key={match.id}
+                                className={`match-card ${selectedMatch?.id === match.id ? 'selected' : ''}`}
+                                onClick={() => {
+                                    setSelectedMatch(match);
+                                    fetchTeamMembers(match.id);
+                                }}
+                            >
+                                <div className="match-header">
+                                    <h3>Match {match.id.slice(0, 8)}</h3>
+                                    {match.started ? (
+                                        <span className="status started">Lancé</span>
+                                    ) : (
+                                        <span className="status not-started">Non lancé</span>
+                                    )}
+                                </div>
+                                <div className="teams">
+                                    <div className="team-card red-team">
+                                        <h4>Équipe Rouge</h4>
+                                        <ul>
+                                            {selectedMatch?.id === match.id &&
+                                            redTeamMembers.length > 0 ? (
+                                                redTeamMembers.map((user) => (
+                                                    <li key={user.id}>{user.username}</li>
+                                                ))
+                                            ) : (
+                                                <li>Aucun membre</li>
+                                            )}
+                                        </ul>
+                                        {!match.started && (
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleJoinTeam(match.redTeamId, 'red');
+                                                }}
+                                                className="btn-modern"
+                                            >
+                                                Rejoindre
+                                            </button>
+                                        )}
+                                    </div>
+                                    <div className="team-card blue-team">
+                                        <h4>Équipe Bleue</h4>
+                                        <ul>
+                                            {selectedMatch?.id === match.id &&
+                                            blueTeamMembers.length > 0 ? (
+                                                blueTeamMembers.map((user) => (
+                                                    <li key={user.id}>{user.username}</li>
+                                                ))
+                                            ) : (
+                                                <li>Aucun membre</li>
+                                            )}
+                                        </ul>
+                                        {!match.started && (
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleJoinTeam(match.blueTeamId, 'blue');
+                                                }}
+                                                className="btn-modern"
+                                            >
+                                                Rejoindre
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                                {!match.started && (
+                                    <div className="match-actions">
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleDeleteMatch(match.id);
+                                            }}
+                                            className="btn-modern btn-delete"
+                                        >
+                                            Supprimer
+                                        </button>
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleStartMatch(match.id);
+                                            }}
+                                            className="btn-modern btn-start"
+                                        >
+                                            Lancer
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        ))
+                    ) : (
+                        <p>Aucun match disponible.</p>
+                    )}
+                </div>
                 {selectedMatch && (
-                    <div className="teams">
-                        <div className="team-card red-team">
-                            <h3>Équipe Rouge</h3>
-                            <ul>
-                                {redTeamMembers.map(user => (
-                                    <li key={user.id}>{user.username}</li>
-                                ))}
-                            </ul>
-                            <button
-                                onClick={() => handleJoinTeam(selectedMatch.redTeamId, 'red')}
-                                className="btn-modern"
-                            >
-                                Rejoindre
-                            </button>
-                        </div>
-                        <div className="team-card blue-team">
-                            <h3>Équipe Bleue</h3>
-                            <ul>
-                                {blueTeamMembers.map(user => (
-                                    <li key={user.id}>{user.username}</li>
-                                ))}
-                            </ul>
-                            <button
-                                onClick={() => handleJoinTeam(selectedMatch.blueTeamId, 'blue')}
-                                className="btn-modern"
-                            >
-                                Rejoindre
-                            </button>
-                        </div>
-                    </div>
+                    <button onClick={handleLeaveTeam} className="btn-modern" style={{ marginTop: '1rem' }}>
+                        Quitter l'équipe
+                    </button>
                 )}
-                <button className="launch-button" style={{ marginTop: '2rem' }}>Lancer</button>
             </main>
         </div>
     );

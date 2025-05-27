@@ -26,7 +26,6 @@ const authenticateToken = (req: AuthenticatedRequest, res: Response, next: NextF
 };
 
 // Créer un match
-// @ts-ignore
 router.post('/create', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
     try {
         const redTeam = await prisma.team.create({ data: { name: 'Équipe Rouge' } });
@@ -58,11 +57,11 @@ router.get('/list', authenticateToken, async (req: AuthenticatedRequest, res: Re
             include: {
                 redTeam: true,
                 blueTeam: true,
-            }
+            },
         });
         return res.status(200).json({
             success: true,
-            matches
+            matches,
         });
     } catch (err) {
         console.error(err);
@@ -71,7 +70,6 @@ router.get('/list', authenticateToken, async (req: AuthenticatedRequest, res: Re
 });
 
 // Obtenir les membres des équipes d'un match
-// @ts-ignore
 router.get('/:matchId/teams', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
     const { matchId } = req.params;
     try {
@@ -79,8 +77,8 @@ router.get('/:matchId/teams', authenticateToken, async (req: AuthenticatedReques
             where: { id: matchId },
             include: {
                 redTeam: { include: { users: true } },
-                blueTeam: { include: { users: true } }
-            }
+                blueTeam: { include: { users: true } },
+            },
         });
         if (!match) {
             return res.status(404).json({ success: false, message: 'Match non trouvé' });
@@ -88,7 +86,7 @@ router.get('/:matchId/teams', authenticateToken, async (req: AuthenticatedReques
         return res.status(200).json({
             success: true,
             redTeam: match.redTeam,
-            blueTeam: match.blueTeam
+            blueTeam: match.blueTeam,
         });
     } catch (err) {
         console.error(err);
@@ -106,9 +104,19 @@ router.post('/join', authenticateToken, async (req: AuthenticatedRequest, res: R
     }
 
     try {
+        const match = await prisma.match.findUnique({
+            where: { id: matchId },
+        });
+
+        if (!match) {
+            return res.status(404).json({ success: false, message: 'Match non trouvé' });
+        }
+
+
+
         const user = await prisma.user.findUnique({
             where: { id: userId },
-            include: { team: true }
+            include: { team: true },
         });
 
         if (!user) {
@@ -121,13 +129,111 @@ router.post('/join', authenticateToken, async (req: AuthenticatedRequest, res: R
 
         await prisma.user.update({
             where: { id: userId },
-            data: { teamId }
+            data: { teamId },
         });
 
         return res.status(200).json({ success: true, message: 'Équipe rejointe avec succès' });
     } catch (err) {
         console.error(err);
         res.status(500).json({ success: false, message: 'Erreur lors de la jointure de l\'équipe' });
+    }
+});
+
+// Quitter une équipe
+router.post('/leave-team', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+    const userId = req.user?.userId;
+
+    if (!userId) {
+        return res.status(401).json({ success: false, message: 'Utilisateur non authentifié' });
+    }
+
+    try {
+        const user = await prisma.user.findUnique({
+            where: { id: userId },
+            include: { team: true },
+        });
+
+        if (!user) {
+            return res.status(404).json({ success: false, message: 'Utilisateur non trouvé' });
+        }
+
+        if (!user.teamId) {
+            return res.status(400).json({ success: false, message: 'Vous n\'êtes pas dans une équipe' });
+        }
+
+        const match = await prisma.match.findFirst({
+            where: {
+                OR: [
+                    { redTeamId: user.teamId },
+                    { blueTeamId: user.teamId },
+                ],
+            },
+        });
+
+
+        await prisma.user.update({
+            where: { id: userId },
+            data: { teamId: null },
+        });
+
+        return res.status(200).json({ success: true, message: 'Équipe quittée avec succès' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Erreur lors de la sortie de l\'équipe' });
+    }
+});
+
+// Supprimer un match
+router.delete('/:matchId', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+    const { matchId } = req.params;
+
+    try {
+        const match = await prisma.match.findUnique({
+            where: { id: matchId },
+            include: { redTeam: true, blueTeam: true },
+        });
+
+        if (!match) {
+            return res.status(404).json({ success: false, message: 'Match non trouvé' });
+        }
+
+
+        await prisma.user.updateMany({
+            where: { teamId: { in: [match.redTeamId, match.blueTeamId] } },
+            data: { teamId: null },
+        });
+
+        await prisma.team.deleteMany({
+            where: { id: { in: [match.redTeamId, match.blueTeamId] } },
+        });
+
+        await prisma.match.delete({
+            where: { id: matchId },
+        });
+
+        return res.status(200).json({ success: true, message: 'Match supprimé avec succès' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Erreur lors de la suppression du match' });
+    }
+});
+
+// Lancer un match
+router.post('/:matchId/start', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
+    const { matchId } = req.params;
+
+    try {
+        const match = await prisma.match.findUnique({
+            where: { id: matchId },
+        });
+
+        if (!match) {
+            return res.status(404).json({ success: false, message: 'Match non trouvé' });
+        }
+        return res.status(200).json({ success: true, message: 'Match lancé avec succès' });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Erreur lors du lancement du match' });
     }
 });
 
