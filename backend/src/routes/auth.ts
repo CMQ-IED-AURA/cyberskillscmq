@@ -11,11 +11,11 @@ const JWT_SECRET = process.env.JWT_SECRET || 'secretkey';
 // Route Inscription
 // @ts-ignore
 router.post('/register', async (req: Request, res: Response) => {
-  const { email, password, username } = req.body;
+  const { username, password,} = req.body;
 
   try {
     // Vérifier si email existe
-    const existingUserEmail = await prisma.user.findUnique({ where: { email } });
+    const existingUserEmail = await prisma.user.findUnique({ where: { username } });
     if (existingUserEmail) {
       return res.status(400).json({ success: false, message: 'Email déjà utilisé' });
     }
@@ -32,7 +32,6 @@ router.post('/register', async (req: Request, res: Response) => {
     // Créer utilisateur
     const newUser = await prisma.user.create({
       data: {
-        email,
         username,
         passwordHash,
       },
@@ -41,7 +40,7 @@ router.post('/register', async (req: Request, res: Response) => {
     return res.status(201).json({
       success: true,
       message: 'Inscription réussie',
-      user: { id: newUser.id, username: newUser.username, email: newUser.email },
+      user: { id: newUser.id, username: newUser.username },
     });
   } catch (error) {
     console.error(error);
@@ -52,10 +51,10 @@ router.post('/register', async (req: Request, res: Response) => {
 // Route Connexion
 // @ts-ignore
 router.post('/login', async (req: Request, res: Response) => {
-  const { email, password } = req.body;
+  const { username, password } = req.body;
 
   try {
-    const user = await prisma.user.findUnique({ where: { email } });
+    const user = await prisma.user.findUnique({ where: { username } });
     if (!user) {
       return res.status(401).json({ success: false, message: 'Identifiants invalides' });
     }
@@ -72,7 +71,7 @@ router.post('/login', async (req: Request, res: Response) => {
     return res.status(200).json({
       success: true,
       message: 'Authentification réussie',
-      user: { id: user.id, email: user.email, username: user.username },
+      user: { id: user.id,username: user.username },
       token,
     });
   } catch (error) {
