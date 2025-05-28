@@ -5,12 +5,11 @@ import io from 'socket.io-client';
 import { FaUser, FaStar, FaSignOutAlt } from 'react-icons/fa';
 import './styles.css';
 
-const socket = io('https://cyberskills.onrender.com', {
+const socket = io('wss://cyberskills.onrender.com', {
     reconnection: true,
     reconnectionAttempts: 5,
     reconnectionDelay: 1000,
-    transports: ['websocket', 'polling'],
-    withCredentials: true,
+    transports: ['websocket'], // Forcer WebSocket, éviter polling
 });
 
 function Game() {
@@ -19,10 +18,10 @@ function Game() {
     const [selectedMatch, setSelectedMatch] = useState(null);
     const [redTeamMembers, setRedTeamMembers] = useState([]);
     const [blueTeamMembers, setBlueTeamMembers] = useState([]);
+    const [users, setUsers] = useState([]);
     const [connectedUsers, setConnectedUsers] = useState([]);
     const [role, setRole] = useState(null);
     const [selectedMatchId, setSelectedMatchId] = useState('');
-    const [error, setError] = useState('');
 
     useEffect(() => {
         const token = Cookies.get('token');
@@ -31,39 +30,38 @@ function Game() {
             return;
         }
 
+        // Décoder le token pour obtenir le rôle
         try {
             const payload = token.split('.')[1];
+            if (!payload) throw new Error('Payload du token manquant');
             const decoded = JSON.parse(atob(payload));
             setRole(decoded.role);
+            console.log('Connexion Socket.IO avec token:', token.slice(0, 10) + '...');
             socket.emit('authenticate', token);
             if (decoded.role === 'ADMIN') {
-                socket.emit('join-admin', token);
+                socket.emit('join-admin');
+                fetchUsers();
             }
             fetchMatches();
-        } catch (err) {
-            console.error('Erreur décodage token:', err);
-            setError('Session invalide');
+        } catch (error) {
+            console.error('Erreur lors du décodage du token:', error);
             Cookies.remove('token');
             navigate('/login');
         }
 
+        // Écouter les mises à jour en temps réel
         socket.on('connect', () => {
             console.log('Connecté à Socket.IO');
         });
 
         socket.on('connect_error', (err) => {
-            console.error('Erreur connexion Socket.IO:', err.message);
-            setError('Erreur de connexion au serveur');
+            console.error('Erreur de connexion Socket.IO:', err.message);
         });
 
         socket.on('match-created', (match) => {
-            console.log('Match créé:', match.id);
+            console.log('Match créé reçu:', match.id);
             setMatches((prev) => [...prev, match]);
-            if (!selectedMatchId) {
-                setSelectedMatchId(match.id);
-                setSelectedMatch(match);
-                fetchTeamMembers(match.id);
-            }
+            if (!selectedMatchId) setSelectedMatchId(match.id);
         });
 
         socket.on('match-deleted', (matchId) => {
@@ -73,19 +71,19 @@ function Game() {
                 setSelectedMatch(null);
                 setRedTeamMembers([]);
                 setBlueTeamMembers([]);
-                setSelectedMatchId('');
             }
+            if (selectedMatchId === matchId) setSelectedMatchId('');
         });
 
         socket.on('match-updated', (updatedMatch) => {
-            console.log('Match mis à jour:', updatedMatch?.id);
+            console.log('Match mis à jour:', updatedMatch.id);
             setMatches((prev) =>
-                prev.map((m) => (m.id === updatedMatch?.id ? updatedMatch : m))
+                prev.map((m) => (m.id === updatedMatch.id ? updatedMatch : m))
             );
-            if (selectedMatch?.id === updatedMatch?.id) {
+            if (selectedMatch?.id === updatedMatch.id) {
                 setSelectedMatch(updatedMatch);
-                setRedTeamMembers(updatedMatch.redTeam?.users || []);
-                setBlueTeamMembers(updatedMatch.blueTeam?.users || []);
+                setRedTeamMembers(updatedMatch.redTeam.users || []);
+                setBlueTeamMembers(updatedMatch.blueTeam.users || []);
             }
         });
 
@@ -107,7 +105,7 @@ function Game() {
     const fetchMatches = async () => {
         try {
             const res = await fetch('https://cyberskills.onrender.com/match/list', {
-                headers: { Authorization: `Bearer ${Cookies.get('token')}` },
+                headers: { 'Authorization': `Bearer ${Cookies.get('token')}` },
             });
             const data = await res.json();
             if (data.success) {
@@ -118,29 +116,43 @@ function Game() {
                     fetchTeamMembers(data.matches[0].id);
                 }
             } else {
-                setError(data.error || 'Erreur récupération matchs');
+                console.error('Erreur serveur:', data.message);
             }
-        } catch (err) {
-            console.error('Erreur fetchMatches:', err);
-            setError('Erreur réseau');
+        } catch (error) {
+            console.error('Erreur lors de la récupération des matchs:', error);
         }
     };
 
     const fetchTeamMembers = async (matchId) => {
         try {
             const res = await fetch(`https://cyberskills.onrender.com/match/${matchId}/teams`, {
-                headers: { Authorization: `Bearer ${Cookies.get('token')}` },
+                headers: { 'Authorization': `Bearer ${Cookies.get('token')}` },
             });
             const data = await res.json();
             if (data.success) {
-                setRedTeamMembers(data.redTeam?.users || []);
-                setBlueTeamMembers(data.blueTeam?.users || []);
+                setRedTeamMembers(data.redTeam.users || []);
+                setBlueTeamMembers(data.blueTeam.users || []);
             } else {
-                setError(data.error || 'Erreur récupération équipes');
+                console.error('Erreur serveur:', data.message);
             }
-        } catch (err) {
-            console.error('Erreur fetchTeamMembers:', err);
-            setError('Erreur réseau');
+        } catch (error) {
+            console.error('Erreur lors de la récupération des membres:', error);
+        }
+    };
+
+    const fetchUsers = async () => {
+        try {
+            const res = await fetch('https://cyberskills.onrender.com/match/users', {
+                headers: { 'Authorization': `Bearer ${Cookies.get('token')}` },
+            });
+            const data = await res.json();
+            if (data.success) {
+                setUsers(data.users);
+            } else {
+                console.error('Erreur serveur:', data.message);
+            }
+        } catch (error) {
+            console.error('Erreur lors de la récupération des utilisateurs:', error);
         }
     };
 
@@ -150,39 +162,41 @@ function Game() {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    Authorization: `Bearer ${Cookies.get('token')}`,
+                    'Authorization': `Bearer ${Cookies.get('token')}`,
                 },
             });
             const data = await res.json();
             if (!data.success) {
-                setError(data.error || 'Erreur création match');
+                alert(data.message || 'Erreur lors de la création du match');
             }
-        } catch (err) {
-            console.error('Erreur handleCreateMatch:', err);
-            setError('Erreur réseau');
+        } catch (error) {
+            console.error('Erreur:', error);
+            alert('Erreur lors de la création du match');
         }
     };
 
-    const handleDeleteMatch = async (matchId, e) => {
-        e.stopPropagation();
+    const handleDeleteMatch = async (matchId) => {
         try {
             const res = await fetch(`https://cyberskills.onrender.com/match/${matchId}`, {
                 method: 'DELETE',
-                headers: { Authorization: `Bearer ${Cookies.get('token')}` },
+                headers: {
+                    'Authorization': `Bearer ${Cookies.get('token')}`,
+                },
             });
             const data = await res.json();
             if (!data.success) {
-                setError(data.error || 'Erreur suppression match');
+                console.error('Erreur serveur:', data.message, data.error);
+                alert(data.message || 'Erreur lors de la suppression du match');
             }
-        } catch (err) {
-            console.error('Erreur handleDeleteMatch:', err);
-            setError('Erreur réseau');
+        } catch (error) {
+            console.error('Erreur lors de la suppression du match:', error);
+            alert('Erreur lors de la suppression du match');
         }
     };
 
     const handleAssignTeam = async (userId, teamId) => {
         if (!selectedMatchId) {
-            setError('Veuillez sélectionner un match');
+            alert('Veuillez sélectionner un match');
             return;
         }
         try {
@@ -190,17 +204,17 @@ function Game() {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    Authorization: `Bearer ${Cookies.get('token')}`,
+                    'Authorization': `Bearer ${Cookies.get('token')}`,
                 },
                 body: JSON.stringify({ userId, teamId }),
             });
             const data = await res.json();
             if (!data.success) {
-                setError(data.error || 'Erreur assignation équipe');
+                alert(data.message || 'Erreur lors de l\'assignation de l\'équipe');
             }
-        } catch (err) {
-            console.error('Erreur handleAssignTeam:', err);
-            setError('Erreur réseau');
+        } catch (error) {
+            console.error('Erreur:', error);
+            alert('Erreur lors de l\'assignation de l\'équipe');
         }
     };
 
@@ -212,7 +226,7 @@ function Game() {
                     <button
                         onClick={() => {
                             Cookies.remove('token');
-                            navigate('/login');
+                            navigate('/');
                         }}
                         className="btn-modern"
                     >
@@ -220,7 +234,6 @@ function Game() {
                     </button>
                 </nav>
             </header>
-            {error && <div className="error-message">{error}</div>}
             <div className="main-container">
                 {role === 'ADMIN' && (
                     <aside className="sidebar">
@@ -230,18 +243,7 @@ function Game() {
                             <select
                                 id="match-select"
                                 value={selectedMatchId}
-                                onChange={(e) => {
-                                    setSelectedMatchId(e.target.value);
-                                    const match = matches.find((m) => m.id === e.target.value);
-                                    if (match) {
-                                        setSelectedMatch(match);
-                                        fetchTeamMembers(match.id);
-                                    } else {
-                                        setSelectedMatch(null);
-                                        setRedTeamMembers([]);
-                                        setBlueTeamMembers([]);
-                                    }
-                                }}
+                                onChange={(e) => setSelectedMatchId(e.target.value)}
                             >
                                 <option value="">Choisir un match</option>
                                 {matches.map((match) => (
@@ -255,21 +257,19 @@ function Game() {
                             {connectedUsers.length > 0 ? (
                                 connectedUsers.map((user) => (
                                     <div
-                                        key={user.userId}
+                                        key={`user-${user.userId}`}
                                         className={`connected-user-card ${user.role === 'ADMIN' ? 'admin-user' : ''}`}
                                     >
-                                        <div className="user-info">
-                                            <span className="user-icon">
-                                                {user.role === 'ADMIN' ? <FaStar /> : <FaUser />}
-                                            </span>
-                                            <span className="user-name">{user.username}</span>
-                                        </div>
+                                        <span className="user-icon">
+                                            {user.role === 'ADMIN' ? <FaStar /> : <FaUser />}
+                                        </span>
+                                        <span className="user-name">{user.username}</span>
                                         {selectedMatchId && (
                                             <div className="user-actions">
                                                 <button
                                                     onClick={() => {
                                                         const match = matches.find((m) => m.id === selectedMatchId);
-                                                        handleAssignTeam(user.userId, match?.redTeamId);
+                                                        handleAssignTeam(user.userId, match.redTeamId);
                                                     }}
                                                     className="btn-modern btn-accent btn-small"
                                                 >
@@ -278,7 +278,7 @@ function Game() {
                                                 <button
                                                     onClick={() => {
                                                         const match = matches.find((m) => m.id === selectedMatchId);
-                                                        handleAssignTeam(user.userId, match?.blueTeamId);
+                                                        handleAssignTeam(user.userId, match.blueTeamId);
                                                     }}
                                                     className="btn-modern btn-accent btn-small"
                                                 >
@@ -295,11 +295,11 @@ function Game() {
                                     </div>
                                 ))
                             ) : (
-                                <p>Aucun utilisateur connecté</p>
+                                <p>Aucun utilisateur connecté.</p>
                             )}
                         </div>
-                        <button onClick={handleCreateMatch} className="btn-modern">
-                            Créer un match
+                        <button onClick={handleCreateMatch} className="btn-modern" style={{ marginTop: '1rem' }}>
+                            Créer un nouveau match
                         </button>
                     </aside>
                 )}
@@ -313,7 +313,6 @@ function Game() {
                                     className={`match-card ${selectedMatch?.id === match.id ? 'matched' : ''}`}
                                     onClick={() => {
                                         setSelectedMatch(match);
-                                        setSelectedMatchId(match.id);
                                         fetchTeamMembers(match.id);
                                     }}
                                 >
@@ -321,7 +320,10 @@ function Game() {
                                         <h3>Match {match.id.slice(0, 8)}</h3>
                                         {role === 'ADMIN' && (
                                             <button
-                                                onClick={(e) => handleDeleteMatch(match.id, e)}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleDeleteMatch(match.id);
+                                                }}
                                                 className="btn-modern btn-delete"
                                             >
                                                 Supprimer
@@ -334,7 +336,7 @@ function Game() {
                                             <ul>
                                                 {selectedMatch?.id === match.id && redTeamMembers.length > 0 ? (
                                                     redTeamMembers.map((user) => (
-                                                        <li key={user.id}>{user.username}</li>
+                                                        <li key={user-${user.id}}>{user.username}</li>
                                                     ))
                                                 ) : (
                                                     <li>Aucun joueur</li>
@@ -346,7 +348,7 @@ function Game() {
                                             <ul>
                                                 {selectedMatch?.id === match.id && blueTeamMembers.length > 0 ? (
                                                     blueTeamMembers.map((user) => (
-                                                        <li key={user.id}>{user.username}</li>
+                                                        <li key={user-${user.id}}>{user.username}</li>
                                                     ))
                                                 ) : (
                                                     <li>Aucun joueur</li>
@@ -357,7 +359,7 @@ function Game() {
                                 </div>
                             ))
                         ) : (
-                            <p>Aucun match disponible</p>
+                            <p>Aucun match disponible.</p>
                         )}
                     </div>
                 </main>
