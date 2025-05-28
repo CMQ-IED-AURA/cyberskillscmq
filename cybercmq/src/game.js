@@ -28,9 +28,10 @@ function Game() {
             const decoded = JSON.parse(atob(payload));
             setRole(decoded.role);
 
-            // Initialize Socket.IO
+            // Initialize Socket.IO with error handling
             const newSocket = io('https://cyberskills.onrender.com', {
                 auth: { token },
+                transports: ['websocket', 'polling'], // Prefer WebSocket, fallback to polling
             });
             setSocket(newSocket);
 
@@ -42,21 +43,28 @@ function Game() {
 
             // Socket.IO event listeners
             newSocket.on('connect', () => {
-                console.log('Connected to WebSocket');
+                console.log('Connected to WebSocket:', newSocket.id);
                 newSocket.emit('authenticate', token);
             });
 
+            newSocket.on('connect_error', (error) => {
+                console.error('WebSocket connection error:', error.message);
+            });
+
             newSocket.on('connectedUsers', (connectedUsers) => {
+                console.log('Received connected users:', connectedUsers);
                 if (decoded.role === 'ADMIN') {
                     setUsers(connectedUsers);
                 }
             });
 
             newSocket.on('matchCreated', (newMatch) => {
+                console.log('New match created:', newMatch);
                 setMatches((prev) => [...prev, newMatch]);
             });
 
             newSocket.on('matchDeleted', (matchId) => {
+                console.log('Match deleted:', matchId);
                 setMatches((prev) => prev.filter((match) => match.id !== matchId));
                 if (selectedMatch?.id === matchId) {
                     setSelectedMatch(null);
@@ -66,6 +74,7 @@ function Game() {
             });
 
             newSocket.on('teamAssigned', ({ matchId, userId, teamId }) => {
+                console.log('Team assigned:', { matchId, userId, teamId });
                 if (selectedMatch?.id === matchId) {
                     fetchTeamMembers(matchId);
                 }
@@ -75,6 +84,7 @@ function Game() {
             });
 
             return () => {
+                console.log('Disconnecting WebSocket');
                 newSocket.disconnect();
             };
         } catch (error) {
