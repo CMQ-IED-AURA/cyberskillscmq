@@ -18,14 +18,17 @@ function Login() {
             });
             const data = await res.json();
             if (data.success) {
-                Cookies.set('token', data.token, { secure: true, sameSite: 'Strict' });
+                Cookies.set('token', data.token, {
+                    secure: process.env.NODE_ENV === 'production',
+                    sameSite: 'Strict'
+                });
                 navigate('/game');
             } else {
-                alert('Erreur lors de la connexion:' data.message || 'Erreur lors de la connexion');
+                alert(`Erreur lors de la connexion : ${data.message || 'Erreur inconnue'}`);
             }
         } catch (error) {
             console.error('Erreur:', error);
-            alert('Erreur lors de la connexion');
+            alert('Erreur lors de la connexion : Problème réseau ou serveur');
         }
     };
 
@@ -37,7 +40,7 @@ function Login() {
                     type="text"
                     placeholder="Nom d'utilisateur"
                     value={username}
-                    onChange={(e) => {setUsername(e.target.value)}}
+                    onChange={(e) => setUsername(e.target.value)}
                     required
                 />
                 <input
