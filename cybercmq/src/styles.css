@@ -1,4 +1,4 @@
-/* styles.css - Ajout d'un bandeau latéral style Twitch pour utilisateurs connectés */
+/* styles.css - Restauré à partir de ton original avec corrections et ajouts pour admin, formulaires, et liens */
 
 /* Couleurs principales */
 :root {
@@ -18,8 +18,6 @@
     --border-radius: 16px;
     --border-radius-large: 12px;
     --transition: all 0.3s ease;
-    --neon-purple: #9147ff; /* Couleur Twitch */
-    --sidebar-bg: rgba(21, 28, 58, 0.9);
 }
 
 * {
@@ -79,7 +77,7 @@ body::before {
     justify-content: space-between;
     align-items: center;
     flex-wrap: wrap;
-    border-bottom: 2px solid var(--neon-purple);
+    border-bottom: 1px solid rgba(97, 127, 153, 0.2);
     position: sticky;
     top: 0;
     z-index: 100;
@@ -88,8 +86,8 @@ body::before {
 .header h1 {
     margin: 0;
     font-size: clamp(1.8rem, 5vw, 2.5rem);
-    color: var(--neon-purple);
-    text-shadow: 0 0 15px var(--neon-purple);
+    color: var(--hover-glow);
+    text-shadow: 0 0 15px var(--hover-glow);
     letter-spacing: 0.1em;
     font-weight: 800;
 }
@@ -117,14 +115,11 @@ body::before {
     transition: var(--transition);
     position: relative;
     overflow: hidden;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
 }
 
 .btn-modern:hover {
-    background: linear-gradient(135deg, var(--neon-purple) 0%, #4056f7 100%);
-    box-shadow: 0 6px 25px rgba(145, 71, 255, 0.5);
+    background: linear-gradient(135deg, var(--hover-glow) 0%, #4056f7 100%);
+    box-shadow: 0 6px 25px rgba(138, 176, 255, 0.5);
     transform: translateY(-2px);
 }
 
@@ -161,121 +156,12 @@ body::before {
     box-shadow: 0 6px 25px rgba(138, 176, 255, 0.5);
 }
 
-.btn-small {
-    padding: 0.5rem 0.75rem;
-    font-size: 0.85rem;
-}
-
-/* Main container */
-.main-container {
-    display: flex;
-    flex: 1;
-    max-width: 1400px;
-    margin: 0 auto;
-    width: 100%;
-    padding: 2rem;
-    gap: 2rem;
-}
-
-/* Sidebar (style Twitch) */
-.sidebar {
-    width: 300px;
-    background: var(--sidebar-bg);
-    backdrop-filter: blur(10px);
-    border-radius: var(--border-radius-large);
-    padding: 1.5rem;
-    box-shadow: 0 4px 15px var(--shadow);
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-    height: fit-content;
-    animation: slideIn 0.5s ease-in;
-}
-
-.sidebar h2 {
-    color: var(--neon-purple);
-    text-shadow: 0 0 10px var(--neon-purple);
-    margin: 0 0 1rem;
-    font-size: 1.5rem;
-}
-
-.match-selector {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-}
-
-.match-selector label {
-    color: var(--text-light);
-    font-size: 0.95rem;
-}
-
-.match-selector select {
-    padding: 0.5rem;
-    border-radius: var(--border-radius);
-    background: var(--input-bg);
-    color: var(--text-light);
-    border: none;
-    font-size: 0.95rem;
-    cursor: pointer;
-}
-
-.match-selector select:focus {
-    outline: none;
-    border: 2px solid var(--neon-purple);
-}
-
-.connected-users {
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-}
-
-.connected-user-card {
-    background: var(--card-bg);
-    border-radius: var(--border-radius);
-    padding: 0.75rem;
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-    transition: var(--transition);
-}
-
-.connected-user-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 15px var(--shadow);
-}
-
-.connected-user-card.admin-user {
-    border-left: 4px solid var(--neon-purple);
-}
-
-.connected-user-card .user-icon {
-    color: var(--neon-blue);
-    font-size: 1.2rem;
-}
-
-.connected-user-card.admin-user .user-icon {
-    color: var(--neon-purple);
-}
-
-.connected-user-card .user-name {
-    color: var(--text-light);
-    font-size: 0.95rem;
-    font-weight: 500;
-}
-
-.user-actions {
-    display: flex;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-}
-
 /* Container principal */
 .container {
     flex: 1;
     padding: 2rem;
-    max-width: 1000px;
+    max-width: 1200px;
+    margin: 0 auto;
     width: 100%;
     position: relative;
     z-index: 1;
@@ -320,10 +206,28 @@ input::placeholder {
     opacity: 0.7;
 }
 
+.form-link {
+    margin: 0;
+    font-size: 0.9rem;
+    color: var(--text-dark);
+    text-align: center;
+}
+
+.form-link a {
+    color: var(--hover-glow);
+    text-decoration: none;
+    transition: var(--transition);
+}
+
+.form-link a:hover {
+    text-decoration: underline;
+    color: #4056f7;
+}
+
 /* Matches container */
 .matches-container {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    display: flex;
+    flex-direction: column;
     gap: 1.5rem;
 }
 
@@ -335,7 +239,6 @@ input::placeholder {
     box-shadow: 0 4px 15px var(--shadow);
     transition: var(--transition);
     cursor: pointer;
-    animation: fadeIn 0.5s ease-in;
 }
 
 .match-card:hover {
@@ -344,7 +247,7 @@ input::placeholder {
 }
 
 .match-card.matched {
-    border: 2px solid var(--neon-purple);
+    border: 2px solid var(--hover-glow);
 }
 
 .match-header {
@@ -362,14 +265,15 @@ input::placeholder {
 
 .teams {
     display: flex;
-    gap: 1rem;
+    gap: 1.5rem;
     flex-wrap: wrap;
-    justify-content: space-between;
+    justify-content: center;
 }
 
 .team-card {
     flex: 1;
-    min-width: 150px;
+    min-width: 200px;
+    max-width: 300px;
     padding: 1rem;
     border-radius: var(--border-radius);
     color: var(--text-light);
@@ -378,6 +282,7 @@ input::placeholder {
     align-items: center;
     box-shadow: 0 4px 15px var(--shadow);
     transition: var(--transition);
+    position: relative;
     backdrop-filter: blur(10px);
 }
 
@@ -408,29 +313,73 @@ input::placeholder {
     font-size: 0.9rem;
 }
 
-/* Animations */
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
+.match-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
 }
 
-@keyframes slideIn {
-    from { opacity: 0; transform: translateX(-20px); }
-    to { opacity: 1; transform: translateX(0); }
+/* Users container (admin) */
+.users-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.user-card {
+    background: var(--card-bg);
+    backdrop-filter: blur(10px);
+    border-radius: var(--border-radius);
+    padding: 1rem;
+    box-shadow: 0 4px 10px var(--shadow);
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.user-card p {
+    margin: 0;
+    font-size: 0.95rem;
+    color: var(--text-light);
+}
+
+.user-card div {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+/* Section hero pour la page d'accueil */
+.hero {
+    text-align: center;
+    padding: 4rem 1rem;
+}
+
+.hero h1 {
+    font-size: clamp(2.5rem, 6vw, 4rem);
+    color: var(--hover-glow);
+    text-shadow: 0 0 20px var(--hover-glow);
+    letter-spacing: 0.1em;
+    margin-bottom: 1rem;
+    font-weight: 900;
+}
+
+.hero p {
+    font-size: clamp(1rem, 3vw, 1.3rem);
+    color: var(--text-dark);
+    margin: 1.5rem 0;
+    line-height: 1.6;
+    max-width: 600px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.hero .btn-modern {
+    margin: 0 0.5rem;
 }
 
 /* Responsive Design */
-@media screen and (max-width: 1024px) {
-    .main-container {
-        flex-direction: column;
-    }
-
-    .sidebar {
-        width: 100%;
-        max-width: none;
-    }
-}
-
 @media screen and (max-width: 768px) {
     .header {
         flex-direction: column;
@@ -463,13 +412,17 @@ input::placeholder {
         padding: 1rem;
     }
 
+    .hero h1 {
+        font-size: clamp(2rem, 5vw, 2.5rem);
+    }
+
+    .hero p {
+        font-size: clamp(0.9rem, 2.5vw, 1.1rem);
+    }
+
     .btn-modern {
         font-size: 0.9rem;
         padding: 0.7rem 1rem;
-    }
-
-    .matches-container {
-        grid-template-columns: 1fr;
     }
 }
 
@@ -478,12 +431,13 @@ input::placeholder {
         font-size: clamp(1.4rem, 3.5vw, 1.8rem);
     }
 
-    .sidebar {
-        padding: 1rem;
+    .hero h1 {
+        font-size: clamp(1.8rem, 4.5vw, 2rem);
     }
 
-    .connected-user-card {
-        padding: 0.5rem;
+    form {
+        padding: 1.5rem;
+        margin: 1rem;
     }
 
     .team-card {
@@ -492,5 +446,9 @@ input::placeholder {
 
     .match-card {
         padding: 1rem;
+    }
+
+    .user-card {
+        padding: 0.8rem;
     }
 }
