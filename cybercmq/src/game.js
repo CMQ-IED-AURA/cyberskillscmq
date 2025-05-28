@@ -9,6 +9,8 @@ const socket = io('https://cyberskills.onrender.com', {
     reconnection: true,
     reconnectionAttempts: 5,
     reconnectionDelay: 1000,
+    transports: ['websocket', 'polling'],
+    withCredentials: true,
 });
 
 function Game() {
@@ -17,10 +19,10 @@ function Game() {
     const [selectedMatch, setSelectedMatch] = useState(null);
     const [redTeamMembers, setRedTeamMembers] = useState([]);
     const [blueTeamMembers, setBlueTeamMembers] = useState([]);
-    const [users, setUsers] = useState([]);
     const [connectedUsers, setConnectedUsers] = useState([]);
     const [role, setRole] = useState(null);
     const [selectedMatchId, setSelectedMatchId] = useState('');
+    const [error, setError] = useState('');
 
     useEffect(() => {
         const token = Cookies.get('token');
@@ -29,56 +31,72 @@ function Game() {
             return;
         }
 
-        // Décoder le token pour obtenir le rôle
         try {
             const payload = token.split('.')[1];
-            if (!payload) throw new Error('Payload du token manquant');
             const decoded = JSON.parse(atob(payload));
             setRole(decoded.role);
             socket.emit('authenticate', token);
             if (decoded.role === 'ADMIN') {
                 socket.emit('join-admin', token);
-                fetchUsers();
             }
             fetchMatches();
-        } catch (error) {
-            console.error('Erreur lors du décodage du token:', error);
+        } catch (err) {
+            console.error('Erreur décodage token:', err);
+            setError('Session invalide');
             Cookies.remove('token');
             navigate('/login');
         }
 
-        // Écouter les mises à jour en temps réel
+        socket.on('connect', () => {
+            console.log('Connecté à Socket.IO');
+        });
+
+        socket.on('connect_error', (err) => {
+            console.error('Erreur connexion Socket.IO:', err.message);
+            setError('Erreur de connexion au serveur');
+        });
+
         socket.on('match-created', (match) => {
+            console.log('Match créé:', match.id);
             setMatches((prev) => [...prev, match]);
-            if (!selectedMatchId) setSelectedMatchId(match.id);
+            if (!selectedMatchId) {
+                setSelectedMatchId(match.id);
+                setSelectedMatch(match);
+                fetchTeamMembers(match.id);
+            }
         });
 
         socket.on('match-deleted', (matchId) => {
+            console.log('Match supprimé:', matchId);
             setMatches((prev) => prev.filter((m) => m.id !== matchId));
             if (selectedMatch?.id === matchId) {
                 setSelectedMatch(null);
                 setRedTeamMembers([]);
                 setBlueTeamMembers([]);
+                setSelectedMatchId('');
             }
-            if (selectedMatchId === matchId) setSelectedMatchId('');
         });
 
         socket.on('match-updated', (updatedMatch) => {
+            console.log('Match mis à jour:', updatedMatch?.id);
             setMatches((prev) =>
-                prev.map((m) => (m.id === updatedMatch.id ? updatedMatch : m))
+                prev.map((m) => (m.id === updatedMatch?.id ? updatedMatch : m))
             );
-            if (selectedMatch?.id === updatedMatch.id) {
+            if (selectedMatch?.id === updatedMatch?.id) {
                 setSelectedMatch(updatedMatch);
-                setRedTeamMembers(updatedMatch.redTeam.users || []);
-                setBlueTeamMembers(updatedMatch.blueTeam.users || []);
+                setRedTeamMembers(updatedMatch.redTeam?.users || []);
+                setBlueTeamMembers(updatedMatch.blueTeam?.users || []);
             }
         });
 
         socket.on('connected-users', (users) => {
+            console.log('Utilisateurs connectés:', users);
             setConnectedUsers(users);
         });
 
         return () => {
+            socket.off('connect');
+            socket.off('connect_error');
             socket.off('match-created');
             socket.off('match-deleted');
             socket.off('match-updated');
@@ -89,7 +107,7 @@ function Game() {
     const fetchMatches = async () => {
         try {
             const res = await fetch('https://cyberskills.onrender.com/match/list', {
-                headers: { 'Authorization': `Bearer ${Cookies.get('token')}` },
+                headers: { Authorization: `Bearer ${Cookies.get('token')}` },
             });
             const data = await res.json();
             if (data.success) {
@@ -100,43 +118,29 @@ function Game() {
                     fetchTeamMembers(data.matches[0].id);
                 }
             } else {
-                console.error('Erreur serveur:', data.message);
+                setError(data.error || 'Erreur récupération matchs');
             }
-        } catch (error) {
-            console.error('Erreur lors de la récupération des matchs:', error);
+        } catch (err) {
+            console.error('Erreur fetchMatches:', err);
+            setError('Erreur réseau');
         }
     };
 
     const fetchTeamMembers = async (matchId) => {
         try {
             const res = await fetch(`https://cyberskills.onrender.com/match/${matchId}/teams`, {
-                headers: { 'Authorization': `Bearer ${Cookies.get('token')}` },
+                headers: { Authorization: `Bearer ${Cookies.get('token')}` },
             });
             const data = await res.json();
             if (data.success) {
-                setRedTeamMembers(data.redTeam.users || []);
-                setBlueTeamMembers(data.blueTeam.users || []);
+                setRedTeamMembers(data.redTeam?.users || []);
+                setBlueTeamMembers(data.blueTeam?.users || []);
             } else {
-                console.error('Erreur serveur:', data.message);
+                setError(data.error || 'Erreur récupération équipes');
             }
-        } catch (error) {
-            console.error('Erreur lors de la récupération des membres:', error);
-        }
-    };
-
-    const fetchUsers = async () => {
-        try {
-            const res = await fetch('https://cyberskills.onrender.com/match/users', {
-                headers: { 'Authorization': `Bearer ${Cookies.get('token')}` },
-            });
-            const data = await res.json();
-            if (data.success) {
-                setUsers(data.users);
-            } else {
-                console.error('Erreur serveur:', data.message);
-            }
-        } catch (error) {
-            console.error('Erreur lors de la récupération des utilisateurs:', error);
+        } catch (err) {
+            console.error('Erreur fetchTeamMembers:', err);
+            setError('Erreur réseau');
         }
     };
 
@@ -146,41 +150,39 @@ function Game() {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${Cookies.get('token')}`,
+                    Authorization: `Bearer ${Cookies.get('token')}`,
                 },
             });
             const data = await res.json();
             if (!data.success) {
-                alert(data.message || 'Erreur lors de la création du match');
+                setError(data.error || 'Erreur création match');
             }
-        } catch (error) {
-            console.error('Erreur:', error);
-            alert('Erreur lors de la création du match');
+        } catch (err) {
+            console.error('Erreur handleCreateMatch:', err);
+            setError('Erreur réseau');
         }
     };
 
-    const handleDeleteMatch = async (matchId) => {
+    const handleDeleteMatch = async (matchId, e) => {
+        e.stopPropagation();
         try {
             const res = await fetch(`https://cyberskills.onrender.com/match/${matchId}`, {
                 method: 'DELETE',
-                headers: {
-                    'Authorization': `Bearer ${Cookies.get('token')}`,
-                },
+                headers: { Authorization: `Bearer ${Cookies.get('token')}` },
             });
             const data = await res.json();
             if (!data.success) {
-                console.error('Erreur serveur:', data.message, data.error);
-                alert(data.message || 'Erreur lors de la suppression du match');
+                setError(data.error || 'Erreur suppression match');
             }
-        } catch (error) {
-            console.error('Erreur lors de la suppression du match:', error);
-            alert('Erreur lors de la suppression du match');
+        } catch (err) {
+            console.error('Erreur handleDeleteMatch:', err);
+            setError('Erreur réseau');
         }
     };
 
     const handleAssignTeam = async (userId, teamId) => {
         if (!selectedMatchId) {
-            alert('Veuillez sélectionner un match');
+            setError('Veuillez sélectionner un match');
             return;
         }
         try {
@@ -188,17 +190,17 @@ function Game() {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${Cookies.get('token')}`,
+                    Authorization: `Bearer ${Cookies.get('token')}`,
                 },
                 body: JSON.stringify({ userId, teamId }),
             });
             const data = await res.json();
             if (!data.success) {
-                alert(data.message || 'Erreur lors de l\'assignation de l\'équipe');
+                setError(data.error || 'Erreur assignation équipe');
             }
-        } catch (error) {
-            console.error('Erreur:', error);
-            alert('Erreur lors de l\'assignation de l\'équipe');
+        } catch (err) {
+            console.error('Erreur handleAssignTeam:', err);
+            setError('Erreur réseau');
         }
     };
 
@@ -210,7 +212,7 @@ function Game() {
                     <button
                         onClick={() => {
                             Cookies.remove('token');
-                            navigate('/');
+                            navigate('/login');
                         }}
                         className="btn-modern"
                     >
@@ -218,6 +220,7 @@ function Game() {
                     </button>
                 </nav>
             </header>
+            {error && <div className="error-message">{error}</div>}
             <div className="main-container">
                 {role === 'ADMIN' && (
                     <aside className="sidebar">
@@ -227,7 +230,18 @@ function Game() {
                             <select
                                 id="match-select"
                                 value={selectedMatchId}
-                                onChange={(e) => setSelectedMatchId(e.target.value)}
+                                onChange={(e) => {
+                                    setSelectedMatchId(e.target.value);
+                                    const match = matches.find((m) => m.id === e.target.value);
+                                    if (match) {
+                                        setSelectedMatch(match);
+                                        fetchTeamMembers(match.id);
+                                    } else {
+                                        setSelectedMatch(null);
+                                        setRedTeamMembers([]);
+                                        setBlueTeamMembers([]);
+                                    }
+                                }}
                             >
                                 <option value="">Choisir un match</option>
                                 {matches.map((match) => (
@@ -244,16 +258,18 @@ function Game() {
                                         key={user.userId}
                                         className={`connected-user-card ${user.role === 'ADMIN' ? 'admin-user' : ''}`}
                                     >
-                                        <span className="user-icon">
-                                            {user.role === 'ADMIN' ? <FaStar /> : <FaUser />}
-                                        </span>
-                                        <span className="user-name">{user.username}</span>
+                                        <div className="user-info">
+                                            <span className="user-icon">
+                                                {user.role === 'ADMIN' ? <FaStar /> : <FaUser />}
+                                            </span>
+                                            <span className="user-name">{user.username}</span>
+                                        </div>
                                         {selectedMatchId && (
                                             <div className="user-actions">
                                                 <button
                                                     onClick={() => {
                                                         const match = matches.find((m) => m.id === selectedMatchId);
-                                                        handleAssignTeam(user.userId, match.redTeamId);
+                                                        handleAssignTeam(user.userId, match?.redTeamId);
                                                     }}
                                                     className="btn-modern btn-accent btn-small"
                                                 >
@@ -262,7 +278,7 @@ function Game() {
                                                 <button
                                                     onClick={() => {
                                                         const match = matches.find((m) => m.id === selectedMatchId);
-                                                        handleAssignTeam(user.userId, match.blueTeamId);
+                                                        handleAssignTeam(user.userId, match?.blueTeamId);
                                                     }}
                                                     className="btn-modern btn-accent btn-small"
                                                 >
@@ -279,11 +295,11 @@ function Game() {
                                     </div>
                                 ))
                             ) : (
-                                <p>Aucun utilisateur connecté.</p>
+                                <p>Aucun utilisateur connecté</p>
                             )}
                         </div>
-                        <button onClick={handleCreateMatch} className="btn-modern" style={{ marginTop: '1rem' }}>
-                            Créer un nouveau match
+                        <button onClick={handleCreateMatch} className="btn-modern">
+                            Créer un match
                         </button>
                     </aside>
                 )}
@@ -297,6 +313,7 @@ function Game() {
                                     className={`match-card ${selectedMatch?.id === match.id ? 'matched' : ''}`}
                                     onClick={() => {
                                         setSelectedMatch(match);
+                                        setSelectedMatchId(match.id);
                                         fetchTeamMembers(match.id);
                                     }}
                                 >
@@ -304,10 +321,7 @@ function Game() {
                                         <h3>Match {match.id.slice(0, 8)}</h3>
                                         {role === 'ADMIN' && (
                                             <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    handleDeleteMatch(match.id);
-                                                }}
+                                                onClick={(e) => handleDeleteMatch(match.id, e)}
                                                 className="btn-modern btn-delete"
                                             >
                                                 Supprimer
@@ -331,7 +345,7 @@ function Game() {
                                             <h4>Équipe Bleue</h4>
                                             <ul>
                                                 {selectedMatch?.id === match.id && blueTeamMembers.length > 0 ? (
-                                                    redTeamMembers.map((user) => (
+                                                    blueTeamMembers.map((user) => (
                                                         <li key={user.id}>{user.username}</li>
                                                     ))
                                                 ) : (
@@ -343,7 +357,7 @@ function Game() {
                                 </div>
                             ))
                         ) : (
-                            <p>Aucun match disponible.</p>
+                            <p>Aucun match disponible</p>
                         )}
                     </div>
                 </main>
