@@ -1,0 +1,265 @@
+:root {
+    --primary-dark: #151857;
+    --primary-light: #617f99;
+    --accent-red: #cf3e3e;
+    --accent-blue: #3e70cf;
+    --background: #0f1326;
+    --text-light: #ffffff;
+    --text-dark: #d0d6f9;
+    --shadow: rgba(0, 0, 0, 0.3);
+    --neon-blue: #617f99;
+    --hover-glow: #8ab0ff;
+    --card-bg: rgba(32, 41, 79, 0.8);
+    --sidebar-bg: rgba(21, 28, 58, 0.9);
+    --border-radius: 16px;
+    --transition: all 0.3s ease;
+}
+
+.game-page {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background: linear-gradient(135deg, #0f1326 0%, #1a2051 100%);
+}
+
+.game-header {
+    background: rgba(15, 19, 38, 0.9);
+    backdrop-filter: blur(10px);
+    color: var(--text-light);
+    padding: 1rem 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid rgba(97, 127, 153, 0.2);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+.game-header h1 {
+    margin: 0;
+    font-size: clamp(1.8rem, 5vw, 2.5rem);
+    color: var(--hover-glow);
+    text-shadow: 0 0 15px var(--hover-glow);
+    font-weight: 800;
+}
+
+.game-container {
+    flex: 1;
+    padding: 2rem;
+    max-width: 1400px;
+    margin: 0 auto;
+    width: 100%;
+}
+
+.admin-panel {
+    display: flex;
+    gap: 2rem;
+}
+
+.sidebar {
+    width: 300px;
+    background: var(--sidebar-bg);
+    border-radius: var(--border-radius);
+    padding: 1.5rem;
+    box-shadow: 0 4px 15px var(--shadow);
+    height: fit-content;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+.sidebar h3 {
+    color: var(--text-light);
+    margin: 0 0 1rem;
+    font-size: 1.2rem;
+}
+
+.users-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.user-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    color: var(--text-light);
+}
+
+.user-status {
+    width: 10px;
+    height: 10px;
+    background: #4caf50;
+    border-radius: 50%;
+}
+
+.user-actions select {
+    background: var(--primary-dark);
+    color: var(--text-light);
+    border: 1px solid var(--primary-light);
+    border-radius: 8px;
+    padding: 0.5rem;
+    font-size: 0.9rem;
+    cursor: pointer;
+}
+
+.main-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.admin-controls {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.match-selector {
+    background: var(--primary-dark);
+    color: var(--text-light);
+    border: 1px solid var(--primary-light);
+    border-radius: 8px;
+    padding: 0.75rem;
+    font-size: 1rem;
+    cursor: pointer;
+}
+
+.matches-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1.5rem;
+}
+
+.match-card {
+    background: var(--card-bg);
+    backdrop-filter: blur(10px);
+    border-radius: var(--border-radius);
+    padding: 1.5rem;
+    box-shadow: 0 4px 15px var(--shadow);
+    transition: var(--transition);
+    cursor: pointer;
+}
+
+.match-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 25px var(--shadow);
+}
+
+.match-card.matched {
+    border: 2px solid var(--hover-glow);
+}
+
+.match-header h3 {
+    margin: 0;
+    font-size: clamp(1.2rem, 3vw, 1.5rem);
+    color: var(--text-light);
+}
+
+.teams {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.team-card {
+    flex: 1;
+    min-width: 150px;
+    padding: 1rem;
+    border-radius: var(--border-radius);
+    color: var(--text-light);
+    box-shadow: 0 4px 15px var(--shadow);
+}
+
+.team-card.red-team {
+    background: linear-gradient(135deg, var(--accent-red) 0%, #a03030 100%);
+}
+
+.team-card.blue-team {
+    background: linear-gradient(135deg, var(--accent-blue) 0%, #2a5cbf 100%);
+}
+
+.team-card h4 {
+    margin: 0 0 0.5rem;
+    font-size: 1.1rem;
+}
+
+.team-card ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    text-align: center;
+}
+
+.team-card li {
+    padding: 0.25rem 0;
+    font-size: 0.9rem;
+}
+
+.match-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    margin-top: 1rem;
+}
+
+.btn-modern {
+    background: linear-gradient(135deg, var(--primary-light) 0%, var(--primary-dark) 100%);
+    color: var(--text-light);
+    padding: 0.75rem 1.25rem;
+    border-radius: var(--border-radius);
+    cursor: pointer;
+    font-size: 0.95rem;
+    font-weight: 600;
+    border: none;
+    box-shadow: 0 4px 15px rgba(97, 127, 153, 0.3);
+    transition: var(--transition);
+}
+
+.btn-modern:hover {
+    background: linear-gradient(135deg, var(--hover-glow) 0%, #4056f7 100%);
+    box-shadow: 0 6px 25px rgba(138, 176, 255, 0.5);
+    transform: translateY(-2px);
+}
+
+.btn-delete {
+    background: linear-gradient(135deg, var(--accent-red) 0%, #a03030 100%);
+}
+
+.btn-delete:hover {
+    background: linear-gradient(135deg, #ff4444 0%, var(--accent-red) 100%);
+}
+
+@media screen and (max-width: 1024px) {
+    .admin-panel {
+        flex-direction: column;
+    }
+
+    .sidebar {
+        width: 100%;
+        max-height: 300px;
+    }
+}
+
+@media screen and (max-width: 768px) {
+    .game-header {
+        flex-direction: column;
+        gap: 1rem;
+        text-align: center;
+    }
+
+    .matches-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .team-card {
+        min-width: 100%;
+    }
+}

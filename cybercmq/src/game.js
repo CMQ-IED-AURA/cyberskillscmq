@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Cookies from 'js-cookie';
-import './styles.css';
+import io from 'socket.io-client';
+import './game.css';
 
 function Game() {
     const navigate = useNavigate();
@@ -11,6 +12,7 @@ function Game() {
     const [blueTeamMembers, setBlueTeamMembers] = useState([]);
     const [users, setUsers] = useState([]);
     const [role, setRole] = useState(null);
+    const [socket, setSocket] = useState(null);
 
     useEffect(() => {
         const token = Cookies.get('token');
@@ -25,10 +27,56 @@ function Game() {
             if (!payload) throw new Error('Payload du token manquant');
             const decoded = JSON.parse(atob(payload));
             setRole(decoded.role);
+
+            // Initialize Socket.IO
+            const newSocket = io('https://cyberskills.onrender.com', {
+                auth: { token },
+            });
+            setSocket(newSocket);
+
+            // Fetch initial data
             fetchMatches();
             if (decoded.role === 'ADMIN') {
                 fetchUsers();
             }
+
+            // Socket.IO event listeners
+            newSocket.on('connect', () => {
+                console.log('Connected to WebSocket');
+                newSocket.emit('authenticate', token);
+            });
+
+            newSocket.on('connectedUsers', (connectedUsers) => {
+                if (decoded.role === 'ADMIN') {
+                    setUsers(connectedUsers);
+                }
+            });
+
+            newSocket.on('matchCreated', (newMatch) => {
+                setMatches((prev) => [...prev, newMatch]);
+            });
+
+            newSocket.on('matchDeleted', (matchId) => {
+                setMatches((prev) => prev.filter((match) => match.id !== matchId));
+                if (selectedMatch?.id === matchId) {
+                    setSelectedMatch(null);
+                    setRedTeamMembers([]);
+                    setBlueTeamMembers([]);
+                }
+            });
+
+            newSocket.on('teamAssigned', ({ matchId, userId, teamId }) => {
+                if (selectedMatch?.id === matchId) {
+                    fetchTeamMembers(matchId);
+                }
+                if (decoded.role === 'ADMIN') {
+                    fetchUsers();
+                }
+            });
+
+            return () => {
+                newSocket.disconnect();
+            };
         } catch (error) {
             console.error('Erreur lors du décodage du token:', error);
             Cookies.remove('token');
@@ -98,9 +146,7 @@ function Game() {
                     'Authorization': `Bearer ${Cookies.get('token')}` },
             });
             const data = await res.json();
-            if (data.success) {
-                fetchMatches();
-            } else {
+            if (!data.success) {
                 alert(data.message || 'Erreur lors de la création du match');
             }
         } catch (error) {
@@ -117,12 +163,7 @@ function Game() {
                     'Authorization': `Bearer ${Cookies.get('token')}` },
             });
             const data = await res.json();
-            if (data.success) {
-                setSelectedMatch(null);
-                setRedTeamMembers([]);
-                setBlueTeamMembers([]);
-                fetchMatches();
-            } else {
+            if (!data.success) {
                 console.error('Erreur serveur:', data.message, data.error);
                 alert(data.message || 'Erreur lors de la suppression du match');
             }
@@ -133,19 +174,20 @@ function Game() {
     };
 
     const handleAssignTeam = async (userId, teamId) => {
+        if (!selectedMatch) {
+            alert('Veuillez sélectionner un match.');
+            return;
+        }
         try {
             const res = await fetch('https://cyberskills.onrender.com/match/assign-team', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${Cookies.get('token')}` },
-                body: JSON.stringify({ userId, teamId }),
+                body: JSON.stringify({ userId, teamId, matchId: selectedMatch.id }),
             });
             const data = await res.json();
-            if (data.success) {
-                fetchTeamMembers(selectedMatch.id);
-                fetchUsers();
-            } else {
+            if (!data.success) {
                 alert(data.message || 'Erreur lors de l\'assignation de l\'équipe');
             }
         } catch (error) {
@@ -155,8 +197,8 @@ function Game() {
     };
 
     return (
-        <div className="page">
-            <header className="header">
+        <div className="game-page">
+            <header className="game-header">
                 <h1>CyberSkills</h1>
                 <nav>
                     <button
@@ -170,113 +212,130 @@ function Game() {
                     </button>
                 </nav>
             </header>
-            <main className="container">
+            <main className="game-container">
                 {role === 'ADMIN' ? (
-                    <>
-                        <h2>Administration</h2>
-                        <button onClick={handleCreateMatch} className="btn-modern" style={{ marginBottom: '2rem' }}>
-                            Créer un nouveau match
-                        </button>
-                        <h3>Liste des utilisateurs</h3>
-                        <div className="users-container">
-                            {users.length > 0 ? (
-                                users.map((user) => (
-                                    <div key={user.id} className="user-card">
-                                        <p>{user.username} ({user.role})</p>
-                                        <p>Équipe actuelle: {user.teamId ? `ID ${user.teamId.slice(0, 8)}` : 'Aucune'}</p>
-                                        {selectedMatch && (
-                                            <div>
-                                                <button
-                                                    onClick={() => handleAssignTeam(user.id, selectedMatch.redTeamId)}
-                                                    className="btn-modern btn-accent"
+                    <div className="admin-panel">
+                        <div className="sidebar">
+                            <h3>Utilisateurs Connectés</h3>
+                            <div className="users-list">
+                                {users.length > 0 ? (
+                                    users.map((user) => (
+                                        <div key={user.id} className="user-item">
+                                            <span className="user-status"></span>
+                                            <span>{user.username}</span>
+                                            <div className="user-actions">
+                                                <select
+                                                    onChange={(e) => {
+                                                        const teamId = e.target.value ? e.target.value : null;
+                                                        handleAssignTeam(user.id, teamId);
+                                                    }}
+                                                    defaultValue=""
                                                 >
-                                                    Placer dans Équipe Rouge
-                                                </button>
+                                                    <option value="">Retirer de l'équipe</option>
+                                                    {selectedMatch && (
+                                                        <>
+                                                            <option value={selectedMatch.redTeamId}>Équipe Rouge</option>
+                                                            <option value={selectedMatch.blueTeamId}>Équipe Bleue</option>
+                                                        </>
+                                                    )}
+                                                </select>
+                                            </div>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <p>Aucun utilisateur connecté.</p>
+                                )}
+                            </div>
+                        </div>
+                        <div className="main-content">
+                            <h2>Administration</h2>
+                            <div className="admin-controls">
+                                <button onClick={handleCreateMatch} className="btn-modern">
+                                    Créer un nouveau match
+                                </button>
+                                <select
+                                    value={selectedMatch?.id || ''}
+                                    onChange={(e) => {
+                                        const match = matches.find((m) => m.id === e.target.value);
+                                        setSelectedMatch(match || null);
+                                        if (match) fetchTeamMembers(match.id);
+                                    }}
+                                    className="match-selector"
+                                >
+                                    <option value="">Sélectionner un match</option>
+                                    {matches.map((match) => (
+                                        <option key={match.id} value={match.id}>
+                                            Match {match.id.slice(0, 8)}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                            <h3>Liste des matchs</h3>
+                            <div className="matches-grid">
+                                {matches.length > 0 ? (
+                                    matches.map((match) => (
+                                        <div
+                                            key={match.id}
+                                            className={`match-card ${selectedMatch?.id === match.id ? 'matched' : ''}`}
+                                            onClick={() => {
+                                                setSelectedMatch(match);
+                                                fetchTeamMembers(match.id);
+                                            }}
+                                        >
+                                            <div className="match-header">
+                                                <h3>Match {match.id.slice(0, 8)}</h3>
+                                            </div>
+                                            <div className="teams">
+                                                <div className="team-card red-team">
+                                                    <h4>Équipe Rouge</h4>
+                                                    <ul>
+                                                        {selectedMatch?.id === match.id &&
+                                                        redTeamMembers.length > 0 ? (
+                                                            redTeamMembers.map((user) => (
+                                                                <li key={user.id}>{user.username}</li>
+                                                            ))
+                                                        ) : (
+                                                            <li>Aucun joueur</li>
+                                                        )}
+                                                    </ul>
+                                                </div>
+                                                <div className="team-card blue-team">
+                                                    <h4>Équipe Bleue</h4>
+                                                    <ul>
+                                                        {selectedMatch?.id === match.id &&
+                                                        blueTeamMembers.length > 0 ? (
+                                                            blueTeamMembers.map((user) => (
+                                                                <li key={user.id}>{user.username}</li>
+                                                            ))
+                                                        ) : (
+                                                            <li>Aucun joueur</li>
+                                                        )}
+                                                    </ul>
+                                                </div>
+                                            </div>
+                                            <div className="match-actions">
                                                 <button
-                                                    onClick={() => handleAssignTeam(user.id, selectedMatch.blueTeamId)}
-                                                    className="btn-modern btn-accent"
-                                                >
-                                                    Placer dans Équipe Bleue
-                                                </button>
-                                                <button
-                                                    onClick={() => handleAssignTeam(user.id, null)}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleDeleteMatch(match.id);
+                                                    }}
                                                     className="btn-modern btn-delete"
                                                 >
-                                                    Retirer de l'équipe
+                                                    Supprimer
                                                 </button>
                                             </div>
-                                        )}
-                                    </div>
-                                ))
-                            ) : (
-                                <p>Aucun utilisateur.</p>
-                            )}
+                                        </div>
+                                    ))
+                                ) : (
+                                    <p>Aucun match disponible.</p>
+                                )}
+                            </div>
                         </div>
-                        <h2>Liste des matchs</h2>
-                        <div className="matches-container">
-                            {matches.length > 0 ? (
-                                matches.map((match) => (
-                                    <div
-                                        key={match.id}
-                                        className={`match-card ${selectedMatch?.id === match.id ? 'matched' : ''}`}
-                                        onClick={() => {
-                                            setSelectedMatch(match);
-                                            fetchTeamMembers(match.id);
-                                        }}
-                                    >
-                                        <div className="match-header">
-                                            <h3>Match {match.id.slice(0, 8)}</h3>
-                                        </div>
-                                        <div className="teams">
-                                            <div className="team-card red-team">
-                                                <h4>Équipe Rouge</h4>
-                                                <ul>
-                                                    {selectedMatch?.id === match.id &&
-                                                    redTeamMembers.length > 0 ? (
-                                                        redTeamMembers.map((user) => (
-                                                            <li key={user.id}>{user.username}</li>
-                                                        ))
-                                                    ) : (
-                                                        <li>Aucun joueur</li>
-                                                    )}
-                                                </ul>
-                                            </div>
-                                            <div className="team-card blue-team">
-                                                <h4>Équipe Bleue</h4>
-                                                <ul>
-                                                    {selectedMatch?.id === match.id &&
-                                                    blueTeamMembers.length > 0 ? (
-                                                        blueTeamMembers.map((user) => (
-                                                            <li key={user.id}>{user.username}</li>
-                                                        ))
-                                                    ) : (
-                                                        <li>Aucun joueur</li>
-                                                    )}
-                                                </ul>
-                                            </div>
-                                        </div>
-                                        <div className="match-actions">
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    handleDeleteMatch(match.id);
-                                                }}
-                                                className="btn-modern btn-delete"
-                                            >
-                                                Supprimer
-                                            </button>
-                                        </div>
-                                    </div>
-                                ))
-                            ) : (
-                                <p>Aucun match disponible.</p>
-                            )}
-                        </div>
-                    </>
+                    </div>
                 ) : (
-                    <>
+                    <div className="user-panel">
                         <h2>Vos matchs</h2>
-                        <div className="matches-container">
+                        <div className="matches-grid">
                             {matches.length > 0 ? (
                                 matches.map((match) => (
                                     <div
@@ -324,7 +383,7 @@ function Game() {
                                 <p>Aucun match disponible.</p>
                             )}
                         </div>
-                    </>
+                    </div>
                 )}
             </main>
         </div>

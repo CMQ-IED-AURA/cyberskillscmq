@@ -1,16 +1,55 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { PrismaClient } from '@prisma/client';
 import jwt from 'jsonwebtoken';
+import { Server as SocketIOServer } from 'socket.io';
 
 // Interface pour typer req.user
 interface AuthenticatedRequest extends Request {
     user?: { userId: string; role: string };
 }
 
+// Map to track connected users
+const connectedUsers = new Map<string, { userId: string; username: string; socketId: string }>();
+
 const router = Router();
 const prisma = new PrismaClient();
 
 const JWT_SECRET = process.env.JWT_SECRET || 'secretkey';
+
+// Initialize Socket.IO
+export const setupSocket = (io: SocketIOServer) => {
+    io.on('connection', (socket) => {
+        console.log('User connected:', socket.id);
+
+        // Handle user authentication via WebSocket
+        socket.on('authenticate', async (token: string) => {
+            try {
+                const decoded = jwt.verify(token, JWT_SECRET) as { userId: string; username: string; role: string };
+                connectedUsers.set(decoded.userId, {
+                    userId: decoded.userId,
+                    username: decoded.username,
+                    socketId: socket.id,
+                });
+                // Broadcast updated connected users to admins
+                io.emit('connectedUsers', Array.from(connectedUsers.values()));
+            } catch (err) {
+                console.error('Socket authentication failed:', err);
+                socket.disconnect();
+            }
+        });
+
+        socket.on('disconnect', () => {
+            console.log('User disconnected:', socket.id);
+            for (const [userId, user] of connectedUsers) {
+                if (user.socketId === socket.id) {
+                    connectedUsers.delete(userId);
+                    io.emit('connectedUsers', Array.from(connectedUsers.values()));
+                    break;
+                }
+            }
+        });
+    });
+};
 
 // Middleware pour vérifier le token
 const authenticateToken = (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
@@ -53,6 +92,9 @@ router.post('/create', authenticateToken, requireAdmin, async (req: Authenticate
                 blueTeamId: blueTeam.id,
             },
         });
+
+        // Notify all clients of new match
+        req.app.get('io').emit('matchCreated', match);
 
         return res.status(201).json({
             success: true,
@@ -110,18 +152,13 @@ router.get('/:matchId/teams', authenticateToken, async (req: AuthenticatedReques
     }
 });
 
-// Lister les utilisateurs (admin uniquement)
+// Lister les utilisateurs connectés (admin uniquement)
 router.get('/users', authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
     try {
-        const users = await prisma.user.findMany({
-            select: {
-                id: true,
-                username: true,
-                role: true,
-                teamId: true,
-                createdAt: true,
-            },
-        });
+        const users = Array.from(connectedUsers.values()).map((user) => ({
+            id: user.userId,
+            username: user.username,
+        }));
         return res.status(200).json({
             success: true,
             users,
@@ -132,9 +169,9 @@ router.get('/users', authenticateToken, requireAdmin, async (req: AuthenticatedR
     }
 });
 
-// Placer/déplacer un utilisateur dans une équipe (admin uniquement)
+// Placer/déplacer un utilisateur dans une équipe pour un match spécifique (admin uniquement)
 router.post('/assign-team', authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
-    const { userId, teamId } = req.body;
+    const { userId, teamId, matchId } = req.body;
 
     try {
         const user = await prisma.user.findUnique({ where: { id: userId } });
@@ -147,10 +184,18 @@ router.post('/assign-team', authenticateToken, requireAdmin, async (req: Authent
             return res.status(404).json({ success: false, message: 'Équipe non trouvée' });
         }
 
+        const match = matchId ? await prisma.match.findUnique({ where: { id: matchId } }) : null;
+        if (teamId && !match) {
+            return res.status(404).json({ success: false, message: 'Match non trouvé' });
+        }
+
         await prisma.user.update({
             where: { id: userId },
             data: { teamId },
         });
+
+        // Notify all clients of team assignment
+        req.app.get('io').emit('teamAssigned', { matchId, userId, teamId });
 
         return res.status(200).json({ success: true, message: 'Utilisateur assigné à l\'équipe avec succès' });
     } catch (err: any) {
@@ -200,6 +245,9 @@ router.delete('/:matchId', authenticateToken, requireAdmin, async (req: Authenti
         await prisma.match.delete({
             where: { id: matchId },
         });
+
+        // Notify all clients of match deletion
+        req.app.get('io').emit('matchDeleted', matchId);
 
         return res.status(200).json({ success: true, message: 'Match supprimé avec succès' });
     } catch (err: any) {
