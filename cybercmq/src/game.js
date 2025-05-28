@@ -5,11 +5,10 @@ import io from 'socket.io-client';
 import { FaUser, FaStar, FaSignOutAlt } from 'react-icons/fa';
 import './styles.css';
 
-const socket = io('wss://cyberskills.onrender.com', {
+const socket = io('https://cyberskills.onrender.com', {
     reconnection: true,
     reconnectionAttempts: 5,
     reconnectionDelay: 1000,
-    transports: ['websocket'], // Forcer WebSocket, éviter polling
 });
 
 function Game() {
@@ -36,10 +35,9 @@ function Game() {
             if (!payload) throw new Error('Payload du token manquant');
             const decoded = JSON.parse(atob(payload));
             setRole(decoded.role);
-            console.log('Connexion Socket.IO avec token:', token.slice(0, 10) + '...');
             socket.emit('authenticate', token);
             if (decoded.role === 'ADMIN') {
-                socket.emit('join-admin');
+                socket.emit('join-admin', token);
                 fetchUsers();
             }
             fetchMatches();
@@ -50,22 +48,12 @@ function Game() {
         }
 
         // Écouter les mises à jour en temps réel
-        socket.on('connect', () => {
-            console.log('Connecté à Socket.IO');
-        });
-
-        socket.on('connect_error', (err) => {
-            console.error('Erreur de connexion Socket.IO:', err.message);
-        });
-
         socket.on('match-created', (match) => {
-            console.log('Match créé reçu:', match.id);
             setMatches((prev) => [...prev, match]);
             if (!selectedMatchId) setSelectedMatchId(match.id);
         });
 
         socket.on('match-deleted', (matchId) => {
-            console.log('Match supprimé:', matchId);
             setMatches((prev) => prev.filter((m) => m.id !== matchId));
             if (selectedMatch?.id === matchId) {
                 setSelectedMatch(null);
@@ -76,7 +64,6 @@ function Game() {
         });
 
         socket.on('match-updated', (updatedMatch) => {
-            console.log('Match mis à jour:', updatedMatch.id);
             setMatches((prev) =>
                 prev.map((m) => (m.id === updatedMatch.id ? updatedMatch : m))
             );
@@ -88,13 +75,10 @@ function Game() {
         });
 
         socket.on('connected-users', (users) => {
-            console.log('Utilisateurs connectés:', users);
             setConnectedUsers(users);
         });
 
         return () => {
-            socket.off('connect');
-            socket.off('connect_error');
             socket.off('match-created');
             socket.off('match-deleted');
             socket.off('match-updated');
@@ -257,7 +241,7 @@ function Game() {
                             {connectedUsers.length > 0 ? (
                                 connectedUsers.map((user) => (
                                     <div
-                                        key={`user-${user.userId}`}
+                                        key={user.userId}
                                         className={`connected-user-card ${user.role === 'ADMIN' ? 'admin-user' : ''}`}
                                     >
                                         <span className="user-icon">
@@ -336,7 +320,7 @@ function Game() {
                                             <ul>
                                                 {selectedMatch?.id === match.id && redTeamMembers.length > 0 ? (
                                                     redTeamMembers.map((user) => (
-                                                        <li key={user-${user.id}}>{user.username}</li>
+                                                        <li key={user.id}>{user.username}</li>
                                                     ))
                                                 ) : (
                                                     <li>Aucun joueur</li>
@@ -347,8 +331,8 @@ function Game() {
                                             <h4>Équipe Bleue</h4>
                                             <ul>
                                                 {selectedMatch?.id === match.id && blueTeamMembers.length > 0 ? (
-                                                    blueTeamMembers.map((user) => (
-                                                        <li key={user-${user.id}}>{user.username}</li>
+                                                    redTeamMembers.map((user) => (
+                                                        <li key={user.id}>{user.username}</li>
                                                     ))
                                                 ) : (
                                                     <li>Aucun joueur</li>
