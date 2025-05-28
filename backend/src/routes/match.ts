@@ -3,12 +3,10 @@ import { PrismaClient } from '@prisma/client';
 import jwt from 'jsonwebtoken';
 import { Server as SocketIOServer } from 'socket.io';
 
-// Interface pour typer req.user
 interface AuthenticatedRequest extends Request {
     user?: { userId: string; role: string; username: string };
 }
 
-// Map to track connected users
 const connectedUsers = new Map<string, { userId: string; username: string; socketId: string }>();
 
 const router = Router();
@@ -16,12 +14,10 @@ const prisma = new PrismaClient();
 
 const JWT_SECRET = process.env.JWT_SECRET || 'secretkey';
 
-// Initialize Socket.IO
 export const setupSocket = (io: SocketIOServer) => {
     io.on('connection', (socket) => {
         console.log('User connected:', socket.id);
 
-        // Handle user authentication via WebSocket
         socket.on('authenticate', async (token: string) => {
             try {
                 const decoded = jwt.verify(token, JWT_SECRET) as { userId: string; username: string; role: string };
@@ -30,7 +26,6 @@ export const setupSocket = (io: SocketIOServer) => {
                     username: decoded.username,
                     socketId: socket.id,
                 });
-                // Broadcast updated connected users to admins
                 io.emit('connectedUsers', Array.from(connectedUsers.values()));
             } catch (err) {
                 console.error('Socket authentication failed:', err);
@@ -51,7 +46,6 @@ export const setupSocket = (io: SocketIOServer) => {
     });
 };
 
-// Middleware pour vérifier le token
 const authenticateToken = (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
@@ -62,7 +56,7 @@ const authenticateToken = (req: AuthenticatedRequest, res: Response, next: NextF
 
     jwt.verify(token, JWT_SECRET, (err: any, user: any) => {
         if (err) {
-            console.error('Erreur de vérification du token:', err.message, err.stack);
+            console.error('Token verification error:', err.message);
             res.status(403).json({ success: false, message: 'Token invalide' });
             return;
         }
@@ -71,7 +65,6 @@ const authenticateToken = (req: AuthenticatedRequest, res: Response, next: NextF
     });
 };
 
-// Middleware pour vérifier le rôle admin
 const requireAdmin = (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
     if (req.user?.role !== 'ADMIN') {
         res.status(403).json({ success: false, message: 'Accès réservé aux administrateurs' });
@@ -80,8 +73,6 @@ const requireAdmin = (req: AuthenticatedRequest, res: Response, next: NextFuncti
     next();
 };
 
-// Créer un match (admin uniquement)
-// @ts-ignore
 router.post('/create', authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
     try {
         const redTeam = await prisma.team.create({ data: { name: 'Équipe Rouge' } });
@@ -94,7 +85,6 @@ router.post('/create', authenticateToken, requireAdmin, async (req: Authenticate
             },
         });
 
-        // Notify all clients of new match
         req.app.get('io').emit('matchCreated', match);
 
         return res.status(201).json({
@@ -104,13 +94,11 @@ router.post('/create', authenticateToken, requireAdmin, async (req: Authenticate
             blueTeamId: blueTeam.id,
         });
     } catch (err: any) {
-        console.error('Erreur lors de la création du match:', err.message, err.stack);
+        console.error('Error creating match:', err.message);
         res.status(500).json({ success: false, message: 'Erreur lors de la création du match', error: err.message });
     }
 });
 
-// Liste des matchs
-// @ts-ignore
 router.get('/list', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
     try {
         const matches = await prisma.match.findMany({
@@ -124,13 +112,11 @@ router.get('/list', authenticateToken, async (req: AuthenticatedRequest, res: Re
             matches,
         });
     } catch (err: any) {
-        console.error('Erreur lors de la récupération des matchs:', err.message, err.stack);
+        console.error('Error fetching matches:', err.message);
         res.status(500).json({ success: false, message: 'Erreur lors de la récupération des matchs', error: err.message });
     }
 });
 
-// Obtenir les membres des équipes d'un match
-// @ts-ignore
 router.get('/:matchId/teams', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
     const { matchId } = req.params;
     try {
@@ -150,49 +136,42 @@ router.get('/:matchId/teams', authenticateToken, async (req: AuthenticatedReques
             blueTeam: match.blueTeam,
         });
     } catch (err: any) {
-        console.error('Erreur lors de la récupération des équipes:', err.message, err.stack);
+        console.error('Error fetching teams:', err.message);
         res.status(500).json({ success: false, message: 'Erreur lors de la récupération des équipes', error: err.message });
     }
 });
 
-// Lister les utilisateurs connectés (admin uniquement)
-// @ts-ignore
 router.get('/users', authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
     try {
         const users = Array.from(connectedUsers.values()).map((user) => ({
             id: user.userId,
-            username: user.username,
+            username: user.username || 'Unknown',
         }));
         return res.status(200).json({
             success: true,
             users,
         });
     } catch (err: any) {
-        console.error('Erreur lors de la récupération des utilisateurs:', err.message, err.stack);
+        console.error('Error fetching users:', err.message);
         res.status(500).json({ success: false, message: 'Erreur lors de la récupération des utilisateurs', error: err.message });
     }
 });
 
-// Placer/déplacer un utilisateur dans une équipe pour un match spécifique (admin uniquement)
-// @ts-ignore
 router.post('/assign-team', authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
     const { userId, teamId, matchId } = req.body;
 
-    console.log('Assign team request:', { userId, teamId, matchId }); // Debug log
+    console.log('Assign team request:', { userId, teamId, matchId });
 
     try {
-        // Validate request body
         if (!userId || !matchId) {
             return res.status(400).json({ success: false, message: 'userId et matchId sont requis' });
         }
 
-        // Check if user exists
         const user = await prisma.user.findUnique({ where: { id: userId } });
         if (!user) {
             return res.status(404).json({ success: false, message: 'Utilisateur non trouvé' });
         }
 
-        // Check if match exists
         const match = await prisma.match.findUnique({
             where: { id: matchId },
             include: { redTeam: true, blueTeam: true },
@@ -201,84 +180,63 @@ router.post('/assign-team', authenticateToken, requireAdmin, async (req: Authent
             return res.status(404).json({ success: false, message: 'Match non trouvé' });
         }
 
-        // Validate teamId
-        if (teamId) {
-            if (teamId !== match.redTeamId && teamId !== match.blueTeamId) {
-                return res.status(400).json({ success: false, message: 'teamId ne correspond pas au match spécifié' });
-            }
-            const team = await prisma.team.findUnique({ where: { id: teamId } });
-            if (!team) {
-                return res.status(404).json({ success: false, message: 'Équipe non trouvée' });
-            }
+        if (teamId && teamId !== match.redTeamId && teamId !== match.blueTeamId) {
+            return res.status(400).json({ success: false, message: 'teamId ne correspond pas au match' });
         }
 
-        // Update user's team
         await prisma.user.update({
             where: { id: userId },
             data: { teamId },
         });
 
-        // Notify all clients of team assignment
         req.app.get('io').emit('teamAssigned', { matchId, userId, teamId, username: user.username });
 
-        return res.status(200).json({ success: true, message: 'Utilisateur assigné à l\'équipe avec succès' });
+        return res.status(200).json({ success: true, message: 'Utilisateur assigné avec succès' });
     } catch (err: any) {
-        console.error('Erreur lors de l\'assignation de l\'équipe:', err.message, err.stack);
+        console.error('Error assigning team:', err.message, err.stack);
         res.status(500).json({ success: false, message: 'Erreur lors de l\'assignation de l\'équipe', error: err.message });
     }
 });
 
-// Rejoindre une équipe (désactivé pour les utilisateurs standards)
-// @ts-ignore
 router.post('/join', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
     return res.status(403).json({ success: false, message: 'Les utilisateurs ne peuvent pas rejoindre une équipe eux-mêmes' });
 });
 
-// Quitter une équipe (désactivé pour les utilisateurs standards)
-// @ts-ignore
 router.post('/leave-team', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
     return res.status(403).json({ success: false, message: 'Les utilisateurs ne peuvent pas quitter une équipe eux-mêmes' });
 });
 
-// Supprimer un match (admin uniquement)
-// @ts-ignore
 router.delete('/:matchId', authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
     const { matchId } = req.params;
 
     try {
-        console.log(`Tentative de suppression du match ID: ${matchId}`);
         const match = await prisma.match.findUnique({
             where: { id: matchId },
             include: { redTeam: true, blueTeam: true },
         });
 
         if (!match) {
-            console.log(`Match ID: ${matchId} non trouvé`);
             return res.status(404).json({ success: false, message: 'Match non trouvé' });
         }
 
-        console.log(`Dissociation des utilisateurs pour les équipes: ${match.redTeamId}, ${match.blueTeamId}`);
         await prisma.user.updateMany({
             where: { teamId: { in: [match.redTeamId, match.blueTeamId] } },
             data: { teamId: null },
         });
 
-        console.log(`Suppression des équipes: ${match.redTeamId}, ${match.blueTeamId}`);
         await prisma.team.deleteMany({
             where: { id: { in: [match.redTeamId, match.blueTeamId] } },
         });
 
-        console.log(`Suppression du match: ${matchId}`);
         await prisma.match.delete({
             where: { id: matchId },
         });
 
-        // Notify all clients of match deletion
         req.app.get('io').emit('matchDeleted', matchId);
 
         return res.status(200).json({ success: true, message: 'Match supprimé avec succès' });
     } catch (err: any) {
-        console.error('Erreur lors de la suppression du match:', err.message, err.stack);
+        console.error('Error deleting match:', err.message);
         res.status(500).json({ success: false, message: 'Erreur lors de la suppression du match', error: err.message });
     }
 });
