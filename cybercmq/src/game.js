@@ -16,15 +16,17 @@ function Game() {
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
+        const allCookies = Cookies.get();
+        console.log('Cookies disponibles au chargement:', allCookies);
         const token = Cookies.get('tokenId');
         if (!token) {
-            console.error('Aucun token trouvé, redirection vers login.');
+            console.error('Aucun token trouvé, redirection vers login. Cookies:', allCookies);
             navigate('/login');
             return;
         }
 
         try {
-            const payload = token.split('.')['1'];
+            const payload = token.split('.')[1];
             if (!payload) throw new Error('Payload du token manquant.');
             const decoded = JSON.parse(atob(payload));
             const exp = decoded.exp * 1000;
@@ -89,11 +91,10 @@ function Game() {
 
             newSocket.on('teamAssigned', ({ affectedMatchIds }) => {
                 console.log('Équipe assignée, matchs affectés:', affectedMatchIds);
-                // Mettre à jour tous les matchs affectés
                 affectedMatchIds.forEach((matchId) => {
                     setTeamMembersByMatch((prev) => ({
                         ...prev,
-                        [matchId]: { redTeam: [], blueTeam: [] }, // Vider avant rechargement
+                        [matchId]: { redTeam: [], blueTeam: [] },
                     }));
                     fetchTeamMembers(matchId, token);
                 });
@@ -122,17 +123,17 @@ function Game() {
             });
             const data = await res.json();
             if (data.success) {
-                setMatches(data.matches || []);
-                console.log('Matchs récupérés:', data.matches);
-                for (const match of data.matches) {
+                setMatches(data.data || []);
+                console.log('Matchs récupérés:', data.data);
+                for (const match of data.data) {
                     await fetchTeamMembers(match.id, token);
                 }
-                if (data.matches.length > 0 && !selectedMatch) {
-                    setSelectedMatch(data.matches[0]);
+                if (data.data.length > 0 && !selectedMatch) {
+                    setSelectedMatch(data.data[0]);
                 }
             } else {
-                console.error('Erreur serveur:', data.message);
-                setError(data.message || 'Erreur lors de la récupération des matchs');
+                console.error('Erreur serveur:', data.error);
+                setError(data.error || 'Erreur lors de la récupération des matchs');
             }
         } catch (error) {
             console.error('Erreur lors de la récupération des matchs:', error);
@@ -156,17 +157,17 @@ function Game() {
                 setTeamMembersByMatch((prev) => ({
                     ...prev,
                     [matchId]: {
-                        redTeam: data.redTeam?.users || [],
-                        blueTeam: data.blueTeam?.users || [],
+                        redTeam: data.data.redTeam?.users || [],
+                        blueTeam: data.data.blueTeam?.users || [],
                     },
                 }));
                 console.log('Membres des équipes récupérés pour match:', matchId, {
-                    redTeam: data.redTeam?.users,
-                    blueTeam: data.blueTeam?.users,
+                    redTeam: data.data.redTeam?.users,
+                    blueTeam: data.data.blueTeam?.users,
                 });
             } else {
-                console.error('Erreur serveur:', data.message);
-                setError(data.message || 'Erreur lors de la récupération des membres');
+                console.error('Erreur serveur:', data.error);
+                setError(data.error || 'Erreur lors de la récupération des membres');
             }
         } catch (error) {
             console.error('Erreur lors de la récupération des membres pour match:', matchId, error);
@@ -182,11 +183,11 @@ function Game() {
             });
             const data = await res.json();
             if (data.success) {
-                console.log('Utilisateurs récupérés via API:', data.users);
-                setUsers(data.users || []);
+                console.log('Utilisateurs récupérés via API:', data.data);
+                setUsers(data.data || []);
             } else {
-                console.error('Erreur serveur:', data.message);
-                setError(data.message || 'Erreur lors de la récupération des utilisateurs');
+                console.error('Erreur serveur:', data.error);
+                setError(data.error || 'Erreur lors de la récupération des utilisateurs');
             }
         } catch (error) {
             console.error('Erreur lors de la récupération des utilisateurs:', error);
@@ -209,11 +210,11 @@ function Game() {
             });
             const data = await res.json();
             if (!data.success) {
-                console.error('Erreur serveur:', data.message);
-                setError(data.message || 'Erreur lors de la création du match');
+                console.error('Erreur serveur:', data.error);
+                setError(data.error || 'Erreur lors de la création du match');
             } else {
                 setError(null);
-                console.log('Match créé avec succès:', data.matchId);
+                console.log('Match créé avec succès:', data.data.matchId);
             }
         } catch (error) {
             console.error('Erreur lors de la création du match:', error);
@@ -240,8 +241,8 @@ function Game() {
             });
             const data = await res.json();
             if (!data.success) {
-                console.error('Erreur serveur:', data.message);
-                setError(data.message || 'Erreur lors de la suppression du match');
+                console.error('Erreur serveur:', data.error);
+                setError(data.error || 'Erreur lors de la suppression du match');
             } else {
                 setError(null);
                 console.log('Match supprimé avec succès:', matchId);
@@ -278,8 +279,8 @@ function Game() {
             });
             const data = await res.json();
             if (!data.success) {
-                console.error('Erreur d\'assignation d\'équipe:', data.message);
-                setError(data.message || 'Erreur lors de l\'assignation de l\'équipe');
+                console.error('Erreur d\'assignation d\'équipe:', data.error);
+                setError(data.error || 'Erreur lors de l\'assignation de l\'équipe');
             } else {
                 setError(null);
                 console.log('Utilisateur assigné avec succès:', { userId, teamId });
@@ -318,12 +319,12 @@ function Game() {
                             <div className="users-list">
                                 {users.length > 0 ? (
                                     users.map((user) => (
-                                        <div key={user.userId || user.id} className="user-item">
+                                        <div key={user.id} className="user-item">
                                             <span className="user-status"></span>
                                             <span className="user-username">{user.username || 'Inconnu'}</span>
                                             <div className="user-actions">
                                                 <button
-                                                    onClick={() => handleAssignTeam(user.userId || user.id, selectedMatch?.redTeamId)}
+                                                    onClick={() => handleAssignTeam(user.id, selectedMatch?.redTeamId)}
                                                     disabled={!selectedMatch || loading}
                                                     className="btn-modern btn-red"
                                                     title="Assigner à l'équipe Rouge"
@@ -331,7 +332,7 @@ function Game() {
                                                     Assigner Rouge
                                                 </button>
                                                 <button
-                                                    onClick={() => handleAssignTeam(user.userId || user.id, selectedMatch?.blueTeamId)}
+                                                    onClick={() => handleAssignTeam(user.id, selectedMatch?.blueTeamId)}
                                                     disabled={!selectedMatch || loading}
                                                     className="btn-modern btn-blue"
                                                     title="Assigner à l'équipe Bleue"
@@ -339,7 +340,7 @@ function Game() {
                                                     Assigner Bleue
                                                 </button>
                                                 <button
-                                                    onClick={() => handleAssignTeam(user.userId || user.id, null)}
+                                                    onClick={() => handleAssignTeam(user.id, null)}
                                                     disabled={!selectedMatch || loading}
                                                     className="btn-modern btn-remove"
                                                     title="Retirer de l'équipe"
