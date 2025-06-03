@@ -46,6 +46,7 @@ router.post('/register', async (req: Request, res: Response) => {
 });
 
 // Route Connexion
+// @ts-ignore
 router.post('/login', async (req: Request, res: Response) => {
   const { username, password } = req.body;
 

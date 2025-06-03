@@ -55,6 +55,7 @@ const authenticateToken = (req: AuthenticatedRequest, res: Response, next: NextF
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
     if (!token) {
+        console.error('Token manquant dans la requête');
         res.status(401).json({ success: false, message: 'Token manquant' });
         return;
     }
@@ -72,6 +73,7 @@ const authenticateToken = (req: AuthenticatedRequest, res: Response, next: NextF
 
 const requireAdmin = (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
     if (req.user?.role !== 'ADMIN') {
+        console.error('Accès non autorisé: utilisateur non admin', { user: req.user });
         res.status(403).json({ success: false, message: 'Accès réservé aux administrateurs' });
         return;
     }
@@ -100,7 +102,7 @@ router.post('/create', authenticateToken, requireAdmin, async (req: Authenticate
             blueTeamId: blueTeam.id,
         });
     } catch (err: any) {
-        console.error('Erreur lors de la création du match:', err.message);
+        console.error('Erreur lors de la création du match:', err.message, err.stack);
         res.status(500).json({ success: false, message: 'Erreur lors de la création du match', error: err.message });
     }
 });
@@ -119,7 +121,7 @@ router.get('/list', authenticateToken, async (req: AuthenticatedRequest, res: Re
             matches,
         });
     } catch (err: any) {
-        console.error('Erreur lors de la récupération des matchs:', err.message);
+        console.error('Erreur lors de la récupération des matchs:', err.message, err.stack);
         res.status(500).json({ success: false, message: 'Erreur lors de la récupération des matchs', error: err.message });
     }
 });
@@ -144,7 +146,7 @@ router.get('/:matchId/teams', authenticateToken, async (req: AuthenticatedReques
             blueTeam: match.blueTeam,
         });
     } catch (err: any) {
-        console.error('Erreur lors de la récupération des équipes:', err.message);
+        console.error('Erreur lors de la récupération des équipes:', err.message, err.stack);
         res.status(500).json({ success: false, message: 'Erreur lors de la récupération des équipes', error: err.message });
     }
 });
@@ -154,15 +156,15 @@ router.get('/users', authenticateToken, requireAdmin, async (req: AuthenticatedR
     try {
         const users = Array.from(connectedUsers.values()).map((user) => ({
             id: user.userId,
-            username: user.username,
+            username: user.username || 'Inconnu',
         }));
         console.log('Utilisateurs connectés envoyés:', users);
         return res.status(200).json({
             success: true,
-            users: users,
+            users,
         });
     } catch (err: any) {
-        console.error('Erreur lors de la récupération des utilisateurs:', err.message);
+        console.error('Erreur lors de la récupération des utilisateurs:', err.message, err.stack);
         res.status(500).json({ success: false, message: 'Erreur lors de la récupération des utilisateurs', error: err.message });
     }
 });
@@ -235,18 +237,22 @@ router.delete('/:matchId', authenticateToken, requireAdmin, async (req: Authenti
         });
 
         if (!match) {
+            console.log('Match non trouvé:', matchId);
             return res.status(404).json({ success: false, message: 'Match non trouvé' });
         }
 
+        console.log('Suppression des utilisateurs associés aux équipes:', { redTeamId: match.redTeamId, blueTeamId: match.blueTeamId });
         await prisma.user.updateMany({
             where: { teamId: { in: [match.redTeamId, match.blueTeamId] } },
             data: { teamId: null },
         });
 
+        console.log('Suppression des équipes:', { redTeamId: match.redTeamId, blueTeamId: match.blueTeamId });
         await prisma.team.deleteMany({
             where: { id: { in: [match.redTeamId, match.blueTeamId] } },
         });
 
+        console.log('Suppression du match:', matchId);
         await prisma.match.delete({
             where: { id: matchId },
         });
@@ -255,7 +261,11 @@ router.delete('/:matchId', authenticateToken, requireAdmin, async (req: Authenti
 
         return res.status(200).json({ success: true, message: 'Match supprimé avec succès' });
     } catch (err: any) {
-        console.error('Erreur lors de la suppression du match:', err.message, err.stack);
+        console.error('Erreur lors de la suppression du match:', {
+            message: err.message,
+            stack: err.stack,
+            matchId,
+        });
         res.status(500).json({ success: false, message: 'Erreur lors de la suppression du match', error: err.message });
     }
 });

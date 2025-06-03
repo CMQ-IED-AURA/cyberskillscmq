@@ -57,14 +57,14 @@ function Game() {
 
             newSocket.on('connect_error', (error) => {
                 console.error('Erreur de connexion WebSocket:', error.message);
-                setError('Erreur de connexion au serveur.');
+                setError('Erreur de connexion au serveur WebSocket.');
             });
 
             newSocket.on('connectedUsers', (connectedUsers) => {
-                console.log('Utilisateurs connectés:', connectedUsers);
+                console.log('Utilisateurs connectés reçus via WebSocket:', connectedUsers);
                 if (decoded.role === 'ADMIN') {
-                    const validUsers = connectedUsers.filter(user => user.id && user.username);
-                    setUsers(validUsers);
+                    // Supprimer le filtrage strict pour afficher tous les utilisateurs
+                    setUsers(connectedUsers);
                 }
             });
 
@@ -107,8 +107,9 @@ function Game() {
     const fetchMatches = async () => {
         setLoading(true);
         try {
+            const token = Cookies.get('token');
             const res = await fetch('https://cyberskills.onrender.com/match/list', {
-                headers: { 'Authorization': `Bearer ${Cookies.get('token')}` },
+                headers: { 'Authorization': `Bearer ${token}` },
             });
             const data = await res.json();
             if (data.success) {
@@ -136,8 +137,9 @@ function Game() {
         }
         setLoading(true);
         try {
+            const token = Cookies.get('token');
             const res = await fetch(`https://cyberskills.onrender.com/match/${matchId}/teams`, {
-                headers: { 'Authorization': `Bearer ${Cookies.get('token')}` },
+                headers: { 'Authorization': `Bearer ${token}` },
             });
             const data = await res.json();
             if (data.success) {
@@ -156,15 +158,16 @@ function Game() {
     };
 
     const fetchUsers = async () => {
+        setLoading(true);
         try {
+            const token = Cookies.get('token');
             const res = await fetch('https://cyberskills.onrender.com/match/users', {
-                headers: { 'Authorization': `Bearer ${Cookies.get('token')}` },
+                headers: { 'Authorization': `Bearer ${token}` },
             });
             const data = await res.json();
             if (data.success) {
-                const validUsers = data.users.filter(user => user.id && user.username);
-                setUsers(validUsers);
-                console.log('Utilisateurs récupérés:', validUsers);
+                console.log('Utilisateurs récupérés via API:', data.users);
+                setUsers(data.users);
             } else {
                 console.error('Erreur serveur:', data.message);
                 setError(data.message || 'Erreur lors de la récupération des utilisateurs');
@@ -172,17 +175,20 @@ function Game() {
         } catch (error) {
             console.error('Erreur lors de la récupération des utilisateurs:', error);
             setError('Erreur serveur lors de la récupération des utilisateurs.');
+        } finally {
+            setLoading(false);
         }
     };
 
     const handleCreateMatch = async () => {
         setLoading(true);
         try {
+            const token = Cookies.get('token');
             const res = await fetch('https://cyberskills.onrender.com/match/create', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${Cookies.get('token')}`,
+                    'Authorization': `Bearer ${token}`,
                 },
             });
             const data = await res.json();
@@ -207,11 +213,12 @@ function Game() {
         }
         setLoading(true);
         try {
-            console.log('Suppression du match:', matchId);
+            console.log('Tentative de suppression du match:', matchId);
+            const token = Cookies.get('token');
             const res = await fetch(`https://cyberskills.onrender.com/match/${matchId}`, {
                 method: 'DELETE',
                 headers: {
-                    'Authorization': `Bearer ${Cookies.get('token')}`,
+                    'Authorization': `Bearer ${token}`,
                 },
             });
             const data = await res.json();
@@ -242,11 +249,12 @@ function Game() {
         try {
             const requestBody = { userId, teamId, matchId: selectedMatch.id };
             console.log('Assignation d\'équipe:', requestBody);
+            const token = Cookies.get('token');
             const res = await fetch('https://cyberskills.onrender.com/match/assign-team', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${Cookies.get('token')}`,
+                    'Authorization': `Bearer ${token}`,
                 },
                 body: JSON.stringify(requestBody),
             });
