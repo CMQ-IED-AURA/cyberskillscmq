@@ -8,6 +8,7 @@ const prisma = new PrismaClient();
 
 const JWT_SECRET = process.env.JWT_SECRET || 'secretkey';
 
+// @ts-ignore
 router.post('/register', async (req: Request, res: Response) => {
   const { username, password } = req.body;
 
@@ -27,7 +28,7 @@ router.post('/register', async (req: Request, res: Response) => {
       data: {
         username,
         passwordHash,
-        role: 'USER',
+        role: 'USER', // Par défaut, rôle utilisateur
       },
     });
 
@@ -37,20 +38,13 @@ router.post('/register', async (req: Request, res: Response) => {
         { expiresIn: '1h' }
     );
 
-    // Définir le cookie
-    res.cookie('tokenId', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production', // true en production
-      sameSite: 'strict',
-      maxAge: 3600000, // 1 heure en millisecondes
-    });
-
     console.log('Utilisateur inscrit:', { userId: user.id, username: user.username });
     return res.status(201).json({
       success: true,
       message: 'Inscription réussie',
       data: {
         user: { id: user.id, username: user.username, role: user.role },
+        token,
       },
     });
   } catch (err: any) {
@@ -83,20 +77,13 @@ router.post('/login', async (req: Request, res: Response) => {
         { expiresIn: '1h' }
     );
 
-    // Définir le cookie
-    res.cookie('tokenId', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production', // true en production
-      sameSite: 'strict',
-      maxAge: 3600000, // 1 heure en millisecondes
-    });
-
     console.log('Utilisateur connecté:', { userId: user.id, username: user.username });
     return res.status(200).json({
       success: true,
       message: 'Authentification réussie',
       data: {
         user: { id: user.id, username: user.username, role: user.role },
+        token,
       },
     });
   } catch (err: any) {
