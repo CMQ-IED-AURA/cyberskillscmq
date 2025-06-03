@@ -8,7 +8,6 @@ const prisma = new PrismaClient();
 
 const JWT_SECRET = process.env.JWT_SECRET || 'secretkey';
 
-// @ts-ignore
 router.post('/register', async (req: Request, res: Response) => {
   const { username, password } = req.body;
 
@@ -39,7 +38,6 @@ router.post('/register', async (req: Request, res: Response) => {
     );
 
     res.cookie('tokenId', token, {
-      httpOnly: true,
       secure: true, // Toujours true sur Render (HTTPS)
       sameSite: 'strict',
       maxAge: 3600000, // 1 heure
@@ -60,7 +58,6 @@ router.post('/register', async (req: Request, res: Response) => {
   }
 });
 
-// @ts-ignore
 router.post('/login', async (req: Request, res: Response) => {
   const { username, password } = req.body;
 
@@ -86,7 +83,6 @@ router.post('/login', async (req: Request, res: Response) => {
     );
 
     res.cookie('tokenId', token, {
-      httpOnly: true,
       secure: true, // Toujours true sur Render (HTTPS)
       sameSite: 'strict',
       maxAge: 3600000, // 1 heure
