@@ -9,6 +9,7 @@ const prisma = new PrismaClient();
 const JWT_SECRET = process.env.JWT_SECRET || 'secretkey';
 
 // Route Inscription
+// @ts-ignore
 router.post('/register', async (req: Request, res: Response) => {
   const { username, password } = req.body;
 
@@ -16,7 +17,7 @@ router.post('/register', async (req: Request, res: Response) => {
     // Vérifier si username existe
     const existingUser = await prisma.user.findUnique({ where: { username } });
     if (existingUser) {
-      return res.status(400).json({ success: false, message: "Nom d'utilisateur déjà utilisé" });
+      return res.status(400).json({ success: false, message: "Nom d'utilisateur déjà utilisé." });
     }
 
     // Hasher le mot de passe
@@ -31,17 +32,18 @@ router.post('/register', async (req: Request, res: Response) => {
     });
 
     // Générer JWT
-    const token = jwt.sign({ userId: newUser.id, role: newUser.role }, JWT_SECRET, { expiresIn: '1h' });
+    const token = jwt.sign({ userId: newUser.id, role: newUser.role, username: newUser.username }, JWT_SECRET, { expiresIn: '1h' });
 
+    console.log('Utilisateur inscrit:', { userId: newUser.id, username: newUser.username });
     return res.status(201).json({
-      success: true,
+      success: false,
       message: 'Inscription réussie',
       user: { id: newUser.id, username: newUser.username, role: newUser.role },
       token,
     });
   } catch (error: any) {
     console.error('Erreur lors de l\'inscription:', error.message, error.stack);
-    return res.status(500).json({ success: false, message: 'Erreur serveur' });
+    return res.status(500).json({ success: false, message: 'Erreur serveur.' });
   }
 });
 
@@ -53,18 +55,19 @@ router.post('/login', async (req: Request, res: Response) => {
   try {
     const user = await prisma.user.findUnique({ where: { username } });
     if (!user) {
-      return res.status(401).json({ success: false, message: 'Identifiants invalides' });
+      return res.status(401).json({ success: false, message: 'Identifiants invalides.' });
     }
 
     // Vérifier mot de passe
     const isValid = await bcrypt.compare(password, user.passwordHash);
     if (!isValid) {
-      return res.status(401).json({ success: false, message: 'Identifiants invalides' });
+      return res.status(401).json({ success: false, message: 'Identifiants invalides.' });
     }
 
     // Générer JWT
-    const token = jwt.sign({ userId: user.id, role: user.role }, JWT_SECRET, { expiresIn: '1h' });
+    const token = jwt.sign({ userId: user.id, role: user.role, username: user.username }, JWT_SECRET, { expiresIn: '1h' });
 
+    console.log('Utilisateur connecté:', { userId: user.id, username: user.username });
     return res.status(200).json({
       success: true,
       message: 'Authentification réussie',
@@ -73,7 +76,7 @@ router.post('/login', async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     console.error('Erreur lors de la connexion:', error.message, error.stack);
-    return res.status(500).json({ success: false, message: 'Erreur serveur lors de la connexion' });
+    return res.status(500).json({ success: false, message: 'Erreur serveur lors de la connexion.' });
   }
 });
 

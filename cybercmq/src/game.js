@@ -8,8 +8,7 @@ function Game() {
     const navigate = useNavigate();
     const [matches, setMatches] = useState([]);
     const [selectedMatch, setSelectedMatch] = useState(null);
-    const [redTeamMembers, setRedTeamMembers] = useState([]);
-    const [blueTeamMembers, setBlueTeamMembers] = useState([]);
+    const [teamMembersByMatch, setTeamMembersByMatch] = useState({}); // Stocke les membres par match
     const [users, setUsers] = useState([]);
     const [role, setRole] = useState(null);
     const [socket, setSocket] = useState(null);
@@ -65,30 +64,32 @@ function Game() {
             newSocket.on('connectedUsers', (connectedUsers) => {
                 console.log('Utilisateurs connectés reçus via WebSocket:', connectedUsers);
                 if (decoded.role === 'ADMIN') {
-                    setUsers(connectedUsers || []); // Pas de filtrage strict
+                    setUsers(connectedUsers || []);
                 }
             });
 
             newSocket.on('matchCreated', (newMatch) => {
                 console.log('Nouveau match créé:', newMatch);
                 setMatches((prev) => [...prev, newMatch]);
+                fetchTeamMembers(newMatch.id, token); // Récupérer les membres pour le nouveau match
             });
 
             newSocket.on('matchDeleted', (matchId) => {
                 console.log('Match supprimé:', matchId);
                 setMatches((prev) => prev.filter((match) => match.id !== matchId));
+                setTeamMembersByMatch((prev) => {
+                    const updated = { ...prev };
+                    delete updated[matchId];
+                    return updated;
+                });
                 if (selectedMatch?.id === matchId) {
                     setSelectedMatch(null);
-                    setRedTeamMembers([]);
-                    setBlueTeamMembers([]);
                 }
             });
 
             newSocket.on('teamAssigned', ({ matchId, userId, teamId, username }) => {
                 console.log('Équipe assignée:', { matchId, userId, teamId, username });
-                if (selectedMatch?.id === matchId) {
-                    fetchTeamMembers(matchId, token);
-                }
+                fetchTeamMembers(matchId, token);
                 if (decoded.role === 'ADMIN') {
                     fetchUsers(token);
                 }
@@ -116,9 +117,12 @@ function Game() {
             if (data.success) {
                 setMatches(data.matches || []);
                 console.log('Matchs récupérés:', data.matches);
+                // Récupérer les membres pour chaque match
+                for (const match of data.matches) {
+                    await fetchTeamMembers(match.id, token);
+                }
                 if (data.matches.length > 0 && !selectedMatch) {
                     setSelectedMatch(data.matches[0]);
-                    fetchTeamMembers(data.matches[0].id, token);
                 }
             } else {
                 console.error('Erreur serveur:', data.message);
@@ -134,19 +138,23 @@ function Game() {
 
     const fetchTeamMembers = async (matchId, token) => {
         if (!matchId) {
-            setError('Match non sélectionné ou invalide.');
+            console.error('Match ID invalide:', matchId);
             return;
         }
-        setLoading(true);
         try {
             const res = await fetch(`https://cyberskills.onrender.com/match/${matchId}/teams`, {
                 headers: { 'Authorization': `Bearer ${token}` },
             });
             const data = await res.json();
             if (data.success) {
-                setRedTeamMembers(data.redTeam?.users || []);
-                setBlueTeamMembers(data.blueTeam?.users || []);
-                console.log('Membres des équipes récupérés:', {
+                setTeamMembersByMatch((prev) => ({
+                    ...prev,
+                    [matchId]: {
+                        redTeam: data.redTeam?.users || [],
+                        blueTeam: data.blueTeam?.users || [],
+                    },
+                }));
+                console.log('Membres des équipes récupérés pour match:', matchId, {
                     redTeam: data.redTeam?.users,
                     blueTeam: data.blueTeam?.users,
                 });
@@ -155,10 +163,8 @@ function Game() {
                 setError(data.message || 'Erreur lors de la récupération des membres');
             }
         } catch (error) {
-            console.error('Erreur lors de la récupération des membres:', error);
+            console.error('Erreur lors de la récupération des membres pour match:', matchId, error);
             setError('Erreur serveur lors de la récupération des membres.');
-        } finally {
-            setLoading(false);
         }
     };
 
@@ -351,9 +357,6 @@ function Game() {
                                     onChange={(e) => {
                                         const match = matches.find((m) => m.id === e.target.value);
                                         setSelectedMatch(match || null);
-                                        setRedTeamMembers([]);
-                                        setBlueTeamMembers([]);
-                                        if (match) fetchTeamMembers(match.id, Cookies.get('token'));
                                     }}
                                     className="match-selector"
                                     disabled={loading}
@@ -375,9 +378,6 @@ function Game() {
                                             className={`match-card ${selectedMatch?.id === match.id ? 'matched' : ''}`}
                                             onClick={() => {
                                                 setSelectedMatch(match);
-                                                setRedTeamMembers([]);
-                                                setBlueTeamMembers([]);
-                                                fetchTeamMembers(match.id, Cookies.get('token'));
                                             }}
                                         >
                                             <div className="match-header">
@@ -387,8 +387,8 @@ function Game() {
                                                 <div className="team-card red-team">
                                                     <h4>Équipe Rouge</h4>
                                                     <ul>
-                                                        {selectedMatch?.id === match.id && redTeamMembers.length > 0 ? (
-                                                            redTeamMembers.map((user) => (
+                                                        {teamMembersByMatch[match.id]?.redTeam?.length > 0 ? (
+                                                            teamMembersByMatch[match.id].redTeam.map((user) => (
                                                                 <li key={user.id}>{user.username}</li>
                                                             ))
                                                         ) : (
@@ -399,8 +399,8 @@ function Game() {
                                                 <div className="team-card blue-team">
                                                     <h4>Équipe Bleue</h4>
                                                     <ul>
-                                                        {selectedMatch?.id === match.id && blueTeamMembers.length > 0 ? (
-                                                            blueTeamMembers.map((user) => (
+                                                        {teamMembersByMatch[match.id]?.blueTeam?.length > 0 ? (
+                                                            teamMembersByMatch[match.id].blueTeam.map((user) => (
                                                                 <li key={user.id}>{user.username}</li>
                                                             ))
                                                         ) : (
@@ -440,7 +440,6 @@ function Game() {
                                         className={`match-card ${selectedMatch?.id === match.id ? 'matched' : ''}`}
                                         onClick={() => {
                                             setSelectedMatch(match);
-                                            fetchTeamMembers(match.id, Cookies.get('token'));
                                         }}
                                     >
                                         <div className="match-header">
@@ -450,8 +449,8 @@ function Game() {
                                             <div className="team-card red-team">
                                                 <h4>Équipe Rouge</h4>
                                                 <ul>
-                                                    {selectedMatch?.id === match.id && redTeamMembers.length > 0 ? (
-                                                        redTeamMembers.map((user) => (
+                                                    {teamMembersByMatch[match.id]?.redTeam?.length > 0 ? (
+                                                        teamMembersByMatch[match.id].redTeam.map((user) => (
                                                             <li key={user.id}>{user.username}</li>
                                                         ))
                                                     ) : (
@@ -462,8 +461,8 @@ function Game() {
                                             <div className="team-card blue-team">
                                                 <h4>Équipe Bleue</h4>
                                                 <ul>
-                                                    {selectedMatch?.id === match.id && blueTeamMembers.length > 0 ? (
-                                                        blueTeamMembers.map((user) => (
+                                                    {teamMembersByMatch[match.id]?.blueTeam?.length > 0 ? (
+                                                        teamMembersByMatch[match.id].blueTeam.map((user) => (
                                                             <li key={user.id}>{user.username}</li>
                                                         ))
                                                     ) : (

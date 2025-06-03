@@ -236,13 +236,13 @@ router.post('/leave-team', authenticateToken, async (req: AuthenticatedRequest, 
 router.delete('/:matchId', authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
     const { matchId } = req.params;
 
-    console.log('Requête de suppression de match reçue:', { matchId, headers: req.headers });
+    console.log('Requête de suppression de match reçue:', { matchId, user: req.user });
 
     try {
         // Vérifier l'existence du match
         const match = await prisma.match.findUnique({
             where: { id: matchId },
-            include: { redTeam: true, blueTeam: true },
+            include: { redTeam: { include: { users: true } }, blueTeam: { include: { users: true } } },
         });
 
         if (!match) {
@@ -250,18 +250,28 @@ router.delete('/:matchId', authenticateToken, requireAdmin, async (req: Authenti
             return res.status(404).json({ success: false, message: 'Match non trouvé' });
         }
 
+        console.log('Match trouvé:', {
+            matchId,
+            redTeamId: match.redTeamId,
+            blueTeamId: match.blueTeamId,
+            redTeamUsers: match.redTeam.users.length,
+            blueTeamUsers: match.blueTeam.users.length,
+        });
+
         // Étape 1 : Dissocier les utilisateurs des équipes
         console.log('Dissociation des utilisateurs des équipes:', { redTeamId: match.redTeamId, blueTeamId: match.blueTeamId });
-        await prisma.user.updateMany({
+        const updatedUsers = await prisma.user.updateMany({
             where: { teamId: { in: [match.redTeamId, match.blueTeamId] } },
             data: { teamId: null },
         });
+        console.log('Utilisateurs dissociés:', updatedUsers.count);
 
         // Étape 2 : Supprimer les équipes
         console.log('Suppression des équipes:', { redTeamId: match.redTeamId, blueTeamId: match.blueTeamId });
-        await prisma.team.deleteMany({
+        const deletedTeams = await prisma.team.deleteMany({
             where: { id: { in: [match.redTeamId, match.blueTeamId] } },
         });
+        console.log('Équipes supprimées:', deletedTeams.count);
 
         // Étape 3 : Supprimer le match
         console.log('Suppression du match:', matchId);
@@ -276,10 +286,17 @@ router.delete('/:matchId', authenticateToken, requireAdmin, async (req: Authenti
     } catch (err: any) {
         console.error('Erreur lors de la suppression du match:', {
             message: err.message,
+            code: err.code,
+            meta: err.meta,
             stack: err.stack,
             matchId,
         });
-        res.status(500).json({ success: false, message: 'Erreur lors de la suppression du match', error: err.message });
+        return res.status(500).json({
+            success: false,
+            message: 'Erreur lors de la suppression du match',
+            error: err.message,
+            code: err.code,
+        });
     }
 });
 
