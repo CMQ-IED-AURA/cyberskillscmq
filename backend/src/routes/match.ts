@@ -16,31 +16,30 @@ const JWT_SECRET = process.env.JWT_SECRET || 'secretkey';
 
 export const setupSocket = (io: SocketIOServer) => {
     io.on('connection', (socket) => {
-        console.log('User connected:', socket.id);
+        console.log('Utilisateur connecté:', socket.id);
 
         socket.on('authenticate', async (token: string) => {
             try {
                 const decoded = jwt.verify(token, JWT_SECRET) as { userId: string; username?: string; role: string };
-                // Fetch username from database if not in token
                 const user = await prisma.user.findUnique({ where: { id: decoded.userId }, select: { username: true } });
                 if (!user) {
-                    throw new Error('User not found');
+                    throw new Error('Utilisateur non trouvé');
                 }
                 connectedUsers.set(decoded.userId, {
                     userId: decoded.userId,
-                    username: user.username || 'Unknown',
+                    username: user.username || 'Inconnu',
                     socketId: socket.id,
                 });
-                console.log('Authenticated user:', { userId: decoded.userId, username: user.username });
+                console.log('Utilisateur authentifié:', { userId: decoded.userId, username: user.username });
                 io.emit('connectedUsers', Array.from(connectedUsers.values()));
             } catch (err) {
-                console.error('Socket authentication failed:', err);
+                console.error('Échec de l\'authentification WebSocket:', err);
                 socket.disconnect();
             }
         });
 
         socket.on('disconnect', () => {
-            console.log('User disconnected:', socket.id);
+            console.log('Utilisateur déconnecté:', socket.id);
             for (const [userId, user] of connectedUsers) {
                 if (user.socketId === socket.id) {
                     connectedUsers.delete(userId);
@@ -62,7 +61,7 @@ const authenticateToken = (req: AuthenticatedRequest, res: Response, next: NextF
 
     jwt.verify(token, JWT_SECRET, (err: any, user: any) => {
         if (err) {
-            console.error('Token verification error:', err.message);
+            console.error('Erreur de vérification du token:', err.message);
             res.status(403).json({ success: false, message: 'Token invalide' });
             return;
         }
@@ -101,7 +100,7 @@ router.post('/create', authenticateToken, requireAdmin, async (req: Authenticate
             blueTeamId: blueTeam.id,
         });
     } catch (err: any) {
-        console.error('Error creating match:', err.message);
+        console.error('Erreur lors de la création du match:', err.message);
         res.status(500).json({ success: false, message: 'Erreur lors de la création du match', error: err.message });
     }
 });
@@ -120,7 +119,7 @@ router.get('/list', authenticateToken, async (req: AuthenticatedRequest, res: Re
             matches,
         });
     } catch (err: any) {
-        console.error('Error fetching matches:', err.message);
+        console.error('Erreur lors de la récupération des matchs:', err.message);
         res.status(500).json({ success: false, message: 'Erreur lors de la récupération des matchs', error: err.message });
     }
 });
@@ -145,7 +144,7 @@ router.get('/:matchId/teams', authenticateToken, async (req: AuthenticatedReques
             blueTeam: match.blueTeam,
         });
     } catch (err: any) {
-        console.error('Error fetching teams:', err.message);
+        console.error('Erreur lors de la récupération des équipes:', err.message);
         res.status(500).json({ success: false, message: 'Erreur lors de la récupération des équipes', error: err.message });
     }
 });
@@ -157,13 +156,13 @@ router.get('/users', authenticateToken, requireAdmin, async (req: AuthenticatedR
             id: user.userId,
             username: user.username,
         }));
-        console.log('Connected users sent:', users);
+        console.log('Utilisateurs connectés envoyés:', users);
         return res.status(200).json({
             success: true,
-            users,
+            users: users,
         });
     } catch (err: any) {
-        console.error('Error fetching users:', err.message);
+        console.error('Erreur lors de la récupération des utilisateurs:', err.message);
         res.status(500).json({ success: false, message: 'Erreur lors de la récupération des utilisateurs', error: err.message });
     }
 });
@@ -172,7 +171,7 @@ router.get('/users', authenticateToken, requireAdmin, async (req: AuthenticatedR
 router.post('/assign-team', authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
     const { userId, teamId, matchId } = req.body;
 
-    console.log('Assign team request:', { userId, teamId, matchId });
+    console.log('Requête assign-team reçue:', { userId, teamId, matchId, body: req.body });
 
     try {
         if (!userId) {
@@ -208,7 +207,7 @@ router.post('/assign-team', authenticateToken, requireAdmin, async (req: Authent
 
         return res.status(200).json({ success: true, message: 'Utilisateur assigné avec succès' });
     } catch (err: any) {
-        console.error('Error assigning team:', err.message, err.stack);
+        console.error('Erreur lors de l\'assignation de l\'équipe:', err.message, err.stack);
         res.status(500).json({ success: false, message: 'Erreur lors de l\'assignation de l\'équipe', error: err.message });
     }
 });
@@ -227,7 +226,7 @@ router.post('/leave-team', authenticateToken, async (req: AuthenticatedRequest, 
 router.delete('/:matchId', authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
     const { matchId } = req.params;
 
-    console.log('Delete match request:', { matchId });
+    console.log('Requête de suppression de match reçue:', { matchId, headers: req.headers });
 
     try {
         const match = await prisma.match.findUnique({
@@ -256,7 +255,7 @@ router.delete('/:matchId', authenticateToken, requireAdmin, async (req: Authenti
 
         return res.status(200).json({ success: true, message: 'Match supprimé avec succès' });
     } catch (err: any) {
-        console.error('Error deleting match:', err.message, err.stack);
+        console.error('Erreur lors de la suppression du match:', err.message, err.stack);
         res.status(500).json({ success: false, message: 'Erreur lors de la suppression du match', error: err.message });
     }
 });

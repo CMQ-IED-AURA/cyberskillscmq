@@ -27,11 +27,21 @@ function Game() {
             const payload = token.split('.')[1];
             if (!payload) throw new Error('Payload du token manquant');
             const decoded = JSON.parse(atob(payload));
+            const exp = decoded.exp * 1000; // Convertir en millisecondes
+            if (Date.now() >= exp) {
+                console.error('Token expiré');
+                Cookies.remove('token');
+                navigate('/login');
+                return;
+            }
             setRole(decoded.role);
 
             const newSocket = io('https://cyberskills.onrender.com', {
                 auth: { token },
                 transports: ['websocket', 'polling'],
+                reconnection: true,
+                reconnectionAttempts: 5,
+                reconnectionDelay: 1000,
             });
             setSocket(newSocket);
 
@@ -41,29 +51,30 @@ function Game() {
             }
 
             newSocket.on('connect', () => {
-                console.log('Connected to WebSocket:', newSocket.id);
+                console.log('Connecté au WebSocket:', newSocket.id);
                 newSocket.emit('authenticate', token);
             });
 
             newSocket.on('connect_error', (error) => {
-                console.error('WebSocket connection error:', error.message);
+                console.error('Erreur de connexion WebSocket:', error.message);
                 setError('Erreur de connexion au serveur.');
             });
 
             newSocket.on('connectedUsers', (connectedUsers) => {
-                console.log('Connected users:', connectedUsers);
+                console.log('Utilisateurs connectés:', connectedUsers);
                 if (decoded.role === 'ADMIN') {
-                    setUsers(connectedUsers);
+                    const validUsers = connectedUsers.filter(user => user.id && user.username);
+                    setUsers(validUsers);
                 }
             });
 
             newSocket.on('matchCreated', (newMatch) => {
-                console.log('New match:', newMatch);
+                console.log('Nouveau match:', newMatch);
                 setMatches((prev) => [...prev, newMatch]);
             });
 
             newSocket.on('matchDeleted', (matchId) => {
-                console.log('Match deleted:', matchId);
+                console.log('Match supprimé:', matchId);
                 setMatches((prev) => prev.filter((match) => match.id !== matchId));
                 if (selectedMatch?.id === matchId) {
                     setSelectedMatch(null);
@@ -73,7 +84,7 @@ function Game() {
             });
 
             newSocket.on('teamAssigned', ({ matchId, userId, teamId, username }) => {
-                console.log('Team assigned:', { matchId, userId, teamId, username });
+                console.log('Équipe assignée:', { matchId, userId, teamId, username });
                 if (selectedMatch?.id === matchId) {
                     fetchTeamMembers(matchId);
                 }
@@ -83,11 +94,11 @@ function Game() {
             });
 
             return () => {
-                console.log('Disconnecting WebSocket');
+                console.log('Déconnexion du WebSocket');
                 newSocket.disconnect();
             };
         } catch (error) {
-            console.error('Token decoding error:', error);
+            console.error('Erreur de décodage du token:', error);
             Cookies.remove('token');
             navigate('/login');
         }
@@ -107,11 +118,11 @@ function Game() {
                     fetchTeamMembers(data.matches[0].id);
                 }
             } else {
-                console.error('Server error:', data.message);
+                console.error('Erreur serveur:', data.message);
                 setError(data.message || 'Erreur lors de la récupération des matchs');
             }
         } catch (error) {
-            console.error('Error fetching matches:', error);
+            console.error('Erreur lors de la récupération des matchs:', error);
             setError('Erreur serveur lors de la récupération des matchs.');
         } finally {
             setLoading(false);
@@ -119,6 +130,10 @@ function Game() {
     };
 
     const fetchTeamMembers = async (matchId) => {
+        if (!matchId) {
+            setError('Match non sélectionné ou invalide.');
+            return;
+        }
         setLoading(true);
         try {
             const res = await fetch(`https://cyberskills.onrender.com/match/${matchId}/teams`, {
@@ -129,11 +144,11 @@ function Game() {
                 setRedTeamMembers(data.redTeam.users || []);
                 setBlueTeamMembers(data.blueTeam.users || []);
             } else {
-                console.error('Server error:', data.message);
+                console.error('Erreur serveur:', data.message);
                 setError(data.message || 'Erreur lors de la récupération des membres');
             }
         } catch (error) {
-            console.error('Error fetching team members:', error);
+            console.error('Erreur lors de la récupération des membres:', error);
             setError('Erreur serveur lors de la récupération des membres.');
         } finally {
             setLoading(false);
@@ -147,14 +162,15 @@ function Game() {
             });
             const data = await res.json();
             if (data.success) {
-                setUsers(data.users);
-                console.log('Fetched users:', data.users);
+                const validUsers = data.users.filter(user => user.id && user.username);
+                setUsers(validUsers);
+                console.log('Utilisateurs récupérés:', validUsers);
             } else {
-                console.error('Server error:', data.message);
+                console.error('Erreur serveur:', data.message);
                 setError(data.message || 'Erreur lors de la récupération des utilisateurs');
             }
         } catch (error) {
-            console.error('Error fetching users:', error);
+            console.error('Erreur lors de la récupération des utilisateurs:', error);
             setError('Erreur serveur lors de la récupération des utilisateurs.');
         }
     };
@@ -171,13 +187,13 @@ function Game() {
             });
             const data = await res.json();
             if (!data.success) {
-                console.error('Server error:', data.message);
+                console.error('Erreur serveur:', data.message);
                 setError(data.message || 'Erreur lors de la création du match');
             } else {
                 setError(null);
             }
         } catch (error) {
-            console.error('Error creating match:', error);
+            console.error('Erreur lors de la création du match:', error);
             setError('Erreur serveur lors de la création du match.');
         } finally {
             setLoading(false);
@@ -185,9 +201,13 @@ function Game() {
     };
 
     const handleDeleteMatch = async (matchId) => {
+        if (!matchId) {
+            setError('Match non sélectionné ou invalide.');
+            return;
+        }
         setLoading(true);
         try {
-            console.log('Deleting match:', matchId);
+            console.log('Suppression du match:', matchId);
             const res = await fetch(`https://cyberskills.onrender.com/match/${matchId}`, {
                 method: 'DELETE',
                 headers: {
@@ -196,13 +216,13 @@ function Game() {
             });
             const data = await res.json();
             if (!data.success) {
-                console.error('Server error:', data.message);
+                console.error('Erreur serveur:', data.message);
                 setError(data.message || 'Erreur lors de la suppression du match');
             } else {
                 setError(null);
             }
         } catch (error) {
-            console.error('Error deleting match:', error);
+            console.error('Erreur lors de la suppression du match:', error);
             setError('Erreur serveur lors de la suppression du match.');
         } finally {
             setLoading(false);
@@ -214,10 +234,14 @@ function Game() {
             setError('Veuillez sélectionner un match.');
             return;
         }
+        if (!userId) {
+            setError('Utilisateur non sélectionné ou invalide.');
+            return;
+        }
         setLoading(true);
         try {
             const requestBody = { userId, teamId, matchId: selectedMatch.id };
-            console.log('Assigning team:', requestBody);
+            console.log('Assignation d\'équipe:', requestBody);
             const res = await fetch('https://cyberskills.onrender.com/match/assign-team', {
                 method: 'POST',
                 headers: {
@@ -228,13 +252,13 @@ function Game() {
             });
             const data = await res.json();
             if (!data.success) {
-                console.error('Team assignment error:', data.message);
+                console.error('Erreur d\'assignation d\'équipe:', data.message);
                 setError(data.message || 'Erreur lors de l\'assignation de l\'équipe');
             } else {
                 setError(null);
             }
         } catch (error) {
-            console.error('Error assigning team:', error);
+            console.error('Erreur lors de l\'assignation d\'équipe:', error);
             setError('Erreur serveur lors de l\'assignation de l\'équipe.');
         } finally {
             setLoading(false);
@@ -266,30 +290,33 @@ function Game() {
                             <h3>Utilisateurs Connectés</h3>
                             <div className="users-list">
                                 {users.length > 0 ? (
-                                    users.map((user) => (
-                                        <div key={user.id} className="user-item">
-                                            <span className="user-status"></span>
-                                            <span className="user-username">{user.username || 'Inconnu'}</span>
-                                            <div className="user-actions">
-                                                <select
-                                                    onChange={(e) => {
-                                                        const teamId = e.target.value || null;
-                                                        handleAssignTeam(user.id, teamId);
-                                                    }}
-                                                    value=""
-                                                    disabled={!selectedMatch || loading}
-                                                >
-                                                    <option value="">Retirer de l'équipe</option>
-                                                    {selectedMatch && (
-                                                        <>
-                                                            <option value={selectedMatch.redTeamId}>Équipe Rouge</option>
-                                                            <option value={selectedMatch.blueTeamId}>Équipe Bleue</option>
-                                                        </>
-                                                    )}
-                                                </select>
+                                    users.map((user) => {
+                                        console.log('Rendu utilisateur:', user);
+                                        return (
+                                            <div key={user.id} className="user-item">
+                                                <span className="user-status"></span>
+                                                <span className="user-username">{user.username || 'Inconnu'}</span>
+                                                <div className="user-actions">
+                                                    <select
+                                                        onChange={(e) => {
+                                                            const teamId = e.target.value || null;
+                                                            handleAssignTeam(user.id, teamId);
+                                                        }}
+                                                        value=""
+                                                        disabled={!selectedMatch || loading}
+                                                    >
+                                                        <option value="">Retirer de l'équipe</option>
+                                                        {selectedMatch && (
+                                                            <>
+                                                                <option value={selectedMatch.redTeamId}>Équipe Rouge</option>
+                                                                <option value={selectedMatch.blueTeamId}>Équipe Bleue</option>
+                                                            </>
+                                                        )}
+                                                    </select>
+                                                </div>
                                             </div>
-                                        </div>
-                                    ))
+                                        );
+                                    })
                                 ) : (
                                     <p>Aucun utilisateur connecté.</p>
                                 )}
