@@ -19,23 +19,25 @@ function Game() {
     useEffect(() => {
         const token = Cookies.get('token');
         if (!token) {
+            console.error('Aucun token trouvé, redirection vers login.');
             navigate('/login');
             return;
         }
 
         try {
             const payload = token.split('.')[1];
-            if (!payload) throw new Error('Payload du token manquant');
+            if (!payload) throw new Error('Payload du token manquant.');
             const decoded = JSON.parse(atob(payload));
             const exp = decoded.exp * 1000; // Convertir en millisecondes
             if (Date.now() >= exp) {
-                console.error('Token expiré');
+                console.error('Token expiré, redirection vers login.');
                 Cookies.remove('token');
                 navigate('/login');
                 return;
             }
             setRole(decoded.role);
 
+            console.log('Initialisation du WebSocket avec token:', { userId: decoded.userId, role: decoded.role });
             const newSocket = io('https://cyberskills.onrender.com', {
                 auth: { token },
                 transports: ['websocket', 'polling'],
@@ -45,9 +47,9 @@ function Game() {
             });
             setSocket(newSocket);
 
-            fetchMatches();
+            fetchMatches(token);
             if (decoded.role === 'ADMIN') {
-                fetchUsers();
+                fetchUsers(token);
             }
 
             newSocket.on('connect', () => {
@@ -63,13 +65,12 @@ function Game() {
             newSocket.on('connectedUsers', (connectedUsers) => {
                 console.log('Utilisateurs connectés reçus via WebSocket:', connectedUsers);
                 if (decoded.role === 'ADMIN') {
-                    // Supprimer le filtrage strict pour afficher tous les utilisateurs
-                    setUsers(connectedUsers);
+                    setUsers(connectedUsers || []); // Pas de filtrage strict
                 }
             });
 
             newSocket.on('matchCreated', (newMatch) => {
-                console.log('Nouveau match:', newMatch);
+                console.log('Nouveau match créé:', newMatch);
                 setMatches((prev) => [...prev, newMatch]);
             });
 
@@ -86,10 +87,10 @@ function Game() {
             newSocket.on('teamAssigned', ({ matchId, userId, teamId, username }) => {
                 console.log('Équipe assignée:', { matchId, userId, teamId, username });
                 if (selectedMatch?.id === matchId) {
-                    fetchTeamMembers(matchId);
+                    fetchTeamMembers(matchId, token);
                 }
                 if (decoded.role === 'ADMIN') {
-                    fetchUsers();
+                    fetchUsers(token);
                 }
             });
 
@@ -98,25 +99,26 @@ function Game() {
                 newSocket.disconnect();
             };
         } catch (error) {
-            console.error('Erreur de décodage du token:', error);
+            console.error('Erreur de décodage du token:', error.message);
+            setError('Erreur d\'authentification, veuillez vous reconnecter.');
             Cookies.remove('token');
             navigate('/login');
         }
     }, [navigate]);
 
-    const fetchMatches = async () => {
+    const fetchMatches = async (token) => {
         setLoading(true);
         try {
-            const token = Cookies.get('token');
             const res = await fetch('https://cyberskills.onrender.com/match/list', {
                 headers: { 'Authorization': `Bearer ${token}` },
             });
             const data = await res.json();
             if (data.success) {
-                setMatches(data.matches);
+                setMatches(data.matches || []);
+                console.log('Matchs récupérés:', data.matches);
                 if (data.matches.length > 0 && !selectedMatch) {
                     setSelectedMatch(data.matches[0]);
-                    fetchTeamMembers(data.matches[0].id);
+                    fetchTeamMembers(data.matches[0].id, token);
                 }
             } else {
                 console.error('Erreur serveur:', data.message);
@@ -130,21 +132,24 @@ function Game() {
         }
     };
 
-    const fetchTeamMembers = async (matchId) => {
+    const fetchTeamMembers = async (matchId, token) => {
         if (!matchId) {
             setError('Match non sélectionné ou invalide.');
             return;
         }
         setLoading(true);
         try {
-            const token = Cookies.get('token');
             const res = await fetch(`https://cyberskills.onrender.com/match/${matchId}/teams`, {
                 headers: { 'Authorization': `Bearer ${token}` },
             });
             const data = await res.json();
             if (data.success) {
-                setRedTeamMembers(data.redTeam.users || []);
-                setBlueTeamMembers(data.blueTeam.users || []);
+                setRedTeamMembers(data.redTeam?.users || []);
+                setBlueTeamMembers(data.blueTeam?.users || []);
+                console.log('Membres des équipes récupérés:', {
+                    redTeam: data.redTeam?.users,
+                    blueTeam: data.blueTeam?.users,
+                });
             } else {
                 console.error('Erreur serveur:', data.message);
                 setError(data.message || 'Erreur lors de la récupération des membres');
@@ -157,17 +162,16 @@ function Game() {
         }
     };
 
-    const fetchUsers = async () => {
+    const fetchUsers = async (token) => {
         setLoading(true);
         try {
-            const token = Cookies.get('token');
             const res = await fetch('https://cyberskills.onrender.com/match/users', {
                 headers: { 'Authorization': `Bearer ${token}` },
             });
             const data = await res.json();
             if (data.success) {
                 console.log('Utilisateurs récupérés via API:', data.users);
-                setUsers(data.users);
+                setUsers(data.users || []);
             } else {
                 console.error('Erreur serveur:', data.message);
                 setError(data.message || 'Erreur lors de la récupération des utilisateurs');
@@ -197,6 +201,7 @@ function Game() {
                 setError(data.message || 'Erreur lors de la création du match');
             } else {
                 setError(null);
+                console.log('Match créé avec succès:', data.matchId);
             }
         } catch (error) {
             console.error('Erreur lors de la création du match:', error);
@@ -227,6 +232,7 @@ function Game() {
                 setError(data.message || 'Erreur lors de la suppression du match');
             } else {
                 setError(null);
+                console.log('Match supprimé avec succès:', matchId);
             }
         } catch (error) {
             console.error('Erreur lors de la suppression du match:', error);
@@ -264,6 +270,7 @@ function Game() {
                 setError(data.message || 'Erreur lors de l\'assignation de l\'équipe');
             } else {
                 setError(null);
+                console.log('Utilisateur assigné avec succès:', { userId, teamId });
             }
         } catch (error) {
             console.error('Erreur lors de l\'assignation d\'équipe:', error);
@@ -301,14 +308,14 @@ function Game() {
                                     users.map((user) => {
                                         console.log('Rendu utilisateur:', user);
                                         return (
-                                            <div key={user.id} className="user-item">
+                                            <div key={user.userId || user.id} className="user-item">
                                                 <span className="user-status"></span>
                                                 <span className="user-username">{user.username || 'Inconnu'}</span>
                                                 <div className="user-actions">
                                                     <select
                                                         onChange={(e) => {
                                                             const teamId = e.target.value || null;
-                                                            handleAssignTeam(user.id, teamId);
+                                                            handleAssignTeam(user.userId || user.id, teamId);
                                                         }}
                                                         value=""
                                                         disabled={!selectedMatch || loading}
@@ -346,7 +353,7 @@ function Game() {
                                         setSelectedMatch(match || null);
                                         setRedTeamMembers([]);
                                         setBlueTeamMembers([]);
-                                        if (match) fetchTeamMembers(match.id);
+                                        if (match) fetchTeamMembers(match.id, Cookies.get('token'));
                                     }}
                                     className="match-selector"
                                     disabled={loading}
@@ -370,7 +377,7 @@ function Game() {
                                                 setSelectedMatch(match);
                                                 setRedTeamMembers([]);
                                                 setBlueTeamMembers([]);
-                                                fetchTeamMembers(match.id);
+                                                fetchTeamMembers(match.id, Cookies.get('token'));
                                             }}
                                         >
                                             <div className="match-header">
@@ -433,7 +440,7 @@ function Game() {
                                         className={`match-card ${selectedMatch?.id === match.id ? 'matched' : ''}`}
                                         onClick={() => {
                                             setSelectedMatch(match);
-                                            fetchTeamMembers(match.id);
+                                            fetchTeamMembers(match.id, Cookies.get('token'));
                                         }}
                                     >
                                         <div className="match-header">

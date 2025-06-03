@@ -32,8 +32,8 @@ export const setupSocket = (io: SocketIOServer) => {
                 });
                 console.log('Utilisateur authentifié:', { userId: decoded.userId, username: user.username });
                 io.emit('connectedUsers', Array.from(connectedUsers.values()));
-            } catch (err) {
-                console.error('Échec de l\'authentification WebSocket:', err);
+            } catch (err: any) {
+                console.error('Échec de l\'authentification WebSocket:', err.message);
                 socket.disconnect();
             }
         });
@@ -93,6 +93,7 @@ router.post('/create', authenticateToken, requireAdmin, async (req: Authenticate
             },
         });
 
+        console.log('Match créé:', { matchId: match.id, redTeamId: redTeam.id, blueTeamId: blueTeam.id });
         req.app.get('io').emit('matchCreated', match);
 
         return res.status(201).json({
@@ -116,6 +117,7 @@ router.get('/list', authenticateToken, async (req: AuthenticatedRequest, res: Re
                 blueTeam: { include: { users: true } },
             },
         });
+        console.log('Matchs récupérés:', matches.length);
         return res.status(200).json({
             success: true,
             matches,
@@ -138,8 +140,10 @@ router.get('/:matchId/teams', authenticateToken, async (req: AuthenticatedReques
             },
         });
         if (!match) {
+            console.log('Match non trouvé:', matchId);
             return res.status(404).json({ success: false, message: 'Match non trouvé' });
         }
+        console.log('Équipes récupérées pour match:', matchId);
         return res.status(200).json({
             success: true,
             redTeam: match.redTeam,
@@ -185,6 +189,7 @@ router.post('/assign-team', authenticateToken, requireAdmin, async (req: Authent
 
         const user = await prisma.user.findUnique({ where: { id: userId } });
         if (!user) {
+            console.log('Utilisateur non trouvé:', userId);
             return res.status(404).json({ success: false, message: 'Utilisateur non trouvé' });
         }
 
@@ -193,10 +198,12 @@ router.post('/assign-team', authenticateToken, requireAdmin, async (req: Authent
             include: { redTeam: true, blueTeam: true },
         });
         if (!match) {
+            console.log('Match non trouvé:', matchId);
             return res.status(404).json({ success: false, message: 'Match non trouvé' });
         }
 
         if (teamId && teamId !== match.redTeamId && teamId !== match.blueTeamId) {
+            console.log('teamId invalide pour ce match:', { teamId, redTeamId: match.redTeamId, blueTeamId: match.blueTeamId });
             return res.status(400).json({ success: false, message: 'teamId ne correspond pas au match' });
         }
 
@@ -205,6 +212,7 @@ router.post('/assign-team', authenticateToken, requireAdmin, async (req: Authent
             data: { teamId },
         });
 
+        console.log('Utilisateur assigné:', { userId, teamId, matchId });
         req.app.get('io').emit('teamAssigned', { matchId, userId, teamId, username: user.username });
 
         return res.status(200).json({ success: true, message: 'Utilisateur assigné avec succès' });
@@ -231,6 +239,7 @@ router.delete('/:matchId', authenticateToken, requireAdmin, async (req: Authenti
     console.log('Requête de suppression de match reçue:', { matchId, headers: req.headers });
 
     try {
+        // Vérifier l'existence du match
         const match = await prisma.match.findUnique({
             where: { id: matchId },
             include: { redTeam: true, blueTeam: true },
@@ -241,22 +250,26 @@ router.delete('/:matchId', authenticateToken, requireAdmin, async (req: Authenti
             return res.status(404).json({ success: false, message: 'Match non trouvé' });
         }
 
-        console.log('Suppression des utilisateurs associés aux équipes:', { redTeamId: match.redTeamId, blueTeamId: match.blueTeamId });
+        // Étape 1 : Dissocier les utilisateurs des équipes
+        console.log('Dissociation des utilisateurs des équipes:', { redTeamId: match.redTeamId, blueTeamId: match.blueTeamId });
         await prisma.user.updateMany({
             where: { teamId: { in: [match.redTeamId, match.blueTeamId] } },
             data: { teamId: null },
         });
 
+        // Étape 2 : Supprimer les équipes
         console.log('Suppression des équipes:', { redTeamId: match.redTeamId, blueTeamId: match.blueTeamId });
         await prisma.team.deleteMany({
             where: { id: { in: [match.redTeamId, match.blueTeamId] } },
         });
 
+        // Étape 3 : Supprimer le match
         console.log('Suppression du match:', matchId);
         await prisma.match.delete({
             where: { id: matchId },
         });
 
+        console.log('Match supprimé avec succès:', matchId);
         req.app.get('io').emit('matchDeleted', matchId);
 
         return res.status(200).json({ success: true, message: 'Match supprimé avec succès' });
