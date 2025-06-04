@@ -7,7 +7,7 @@ interface AuthenticatedRequest extends Request {
     user?: { userId: string; role: string; username?: string };
 }
 
-const connectedUsers = new Map<string, { userId: string; username: string; socketId: string }>();
+const connectedUsers = new Map<string, { userId: string; username: string; socketId: string; role: string }>();
 
 const router = Router();
 const prisma = new PrismaClient();
@@ -34,9 +34,10 @@ export const setupSocket = (io: SocketIOServer) => {
                     userId: decoded.userId,
                     username: user.username || 'Inconnu',
                     socketId: socket.id,
+                    role: user.role, // Ajout du rôle stocké en base
                 });
 
-                console.log('Utilisateur authentifié:', { userId: decoded.userId, username: user.username });
+                console.log('Utilisateur authentifié:', { userId: decoded.userId, username: user.username, role: user.role });
 
                 // Envoyer la liste des utilisateurs connectés à tous les clients
                 io.emit('connectedUsers', Array.from(connectedUsers.values()));
@@ -195,21 +196,28 @@ router.get('/:matchId/teams', authenticateToken, async (req: AuthenticatedReques
     }
 });
 
+// CORRECTION : Endpoint pour récupérer les utilisateurs connectés avec leur rôle
 // @ts-ignore
 router.get('/users', authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
     try {
-        // Récupérer les utilisateurs connectés + leurs infos depuis la DB
+        // Récupérer tous les utilisateurs connectés avec leurs infos complètes
         const connectedUserIds = Array.from(connectedUsers.keys());
         const users = await prisma.user.findMany({
             where: { id: { in: connectedUserIds } },
             select: { id: true, username: true, teamId: true, role: true }
         });
 
-        const usersWithConnectionInfo = users.map(user => ({
-            ...user,
-            isConnected: connectedUsers.has(user.id),
-            socketId: connectedUsers.get(user.id)?.socketId
-        }));
+        // Enrichir avec les infos de connexion
+        const usersWithConnectionInfo = users.map(user => {
+            const connectedUser = connectedUsers.get(user.id);
+            return {
+                ...user,
+                isConnected: true,
+                socketId: connectedUser?.socketId,
+                // Utiliser le rôle de la base de données (plus fiable)
+                role: user.role
+            };
+        });
 
         console.log('Utilisateurs connectés envoyés:', usersWithConnectionInfo.length);
         return res.status(200).json({
@@ -387,7 +395,7 @@ router.delete('/:matchId', authenticateToken, requireAdmin, async (req: Authenti
             });
             console.log('Utilisateurs dissociés:', updatedUsers.count);
 
-            // Étape 2 : Supprimer le match (les équipes seront supprimées automatiquement grâce aux contraintes)
+            // Étape 2 : Supprimer le match
             console.log('Suppression du match:', matchId);
             await tx.match.delete({
                 where: { id: matchId },
