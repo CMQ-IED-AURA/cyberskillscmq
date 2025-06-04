@@ -21,13 +21,14 @@
     min-height: 100vh;
     display: flex;
     flex-direction: column;
-    background: linear-gradient(135deg, #0f1326 0%, #1a2051 100%);
+    background: linear-gradient(135deg, var(--background) 0%, #1a2051 100%);
+    font-family: 'Orbitron', sans-serif;
+    color: var(--text-light);
 }
 
 .game-header {
     background: rgba(15, 19, 38, 0.9);
     backdrop-filter: blur(10px);
-    color: var(--text-light);
     padding: 1rem 2rem;
     display: flex;
     justify-content: space-between;
@@ -36,6 +37,7 @@
     position: sticky;
     top: 0;
     z-index: 100;
+    box-shadow: 0 0 20px rgba(97, 127, 153, 0.3);
 }
 
 .game-header h1 {
@@ -61,6 +63,7 @@
     border-radius: 8px;
     margin-bottom: 1rem;
     text-align: center;
+    box-shadow: 0 4px 15px var(--shadow);
 }
 
 .loading {
@@ -70,6 +73,7 @@
     border-radius: 8px;
     margin-bottom: 1rem;
     text-align: center;
+    box-shadow: 0 4px 15px var(--shadow);
 }
 
 .admin-panel {
@@ -86,12 +90,14 @@
     height: fit-content;
     max-height: 80vh;
     overflow-y: auto;
+    border: 1px solid var(--neon-blue);
 }
 
 .sidebar h3 {
     color: var(--text-light);
     margin: 0 0 1rem;
     font-size: 1.2rem;
+    text-shadow: 0 0 10px var(--neon-blue);
 }
 
 .users-list {
@@ -108,6 +114,12 @@
     background: rgba(255, 255, 255, 0.05);
     border-radius: 8px;
     color: var(--text-light);
+    transition: var(--transition);
+}
+
+.user-item:hover {
+    background: rgba(138, 176, 255, 0.2);
+    transform: translateX(5px);
 }
 
 .user-status {
@@ -116,6 +128,7 @@
     background: #4caf50;
     border-radius: 50%;
     flex-shrink: 0;
+    box-shadow: 0 0 5px rgba(76, 175, 80, 0.7);
 }
 
 .user-username {
@@ -126,19 +139,66 @@
     display: block;
 }
 
-.user-actions select {
-    background: var(--primary-dark);
-    color: var(--text-light);
-    border: 1px solid var(--primary-light);
-    border-radius: 8px;
-    padding: 0.5rem;
-    font-size: 0.9rem;
-    cursor: pointer;
+.user-actions {
+    display: flex;
+    gap: 0.5rem;
 }
 
-.user-actions select:disabled {
+.cyber-buttons {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.btn-cyber {
+    padding: 0.5rem 1rem;
+    border: none;
+    border-radius: 8px;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: var(--transition);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    box-shadow: 0 4px 15px var(--shadow);
+}
+
+.btn-cyber:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+}
+
+.btn-red {
+    background: linear-gradient(135deg, var(--accent-red) 0%, #a03030 100%);
+    color: var(--text-light);
+}
+
+.btn-red:hover:not(:disabled) {
+    background: linear-gradient(135deg, #ff4444, var(--accent-red));
+    box-shadow: 0 6px 20px rgba(207, 62, 62, 0.5);
+    transform: translateY(-2px);
+}
+
+.btn-blue {
+    background: linear-gradient(135deg, var(--accent-blue) 0%, #2a5cbf 100%);
+    color: var(--text-light);
+}
+
+.btn-blue:hover:not(:disabled) {
+    background: linear-gradient(135deg, #4a8cff, var(--accent-blue));
+    box-shadow: 0 6px 20px rgba(62, 112, 207, 0.5);
+    transform: translateY(-2px);
+}
+
+.btn-remove {
+    background: linear-gradient(135deg, #666, #444);
+    color: var(--text-light);
+}
+
+.btn-remove:hover:not(:disabled) {
+    background: linear-gradient(135deg, #777, #555);
+    box-shadow: 0 6px 20px rgba(102, 102, 102, 0.5);
+    transform: translateY(-2px);
 }
 
 .main-content {
@@ -146,6 +206,12 @@
     display: flex;
     flex-direction: column;
     gap: 1.5rem;
+    background: var(--card-bg);
+    backdrop-filter: blur(10px);
+    border-radius: var(--border-radius);
+    padding: 1.5rem;
+    box-shadow: 0 4px 15px var(--shadow);
+    border: 1px solid var(--neon-blue);
 }
 
 .selected-match {
@@ -170,6 +236,12 @@
     padding: 0.75rem;
     font-size: 1rem;
     cursor: pointer;
+    font-family: 'Orbitron', sans-serif;
+}
+
+.match-selector:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
 }
 
 .matches-grid {
@@ -195,12 +267,14 @@
 
 .match-card.matched {
     border: 2px solid var(--hover-glow);
+    box-shadow: 0 0 25px rgba(138, 176, 255, 0.5);
 }
 
 .match-header h3 {
     margin: 0;
     font-size: clamp(1.2rem, 3vw, 1.5rem);
     color: var(--text-light);
+    text-shadow: 0 0 10px var(--neon-blue);
 }
 
 .teams {
@@ -230,6 +304,7 @@
 .team-card h4 {
     margin: 0 0 0.5rem;
     font-size: 1.1rem;
+    text-shadow: 0 0 5px var(--neon-blue);
 }
 
 .team-card ul {
@@ -262,6 +337,8 @@
     border: none;
     box-shadow: 0 4px 15px rgba(97, 127, 153, 0.3);
     transition: var(--transition);
+    font-family: 'Orbitron', sans-serif;
+    text-transform: uppercase;
 }
 
 .btn-modern:hover:not(:disabled) {
@@ -280,10 +357,17 @@
 }
 
 .btn-delete:hover:not(:disabled) {
-    background: linear-gradient(135deg, #ff4444, 0% var(--accent-red));
+    background: linear-gradient(135deg, #ff4444, var(--accent-red));
+    box-shadow: 0 6px 20px rgba(207, 62, 62, 0.5);
 }
 
-@media screen and (max-width: 2px) {
+.role-divider {
+    border: 1px solid var(--neon-blue);
+    margin: 1rem 0;
+    box-shadow: 0 0 5px var(--neon-blue);
+}
+
+@media screen and (max-width: 992px) {
     .admin-panel {
         flex-direction: column;
     }
@@ -307,5 +391,14 @@
 
     .team-card {
         min-width: 100%;
+    }
+
+    .cyber-buttons {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .btn-cyber {
+        width: 100%;
     }
 }

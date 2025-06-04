@@ -8,9 +8,10 @@ function Game() {
     const navigate = useNavigate();
     const [matches, setMatches] = useState([]);
     const [selectedMatch, setSelectedMatch] = useState(null);
-    const [teamMembersByMatch, setTeamMembersByMatch] = useState({}); // Stocke les membres par match
+    const [teamMembersByMatch, setTeamMembersByMatch] = useState({});
     const [users, setUsers] = useState([]);
     const [role, setRole] = useState(null);
+    const [userId, setUserId] = useState(null);
     const [socket, setSocket] = useState(null);
     const [error, setError] = useState(null);
     const [loading, setLoading] = useState(false);
@@ -27,7 +28,7 @@ function Game() {
             const payload = token.split('.')[1];
             if (!payload) throw new Error('Payload du token manquant.');
             const decoded = JSON.parse(atob(payload));
-            const exp = decoded.exp * 1000; // Convertir en millisecondes
+            const exp = decoded.exp * 1000;
             if (Date.now() >= exp) {
                 console.error('Token expiré, redirection vers login.');
                 Cookies.remove('token');
@@ -35,8 +36,8 @@ function Game() {
                 return;
             }
             setRole(decoded.role);
+            setUserId(decoded.userId);
 
-            console.log('Initialisation du WebSocket avec token:', { userId: decoded.userId, role: decoded.role });
             const newSocket = io('https://cyberskills.onrender.com', {
                 auth: { token },
                 transports: ['websocket', 'polling'],
@@ -71,7 +72,7 @@ function Game() {
             newSocket.on('matchCreated', (newMatch) => {
                 console.log('Nouveau match créé:', newMatch);
                 setMatches((prev) => [...prev, newMatch]);
-                fetchTeamMembers(newMatch.id, token); // Récupérer les membres pour le nouveau match
+                fetchTeamMembers(newMatch.id, token);
             });
 
             newSocket.on('matchDeleted', (matchId) => {
@@ -117,7 +118,6 @@ function Game() {
             if (data.success) {
                 setMatches(data.matches || []);
                 console.log('Matchs récupérés:', data.matches);
-                // Récupérer les membres pour chaque match
                 for (const match of data.matches) {
                     await fetchTeamMembers(match.id, token);
                 }
@@ -248,8 +248,8 @@ function Game() {
         }
     };
 
-    const handleAssignTeam = async (userId, teamId) => {
-        if (!selectedMatch) {
+    const handleAssignTeam = async (userId, teamId, matchId) => {
+        if (!matchId) {
             setError('Veuillez sélectionner un match.');
             return;
         }
@@ -259,7 +259,7 @@ function Game() {
         }
         setLoading(true);
         try {
-            const requestBody = { userId, teamId, matchId: selectedMatch.id };
+            const requestBody = { userId, teamId, matchId };
             console.log('Assignation d\'équipe:', requestBody);
             const token = Cookies.get('token');
             const res = await fetch('https://cyberskills.onrender.com/match/assign-team', {
@@ -276,7 +276,11 @@ function Game() {
                 setError(data.message || 'Erreur lors de l\'assignation de l\'équipe');
             } else {
                 setError(null);
-                console.log('Utilisateur assigné avec succès:', { userId, teamId });
+                console.log('Utilisateur assigné avec succès:', { userId, teamId, matchId });
+                // Refresh team members for all matches to ensure real-time updates
+                for (const match of matches) {
+                    await fetchTeamMembers(match.id, token);
+                }
             }
         } catch (error) {
             console.error('Erreur lors de l\'assignation d\'équipe:', error);
@@ -286,11 +290,22 @@ function Game() {
         }
     };
 
+    const admins = users.filter(user => user.role === 'ADMIN');
+    const nonAdmins = users.filter(user => user.role !== 'ADMIN');
+
     return (
         <div className="game-page">
             <header className="game-header">
                 <h1>CyberSkills</h1>
                 <nav>
+                    {role === 'ADMIN' && (
+                        <button
+                            onClick={() => navigate('/database-management')}
+                            className="btn-modern btn-cyber"
+                        >
+                            Gestion de la Base de Données
+                        </button>
+                    )}
                     <button
                         onClick={() => {
                             Cookies.remove('token');
@@ -311,33 +326,82 @@ function Game() {
                             <h3>Utilisateurs Connectés</h3>
                             <div className="users-list">
                                 {users.length > 0 ? (
-                                    users.map((user) => {
-                                        console.log('Rendu utilisateur:', user);
-                                        return (
-                                            <div key={user.userId || user.id} className="user-item">
-                                                <span className="user-status"></span>
-                                                <span className="user-username">{user.username || 'Inconnu'}</span>
-                                                <div className="user-actions">
-                                                    <select
-                                                        onChange={(e) => {
-                                                            const teamId = e.target.value || null;
-                                                            handleAssignTeam(user.userId || user.id, teamId);
-                                                        }}
-                                                        value=""
-                                                        disabled={!selectedMatch || loading}
-                                                    >
-                                                        <option value="">Retirer de l'équipe</option>
-                                                        {selectedMatch && (
-                                                            <>
-                                                                <option value={selectedMatch.redTeamId}>Équipe Rouge</option>
-                                                                <option value={selectedMatch.blueTeamId}>Équipe Bleue</option>
-                                                            </>
-                                                        )}
-                                                    </select>
+                                    <>
+                                        <h4>Administrateurs</h4>
+                                        {admins.length > 0 ? (
+                                            admins.map((user) => (
+                                                <div key={user.id} className="user-item">
+                                                    <span className="user-status"></span>
+                                                    <span className="user-username">
+                                                        {user.username || 'Inconnu'}
+                                                        {user.id === userId && ' (vous)'}
+                                                    </span>
+                                                    <div className="user-actions cyber-buttons">
+                                                        <button
+                                                            onClick={() => handleAssignTeam(user.id, selectedMatch?.redTeamId, selectedMatch?.id)}
+                                                            disabled={!selectedMatch || loading}
+                                                            className="btn-cyber btn-red"
+                                                        >
+                                                            Équipe Rouge
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleAssignTeam(user.id, selectedMatch?.blueTeamId, selectedMatch?.id)}
+                                                            disabled={!selectedMatch || loading}
+                                                            className="btn-cyber btn-blue"
+                                                        >
+                                                            Équipe Bleue
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleAssignTeam(user.id, null, selectedMatch?.id)}
+                                                            disabled={!selectedMatch || loading}
+                                                            className="btn-cyber btn-remove"
+                                                        >
+                                                            Retirer
+                                                        </button>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        );
-                                    })
+                                            ))
+                                        ) : (
+                                            <p>Aucun administrateur connecté.</p>
+                                        )}
+                                        <hr className="role-divider" />
+                                        <h4>Joueurs</h4>
+                                        {nonAdmins.length > 0 ? (
+                                            nonAdmins.map((user) => (
+                                                <div key={user.id} className="user-item">
+                                                    <span className="user-status"></span>
+                                                    <span className="user-username">
+                                                        {user.username || 'Inconnu'}
+                                                    </span>
+                                                    <div className="user-actions cyber-buttons">
+                                                        <button
+                                                            onClick={() => handleAssignTeam(user.id, selectedMatch?.redTeamId, selectedMatch?.id)}
+                                                            disabled={!selectedMatch || loading}
+                                                            className="btn-cyber btn-red"
+                                                        >
+                                                            Équipe Rouge
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleAssignTeam(user.id, selectedMatch?.blueTeamId, selectedMatch?.id)}
+                                                            disabled={!selectedMatch || loading}
+                                                            className="btn-cyber btn-blue"
+                                                        >
+                                                            Équipe Bleue
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleAssignTeam(user.id, null, selectedMatch?.id)}
+                                                            disabled={!selectedMatch || loading}
+                                                            className="btn-cyber btn-remove"
+                                                        >
+                                                            Retirer
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ))
+                                        ) : (
+                                            <p>Aucun joueur connecté.</p>
+                                        )}
+                                    </>
                                 ) : (
                                     <p>Aucun utilisateur connecté.</p>
                                 )}
@@ -349,7 +413,7 @@ function Game() {
                                 {selectedMatch ? `Match Sélectionné : ${selectedMatch.id.slice(0, 8)}` : 'Aucun match sélectionné'}
                             </h3>
                             <div className="admin-controls">
-                                <button onClick={handleCreateMatch} disabled={loading} className="btn-modern">
+                                <button onClick={handleCreateMatch} disabled={loading} className="btn-modern btn-cyber">
                                     Créer un nouveau match
                                 </button>
                                 <select
