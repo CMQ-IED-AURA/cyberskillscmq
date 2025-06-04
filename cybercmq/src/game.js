@@ -47,6 +47,11 @@ function Game() {
             });
             setSocket(newSocket);
 
+            // Debug - Log tous les événements WebSocket
+            newSocket.onAny((eventName, ...args) => {
+                console.log('Événement WebSocket reçu:', eventName, args);
+            });
+
             fetchMatches(token);
             if (decoded.role === 'ADMIN') {
                 fetchUsers(token);
@@ -90,10 +95,24 @@ function Game() {
 
             newSocket.on('teamAssigned', ({ matchId, userId, teamId, username }) => {
                 console.log('Équipe assignée:', { matchId, userId, teamId, username });
+                // Rafraîchir seulement le match concerné
                 fetchTeamMembers(matchId, token);
+                // Rafraîchir la liste des utilisateurs pour les admins
                 if (decoded.role === 'ADMIN') {
                     fetchUsers(token);
                 }
+            });
+
+            // Nouvel événement pour les mises à jour d'équipes en temps réel
+            newSocket.on('teamsUpdated', ({ matchId, redTeam, blueTeam }) => {
+                console.log('Équipes mises à jour:', { matchId, redTeam, blueTeam });
+                setTeamMembersByMatch((prev) => ({
+                    ...prev,
+                    [matchId]: {
+                        redTeam: redTeam || [],
+                        blueTeam: blueTeam || [],
+                    },
+                }));
             });
 
             return () => {
@@ -257,6 +276,34 @@ function Game() {
             setError('Utilisateur non sélectionné ou invalide.');
             return;
         }
+
+        // Optimistic update - mise à jour immédiate de l'interface
+        const user = users.find(u => u.id === userId);
+        if (user) {
+            setTeamMembersByMatch(prev => {
+                const current = prev[matchId] || { redTeam: [], blueTeam: [] };
+                const newState = { ...prev };
+
+                // Retirer l'utilisateur de toutes les équipes
+                newState[matchId] = {
+                    redTeam: current.redTeam.filter(u => u.id !== userId),
+                    blueTeam: current.blueTeam.filter(u => u.id !== userId),
+                };
+
+                // Ajouter à la nouvelle équipe si teamId n'est pas null
+                if (teamId) {
+                    const match = matches.find(m => m.id === matchId);
+                    if (match?.redTeamId === teamId) {
+                        newState[matchId].redTeam.push(user);
+                    } else if (match?.blueTeamId === teamId) {
+                        newState[matchId].blueTeam.push(user);
+                    }
+                }
+
+                return newState;
+            });
+        }
+
         setLoading(true);
         try {
             const requestBody = { userId, teamId, matchId };
@@ -274,17 +321,18 @@ function Game() {
             if (!data.success) {
                 console.error('Erreur d\'assignation d\'équipe:', data.message);
                 setError(data.message || 'Erreur lors de l\'assignation de l\'équipe');
+                // En cas d'erreur, recharger les données correctes
+                fetchTeamMembers(matchId, token);
             } else {
                 setError(null);
                 console.log('Utilisateur assigné avec succès:', { userId, teamId, matchId });
-                // Refresh team members for all matches to ensure real-time updates
-                for (const match of matches) {
-                    await fetchTeamMembers(match.id, token);
-                }
+                // Le WebSocket se chargera de la mise à jour finale
             }
         } catch (error) {
             console.error('Erreur lors de l\'assignation d\'équipe:', error);
             setError('Erreur serveur lors de l\'assignation de l\'équipe.');
+            // En cas d'erreur réseau, recharger les données correctes
+            fetchTeamMembers(matchId, token);
         } finally {
             setLoading(false);
         }
