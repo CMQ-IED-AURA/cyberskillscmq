@@ -290,6 +290,7 @@ function Game() {
         }
     };
 
+    // Filter users by role, ensuring admin users are correctly identified
     const admins = users.filter(user => user.role === 'ADMIN');
     const nonAdmins = users.filter(user => user.role !== 'ADMIN');
 
@@ -298,14 +299,6 @@ function Game() {
             <header className="game-header">
                 <h1>CyberSkills</h1>
                 <nav>
-                    {role === 'ADMIN' && (
-                        <button
-                            onClick={() => navigate('/database-management')}
-                            className="btn-modern btn-cyber"
-                        >
-                            Gestion de la Base de Données
-                        </button>
-                    )}
                     <button
                         onClick={() => {
                             Cookies.remove('token');
