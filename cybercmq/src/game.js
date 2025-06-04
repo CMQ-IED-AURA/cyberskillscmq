@@ -8,19 +8,17 @@ function Game() {
     const navigate = useNavigate();
     const [matches, setMatches] = useState([]);
     const [selectedMatch, setSelectedMatch] = useState(null);
-    const [teamMembersByMatch, setTeamMembersByMatch] = useState({});
+    const [teamMembersByMatch, setTeamMembersByMatch] = useState({}); // Stocke les membres par match
     const [users, setUsers] = useState([]);
     const [role, setRole] = useState(null);
     const [socket, setSocket] = useState(null);
-    const [error, setError] = useState('');
+    const [error, setError] = useState(null);
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
-        const allCookies = Cookies.get();
-        console.log('Cookies disponibles au chargement:', allCookies);
-        const token = Cookies.get('tokenId');
+        const token = Cookies.get('token');
         if (!token) {
-            console.error('Aucun token trouvé, redirection vers login. Cookies:', allCookies);
+            console.error('Aucun token trouvé, redirection vers login.');
             navigate('/login');
             return;
         }
@@ -29,10 +27,10 @@ function Game() {
             const payload = token.split('.')[1];
             if (!payload) throw new Error('Payload du token manquant.');
             const decoded = JSON.parse(atob(payload));
-            const exp = decoded.exp * 1000;
+            const exp = decoded.exp * 1000; // Convertir en millisecondes
             if (Date.now() >= exp) {
                 console.error('Token expiré, redirection vers login.');
-                Cookies.remove('tokenId');
+                Cookies.remove('token');
                 navigate('/login');
                 return;
             }
@@ -73,7 +71,7 @@ function Game() {
             newSocket.on('matchCreated', (newMatch) => {
                 console.log('Nouveau match créé:', newMatch);
                 setMatches((prev) => [...prev, newMatch]);
-                fetchTeamMembers(newMatch.id, token);
+                fetchTeamMembers(newMatch.id, token); // Récupérer les membres pour le nouveau match
             });
 
             newSocket.on('matchDeleted', (matchId) => {
@@ -89,15 +87,9 @@ function Game() {
                 }
             });
 
-            newSocket.on('teamAssigned', ({ affectedMatchIds }) => {
-                console.log('Équipe assignée, matchs affectés:', affectedMatchIds);
-                affectedMatchIds.forEach((matchId) => {
-                    setTeamMembersByMatch((prev) => ({
-                        ...prev,
-                        [matchId]: { redTeam: [], blueTeam: [] },
-                    }));
-                    fetchTeamMembers(matchId, token);
-                });
+            newSocket.on('teamAssigned', ({ matchId, userId, teamId, username }) => {
+                console.log('Équipe assignée:', { matchId, userId, teamId, username });
+                fetchTeamMembers(matchId, token);
                 if (decoded.role === 'ADMIN') {
                     fetchUsers(token);
                 }
@@ -110,7 +102,7 @@ function Game() {
         } catch (error) {
             console.error('Erreur de décodage du token:', error.message);
             setError('Erreur d\'authentification, veuillez vous reconnecter.');
-            Cookies.remove('tokenId');
+            Cookies.remove('token');
             navigate('/login');
         }
     }, [navigate]);
@@ -123,17 +115,18 @@ function Game() {
             });
             const data = await res.json();
             if (data.success) {
-                setMatches(data.data || []);
-                console.log('Matchs récupérés:', data.data);
-                for (const match of data.data) {
+                setMatches(data.matches || []);
+                console.log('Matchs récupérés:', data.matches);
+                // Récupérer les membres pour chaque match
+                for (const match of data.matches) {
                     await fetchTeamMembers(match.id, token);
                 }
-                if (data.data.length > 0 && !selectedMatch) {
-                    setSelectedMatch(data.data[0]);
+                if (data.matches.length > 0 && !selectedMatch) {
+                    setSelectedMatch(data.matches[0]);
                 }
             } else {
-                console.error('Erreur serveur:', data.error);
-                setError(data.error || 'Erreur lors de la récupération des matchs');
+                console.error('Erreur serveur:', data.message);
+                setError(data.message || 'Erreur lors de la récupération des matchs');
             }
         } catch (error) {
             console.error('Erreur lors de la récupération des matchs:', error);
@@ -157,17 +150,17 @@ function Game() {
                 setTeamMembersByMatch((prev) => ({
                     ...prev,
                     [matchId]: {
-                        redTeam: data.data.redTeam?.users || [],
-                        blueTeam: data.data.blueTeam?.users || [],
+                        redTeam: data.redTeam?.users || [],
+                        blueTeam: data.blueTeam?.users || [],
                     },
                 }));
                 console.log('Membres des équipes récupérés pour match:', matchId, {
-                    redTeam: data.data.redTeam?.users,
-                    blueTeam: data.data.blueTeam?.users,
+                    redTeam: data.redTeam?.users,
+                    blueTeam: data.blueTeam?.users,
                 });
             } else {
-                console.error('Erreur serveur:', data.error);
-                setError(data.error || 'Erreur lors de la récupération des membres');
+                console.error('Erreur serveur:', data.message);
+                setError(data.message || 'Erreur lors de la récupération des membres');
             }
         } catch (error) {
             console.error('Erreur lors de la récupération des membres pour match:', matchId, error);
@@ -183,11 +176,11 @@ function Game() {
             });
             const data = await res.json();
             if (data.success) {
-                console.log('Utilisateurs récupérés via API:', data.data);
-                setUsers(data.data || []);
+                console.log('Utilisateurs récupérés via API:', data.users);
+                setUsers(data.users || []);
             } else {
-                console.error('Erreur serveur:', data.error);
-                setError(data.error || 'Erreur lors de la récupération des utilisateurs');
+                console.error('Erreur serveur:', data.message);
+                setError(data.message || 'Erreur lors de la récupération des utilisateurs');
             }
         } catch (error) {
             console.error('Erreur lors de la récupération des utilisateurs:', error);
@@ -200,7 +193,7 @@ function Game() {
     const handleCreateMatch = async () => {
         setLoading(true);
         try {
-            const token = Cookies.get('tokenId');
+            const token = Cookies.get('token');
             const res = await fetch('https://cyberskills.onrender.com/match/create', {
                 method: 'POST',
                 headers: {
@@ -210,11 +203,11 @@ function Game() {
             });
             const data = await res.json();
             if (!data.success) {
-                console.error('Erreur serveur:', data.error);
-                setError(data.error || 'Erreur lors de la création du match');
+                console.error('Erreur serveur:', data.message);
+                setError(data.message || 'Erreur lors de la création du match');
             } else {
                 setError(null);
-                console.log('Match créé avec succès:', data.data.matchId);
+                console.log('Match créé avec succès:', data.matchId);
             }
         } catch (error) {
             console.error('Erreur lors de la création du match:', error);
@@ -232,7 +225,7 @@ function Game() {
         setLoading(true);
         try {
             console.log('Tentative de suppression du match:', matchId);
-            const token = Cookies.get('tokenId');
+            const token = Cookies.get('token');
             const res = await fetch(`https://cyberskills.onrender.com/match/${matchId}`, {
                 method: 'DELETE',
                 headers: {
@@ -241,8 +234,8 @@ function Game() {
             });
             const data = await res.json();
             if (!data.success) {
-                console.error('Erreur serveur:', data.error);
-                setError(data.error || 'Erreur lors de la suppression du match');
+                console.error('Erreur serveur:', data.message);
+                setError(data.message || 'Erreur lors de la suppression du match');
             } else {
                 setError(null);
                 console.log('Match supprimé avec succès:', matchId);
@@ -268,7 +261,7 @@ function Game() {
         try {
             const requestBody = { userId, teamId, matchId: selectedMatch.id };
             console.log('Assignation d\'équipe:', requestBody);
-            const token = Cookies.get('tokenId');
+            const token = Cookies.get('token');
             const res = await fetch('https://cyberskills.onrender.com/match/assign-team', {
                 method: 'POST',
                 headers: {
@@ -279,8 +272,8 @@ function Game() {
             });
             const data = await res.json();
             if (!data.success) {
-                console.error('Erreur d\'assignation d\'équipe:', data.error);
-                setError(data.error || 'Erreur lors de l\'assignation de l\'équipe');
+                console.error('Erreur d\'assignation d\'équipe:', data.message);
+                setError(data.message || 'Erreur lors de l\'assignation de l\'équipe');
             } else {
                 setError(null);
                 console.log('Utilisateur assigné avec succès:', { userId, teamId });
@@ -300,7 +293,7 @@ function Game() {
                 <nav>
                     <button
                         onClick={() => {
-                            Cookies.remove('tokenId');
+                            Cookies.remove('token');
                             navigate('/');
                         }}
                         className="btn-modern"
@@ -318,38 +311,33 @@ function Game() {
                             <h3>Utilisateurs Connectés</h3>
                             <div className="users-list">
                                 {users.length > 0 ? (
-                                    users.map((user) => (
-                                        <div key={user.id} className="user-item">
-                                            <span className="user-status"></span>
-                                            <span className="user-username">{user.username || 'Inconnu'}</span>
-                                            <div className="user-actions">
-                                                <button
-                                                    onClick={() => handleAssignTeam(user.id, selectedMatch?.redTeamId)}
-                                                    disabled={!selectedMatch || loading}
-                                                    className="btn-modern btn-red"
-                                                    title="Assigner à l'équipe Rouge"
-                                                >
-                                                    Assigner Rouge
-                                                </button>
-                                                <button
-                                                    onClick={() => handleAssignTeam(user.id, selectedMatch?.blueTeamId)}
-                                                    disabled={!selectedMatch || loading}
-                                                    className="btn-modern btn-blue"
-                                                    title="Assigner à l'équipe Bleue"
-                                                >
-                                                    Assigner Bleue
-                                                </button>
-                                                <button
-                                                    onClick={() => handleAssignTeam(user.id, null)}
-                                                    disabled={!selectedMatch || loading}
-                                                    className="btn-modern btn-remove"
-                                                    title="Retirer de l'équipe"
-                                                >
-                                                    Retirer
-                                                </button>
+                                    users.map((user) => {
+                                        console.log('Rendu utilisateur:', user);
+                                        return (
+                                            <div key={user.userId || user.id} className="user-item">
+                                                <span className="user-status"></span>
+                                                <span className="user-username">{user.username || 'Inconnu'}</span>
+                                                <div className="user-actions">
+                                                    <select
+                                                        onChange={(e) => {
+                                                            const teamId = e.target.value || null;
+                                                            handleAssignTeam(user.userId || user.id, teamId);
+                                                        }}
+                                                        value=""
+                                                        disabled={!selectedMatch || loading}
+                                                    >
+                                                        <option value="">Retirer de l'équipe</option>
+                                                        {selectedMatch && (
+                                                            <>
+                                                                <option value={selectedMatch.redTeamId}>Équipe Rouge</option>
+                                                                <option value={selectedMatch.blueTeamId}>Équipe Bleue</option>
+                                                            </>
+                                                        )}
+                                                    </select>
+                                                </div>
                                             </div>
-                                        </div>
-                                    ))
+                                        );
+                                    })
                                 ) : (
                                     <p>Aucun utilisateur connecté.</p>
                                 )}
