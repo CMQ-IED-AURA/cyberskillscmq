@@ -39,7 +39,16 @@ export const setupSocket = (io: SocketIOServer) => {
 
                 console.log('Utilisateur authentifié:', { userId: decoded.userId, username: user.username, role: user.role });
 
-                io.emit('connectedUsers', Array.from(connectedUsers.values()));
+                // Envoyer la liste complète des utilisateurs avec leur statut de connexion
+                const allUsers = await prisma.user.findMany({
+                    select: { id: true, username: true, teamId: true, role: true }
+                });
+                const usersWithConnectionInfo = allUsers.map(user => ({
+                    ...user,
+                    isConnected: connectedUsers.has(user.id),
+                    socketId: connectedUsers.get(user.id)?.socketId || null,
+                }));
+                io.emit('connectedUsers', usersWithConnectionInfo);
 
                 socket.emit('authenticated', { success: true, userId: decoded.userId });
 
@@ -55,8 +64,18 @@ export const setupSocket = (io: SocketIOServer) => {
             for (const [userId, user] of connectedUsers) {
                 if (user.socketId === socket.id) {
                     connectedUsers.delete(userId);
-                    io.emit('connectedUsers', Array.from(connectedUsers.values()));
                     console.log(`Utilisateur ${user.username} retiré de la liste des connectés`);
+                    // Mettre à jour la liste des utilisateurs
+                    prisma.user.findMany({
+                        select: { id: true, username: true, teamId: true, role: true }
+                    }).then(allUsers => {
+                        const usersWithConnectionInfo = allUsers.map(u => ({
+                            ...u,
+                            isConnected: connectedUsers.has(u.id),
+                            socketId: connectedUsers.get(u.id)?.socketId || null,
+                        }));
+                        io.emit('connectedUsers', usersWithConnectionInfo);
+                    });
                     break;
                 }
             }
@@ -260,6 +279,12 @@ router.post('/assign-team', authenticateToken, requireAdmin, async (req: Authent
             });
         }
 
+        // Retirer l'utilisateur de toutes les autres équipes avant assignation
+        await prisma.user.update({
+            where: { id: userId },
+            data: { teamId: null }
+        });
+
         const updatedUser = await prisma.user.update({
             where: { id: userId },
             data: { teamId },
@@ -285,7 +310,34 @@ router.post('/assign-team', authenticateToken, requireAdmin, async (req: Authent
                 username: user.username,
                 updatedMatch
             });
-            io.emit('connectedUsers', Array.from(connectedUsers.values()));
+            // Mettre à jour tous les matchs pour refléter le retrait de l'utilisateur des autres équipes
+            const allMatches = await prisma.match.findMany({
+                include: {
+                    redTeam: { include: { users: { select: { id: true, username: true, score: true } } } },
+                    blueTeam: { include: { users: { select: { id: true, username: true, score: true } } } },
+                }
+            });
+            allMatches.forEach(m => {
+                if (m.id !== matchId) {
+                    io.emit('teamAssigned', {
+                        matchId: m.id,
+                        userId,
+                        teamId: null,
+                        username: user.username,
+                        updatedMatch: m
+                    });
+                }
+            });
+            // Mettre à jour la liste des utilisateurs
+            const allUsers = await prisma.user.findMany({
+                select: { id: true, username: true, teamId: true, role: true }
+            });
+            const usersWithConnectionInfo = allUsers.map(u => ({
+                ...u,
+                isConnected: connectedUsers.has(u.id),
+                socketId: connectedUsers.get(u.id)?.socketId || null,
+            }));
+            io.emit('connectedUsers', usersWithConnectionInfo);
         }
 
         return res.status(200).json({
@@ -299,6 +351,84 @@ router.post('/assign-team', authenticateToken, requireAdmin, async (req: Authent
         res.status(500).json({
             success: false,
             message: 'Erreur lors de l\'assignation de l\'équipe',
+            error: err.message
+        });
+    }
+});
+
+router.post('/ban-user', authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
+    const { userId, ipAddress } = req.body;
+
+    console.log('Requête ban-user reçue:', { userId, ipAddress });
+
+    try {
+        if (!userId || !ipAddress) {
+            console.error('Paramètres manquants:', { userId, ipAddress });
+            return res.status(400).json({ success: false, message: 'userId et ipAddress sont requis' });
+        }
+
+        const user = await prisma.user.findUnique({
+            where: { id: userId },
+            select: { username: true, role: true }
+        });
+        if (!user) {
+            console.error('Utilisateur non trouvé:', userId);
+            return res.status(404).json({ success: false, message: 'Utilisateur non trouvé' });
+        }
+
+        if (user.role === 'BANNED') {
+            console.warn('Utilisateur déjà banni:', userId);
+            return res.status(400).json({ success: false, message: 'Utilisateur déjà banni' });
+        }
+
+        // Mettre à jour le rôle de l'utilisateur à BANNED
+        const updatedUser = await prisma.user.update({
+            where: { id: userId },
+            data: { role: 'BANNED', teamId: null }
+        });
+
+        // Ajouter l'IP à la liste des IP bannies
+        await prisma.bannedIP.create({
+            data: {
+                ipAddress,
+                userId,
+                bannedAt: new Date()
+            }
+        });
+
+        console.log('Utilisateur banni:', { userId, ipAddress });
+
+        const io = getSocketIO(req);
+        if (io) {
+            // Déconnecter l'utilisateur s'il est connecté
+            const connectedUser = connectedUsers.get(userId);
+            if (connectedUser) {
+                io.to(connectedUser.socketId).emit('authError', { message: 'Vous avez été banni' });
+                io.to(connectedUser.socketId).disconnectSockets();
+                connectedUsers.delete(userId);
+            }
+            // Mettre à jour la liste des utilisateurs
+            const allUsers = await prisma.user.findMany({
+                select: { id: true, username: true, teamId: true, role: true }
+            });
+            const usersWithConnectionInfo = allUsers.map(u => ({
+                ...u,
+                isConnected: connectedUsers.has(u.id),
+                socketId: connectedUsers.get(u.id)?.socketId || null,
+            }));
+            io.emit('connectedUsers', usersWithConnectionInfo);
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: 'Utilisateur banni avec succès',
+            user: updatedUser
+        });
+    } catch (err: any) {
+        console.error('Erreur lors du bannissement:', err.message, err.stack);
+        res.status(500).json({
+            success: false,
+            message: 'Erreur lors du bannissement de l\'utilisateur',
             error: err.message
         });
     }
@@ -371,7 +501,15 @@ router.delete('/:matchId', authenticateToken, requireAdmin, async (req: Authenti
         const io = getSocketIO(req);
         if (io) {
             io.emit('matchDeleted', { matchId });
-            io.emit('connectedUsers', Array.from(connectedUsers.values()));
+            const allUsers = await prisma.user.findMany({
+                select: { id: true, username: true, teamId: true, role: true }
+            });
+            const usersWithConnectionInfo = allUsers.map(u => ({
+                ...u,
+                isConnected: connectedUsers.has(u.id),
+                socketId: connectedUsers.get(u.id)?.socketId || null,
+            }));
+            io.emit('connectedUsers', usersWithConnectionInfo);
         }
 
         return res.status(200).json({
@@ -403,6 +541,58 @@ router.delete('/:matchId', authenticateToken, requireAdmin, async (req: Authenti
             message: errorMessage,
             error: err.message,
             code: err.code,
+        });
+    }
+});
+
+// Endpoint d'inscription (ajouté pour gérer la vérification d'IP bannie)
+router.post('/register', async (req: Request, res: Response) => {
+    const { username, password, ipAddress } = req.body;
+
+    try {
+        if (!username || !password || !ipAddress) {
+            return res.status(400).json({ success: false, message: 'username, password et ipAddress sont requis' });
+        }
+
+        // Vérifier si l'IP est bannie
+        const bannedIP = await prisma.bannedIP.findUnique({
+            where: { ipAddress }
+        });
+        if (bannedIP) {
+            console.warn('Tentative d\'inscription avec IP bannie:', ipAddress);
+            return res.status(403).json({ success: false, message: 'Inscription interdite : IP bannie' });
+        }
+
+        // Vérifier si l'utilisateur existe déjà
+        const existingUser = await prisma.user.findUnique({
+            where: { username }
+        });
+        if (existingUser) {
+            return res.status(400).json({ success: false, message: 'Nom d\'utilisateur déjà pris' });
+        }
+
+        // Créer l'utilisateur (simplifié, à adapter selon votre logique de hachage de mot de passe)
+        const user = await prisma.user.create({
+            data: {
+                username,
+                passwordHash: password, // À remplacer par un vrai hachage
+                role: 'USER'
+            }
+        });
+
+        console.log('Utilisateur inscrit:', { username, ipAddress });
+
+        return res.status(201).json({
+            success: true,
+            message: 'Utilisateur inscrit avec succès',
+            user: { id: user.id, username: user.username, role: user.role }
+        });
+    } catch (err: any) {
+        console.error('Erreur lors de l\'inscription:', err.message, err.stack);
+        res.status(500).json({
+            success: false,
+            message: 'Erreur lors de l\'inscription',
+            error: err.message
         });
     }
 });

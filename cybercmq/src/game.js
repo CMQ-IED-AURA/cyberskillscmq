@@ -73,6 +73,8 @@ function Game() {
             newSocket.on('authError', (error) => {
                 console.error('Erreur d\'authentification WebSocket:', error);
                 setError('Erreur d\'authentification WebSocket.');
+                Cookies.remove('token');
+                navigate('/login');
             });
 
             newSocket.on('connect_error', (error) => {
@@ -81,8 +83,8 @@ function Game() {
             });
 
             newSocket.on('connectedUsers', (connectedUsers) => {
-                console.log('Utilisateurs connectés reçus via WebSocket:', connectedUsers);
-                // Ne plus mettre à jour users ici, car fetchUsers gère tous les utilisateurs
+                console.log('Utilisateurs reçus via WebSocket:', connectedUsers);
+                setUsers(connectedUsers || []);
             });
 
             newSocket.on('matchCreated', (newMatch) => {
@@ -114,9 +116,6 @@ function Game() {
                         blueTeam: updatedMatch.blueTeam?.users || [],
                     },
                 }));
-                if (role === 'ADMIN') {
-                    fetchUsers(token);
-                }
             });
 
             newSocket.on('teamsUpdated', ({ matchId, redTeam, blueTeam }) => {
@@ -242,7 +241,6 @@ function Game() {
                 setError(data.message || 'Erreur lors de la création du match');
             } else {
                 console.log('Match créé avec succès:', data.matchId);
-                // Le WebSocket se chargera de la mise à jour
             }
         } catch (error) {
             console.error('Erreur lors de la création du match:', error);
@@ -280,7 +278,6 @@ function Game() {
                 setError(data.message || 'Erreur lors de la suppression du match');
             } else {
                 console.log('Match supprimé avec succès:', matchId);
-                // Le WebSocket se chargera de la mise à jour
             }
         } catch (error) {
             console.error('Erreur lors de la suppression du match:', error);
@@ -336,7 +333,6 @@ function Game() {
                 setError(data.message || 'Erreur lors de l\'assignation de l\'équipe');
             } else {
                 console.log('Utilisateur assigné avec succès:', { userId, teamId, matchId });
-                // Le WebSocket se chargera de la mise à jour
             }
         } catch (error) {
             console.error('Erreur lors de l\'assignation d\'équipe:', error);
@@ -488,8 +484,8 @@ function Game() {
                                 <select
                                     value={selectedMatch?.id || ''}
                                     onChange={(e) => {
-                                        const match = matches.find((m) => m.id === e.target.value);
-                                        setSelectedMatch(match || null);
+                                        const match = matches.find((m => m.id === m.id))
+                                        setSelectedMatch((match || null));
                                     }}
                                     className="match-selector"
                                     disabled={loading}
