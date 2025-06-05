@@ -51,7 +51,6 @@ function Game() {
             });
             setSocket(newSocket);
 
-            // Debug - Log tous les événements WebSocket
             newSocket.onAny((eventName, ...args) => {
                 console.log('Événement WebSocket reçu:', eventName, args);
             });
@@ -217,7 +216,7 @@ function Game() {
             }
         } catch (error) {
             console.error('Erreur lors de la récupération des utilisateurs:', error);
-            setError('Erreur serveur lors de la récupération des utilisateurs.');
+            setError('Erreur lors de la récupération des utilisateurs.');
         }
     };
 
@@ -296,7 +295,7 @@ function Game() {
             setError('Utilisateur non sélectionné ou invalide.');
             return;
         }
-        if (teamId && teamId !== selectedMatch.redTeamId && teamId !== selectedMatch.blueTeamId) {
+        if (teamId && teamId !== selectedMatch?.redTeamId && teamId !== selectedMatch?.blueTeamId) {
             setError('Équipe invalide pour ce match.');
             return;
         }
@@ -342,17 +341,28 @@ function Game() {
         }
     };
 
-    const admins = users.filter(user => user.role === 'ADMIN');
-    const nonAdmins = users.filter(user => user.role !== 'ADMIN');
+    // Filtrer les utilisateurs pour n'afficher que :
+    // - Les utilisateurs connectés (isConnected: true)
+    // - Les utilisateurs déconnectés (isConnected: false) qui sont dans une équipe (teamId non null)
+    const filteredUsers = users.filter(user => user.isConnected || (!user.isConnected && user.teamId));
+    const admins = filteredUsers.filter(user => user.role === 'ADMIN');
+    const nonAdmins = filteredUsers.filter(user => user.role !== 'ADMIN');
 
     console.log('État actuel:', {
         role,
         userId,
         username,
-        usersCount: users.length,
+        totalUsers: users.length,
+        filteredUsers: filteredUsers.length,
         adminsCount: admins.length,
         nonAdminsCount: nonAdmins.length,
-        users: users.map(u => ({ id: u.id, username: u.username, role: u.role, isConnected: u.isConnected }))
+        users: filteredUsers.map(u => ({
+            id: u.id,
+            username: u.username,
+            role: u.role,
+            isConnected: u.isConnected,
+            teamId: u.teamId
+        }))
     });
 
     return (
@@ -366,9 +376,9 @@ function Game() {
                     <button
                         onClick={() => {
                             Cookies.remove('token');
-                            navigate('/');
+                            navigate('/login');
                         }}
-                        className="btn-modern"
+                        className="btn btn-modern"
                     >
                         Déconnexion
                     </button>
@@ -380,9 +390,9 @@ function Game() {
                 {role === 'ADMIN' ? (
                     <div className="admin-panel">
                         <div className="sidebar">
-                            <h3>Utilisateurs ({users.length})</h3>
+                            <h3>Utilisateurs ({filteredUsers.length})</h3>
                             <div className="users-list">
-                                {users.length > 0 ? (
+                                {filteredUsers.length > 0 ? (
                                     <>
                                         {admins.length > 0 && (
                                             <>
@@ -399,7 +409,7 @@ function Game() {
                                                             <button
                                                                 onClick={() => handleAssignTeam(user.id, selectedMatch?.redTeamId, selectedMatch?.id)}
                                                                 disabled={!selectedMatch || loading}
-                                                                className="btn-cyber btn-red"
+                                                                className="btn btn-cyber btn-red"
                                                             >
                                                                 Équipe Rouge
                                                             </button>
@@ -430,15 +440,15 @@ function Game() {
                                                 <div key={user.id} className="user-item">
                                                     <span className={`user-status ${user.isConnected ? 'connected' : 'disconnected'}`}></span>
                                                     <span className="user-username">
-                                                        {user.username || 'Inconnu'}
+                                {user.username || 'Inconnu'}
                                                         {user.id === userId && ' (vous)'}
                                                         {!user.isConnected && ' (déconnecté)'}
-                                                    </span>
+                            </span>
                                                     <div className="user-actions cyber-buttons">
                                                         <button
                                                             onClick={() => handleAssignTeam(user.id, selectedMatch?.redTeamId, selectedMatch?.id)}
                                                             disabled={!selectedMatch || loading}
-                                                            className="btn-cyber btn-red"
+                                                            className="btn btn-cyber btn-red"
                                                         >
                                                             Équipe Rouge
                                                         </button>
@@ -471,7 +481,7 @@ function Game() {
                         <div className="main-content">
                             <h2>Administration</h2>
                             <h3 className="selected-match">
-                                {selectedMatch ? `Match Sélectionné : ${selectedMatch.id.slice(0, 8)}` : 'Aucun match sélectionné'}
+                                {selectedMatch ? `Match Sélectionné : ${selectedMatch?.id.slice(0, 8)}` : 'Aucun match sélectionné'}
                             </h3>
                             <div className="admin-controls">
                                 <button
@@ -484,8 +494,8 @@ function Game() {
                                 <select
                                     value={selectedMatch?.id || ''}
                                     onChange={(e) => {
-                                        const match = matches.find((m => m.id === m.id))
-                                        setSelectedMatch((match || null));
+                                        const match = matches.find((m) => m.id === e.target.value);
+                                        setSelectedMatch(match || null);
                                     }}
                                     className="match-selector"
                                     disabled={loading}
@@ -510,7 +520,7 @@ function Game() {
                                             }}
                                         >
                                             <div className="match-header">
-                                                <h3>Match {match.id.slice(0, 8)}</h3>
+                                                <h4>Match {match.id.slice(0, 8)}</h4>
                                             </div>
                                             <div className="teams">
                                                 <div className="team-card red-team">
@@ -550,8 +560,8 @@ function Game() {
                                                         e.stopPropagation();
                                                         handleDeleteMatch(match.id);
                                                     }}
-                                                    className="btn-modern btn-delete"
                                                     disabled={loading}
+                                                    className="btn-modern btn-delete"
                                                 >
                                                     {loading ? 'Suppression...' : 'Supprimer'}
                                                 </button>
@@ -578,7 +588,7 @@ function Game() {
                                         }}
                                     >
                                         <div className="match-header">
-                                            <h3>Match {match.id.slice(0, 8)}</h3>
+                                            <h4>Match {match.id.slice(0, 8)}</h4>
                                         </div>
                                         <div className="teams">
                                             <div className="team-card red-team">
