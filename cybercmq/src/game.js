@@ -82,9 +82,7 @@ function Game() {
 
             newSocket.on('connectedUsers', (connectedUsers) => {
                 console.log('Utilisateurs connectés reçus via WebSocket:', connectedUsers);
-                if (decoded.role === 'ADMIN') {
-                    setUsers(connectedUsers || []);
-                }
+                // Ne plus mettre à jour users ici, car fetchUsers gère tous les utilisateurs
             });
 
             newSocket.on('matchCreated', (newMatch) => {
@@ -108,21 +106,15 @@ function Game() {
             });
 
             newSocket.on('teamAssigned', ({ matchId, userId, teamId, username, updatedMatch }) => {
-                console.log('Équipe assignée:', { matchId, userId, teamId, username, updatedMatch });
-
-                if (updatedMatch) {
-                    setTeamMembersByMatch((prev) => ({
-                        ...prev,
-                        [matchId]: {
-                            redTeam: updatedMatch.redTeam?.users || [],
-                            blueTeam: updatedMatch.blueTeam?.users || [],
-                        },
-                    }));
-                } else {
-                    fetchTeamMembers(matchId, token);
-                }
-
-                if (decoded.role === 'ADMIN') {
+                console.log('Événement teamAssigned reçu:', { matchId, userId, teamId, username, updatedMatch });
+                setTeamMembersByMatch((prev) => ({
+                    ...prev,
+                    [matchId]: {
+                        redTeam: updatedMatch.redTeam?.users || [],
+                        blueTeam: updatedMatch.blueTeam?.users || [],
+                    },
+                }));
+                if (role === 'ADMIN') {
                     fetchUsers(token);
                 }
             });
@@ -158,17 +150,14 @@ function Game() {
             });
             const data = await res.json();
             if (data.success) {
-                console.log('Matchs récupérés:', data.matches);
                 setMatches(data.matches || []);
-
-                // Récupérer les membres des équipes pour chaque match
+                console.log('Matchs récupérés:', data.matches);
                 for (const match of data.matches) {
                     await fetchTeamMembers(match.id, token);
                 }
-
-                // Sélectionner le premier match si aucun n'est sélectionné
                 if (data.matches.length > 0 && !selectedMatch) {
                     setSelectedMatch(data.matches[0]);
+                    console.log('Premier match sélectionné automatiquement:', data.matches[0].id);
                 }
             } else {
                 console.error('Erreur serveur:', data.message);
@@ -253,8 +242,7 @@ function Game() {
                 setError(data.message || 'Erreur lors de la création du match');
             } else {
                 console.log('Match créé avec succès:', data.matchId);
-                // Rafraîchir la liste des matchs
-                await fetchMatches(token);
+                // Le WebSocket se chargera de la mise à jour
             }
         } catch (error) {
             console.error('Erreur lors de la création du match:', error);
@@ -292,8 +280,7 @@ function Game() {
                 setError(data.message || 'Erreur lors de la suppression du match');
             } else {
                 console.log('Match supprimé avec succès:', matchId);
-                // Rafraîchir la liste des matchs
-                await fetchMatches(Cookies.get('token'));
+                // Le WebSocket se chargera de la mise à jour
             }
         } catch (error) {
             console.error('Erreur lors de la suppression du match:', error);
@@ -303,55 +290,29 @@ function Game() {
         }
     };
 
-    const handleAssignTeam = async (userId, teamColor, matchId) => {
-        console.log('=== DEBUT handleAssignTeam ===');
-        console.log('userId:', userId);
-        console.log('teamColor:', teamColor);
-        console.log('matchId:', matchId);
-        console.log('selectedMatch:', selectedMatch);
-
-        if (!matchId) {
-            console.error('matchId manquant');
-            setError('Veuillez sélectionner un match.');
+    const handleAssignTeam = async (userId, teamId, matchId) => {
+        if (!matchId || !selectedMatch?.id) {
+            setError('Veuillez sélectionner un match valide.');
             return;
         }
         if (!userId) {
-            console.error('userId manquant');
             setError('Utilisateur non sélectionné ou invalide.');
             return;
         }
-        if (loading) {
-            console.log('Déjà en cours de chargement, abandon');
+        if (teamId && teamId !== selectedMatch.redTeamId && teamId !== selectedMatch.blueTeamId) {
+            setError('Équipe invalide pour ce match.');
             return;
         }
+        if (loading) return;
 
-        // Trouver le match complet pour obtenir les teamId
-        const currentMatch = matches.find(m => m.id === matchId);
-        if (!currentMatch) {
-            console.error('Match non trouvé dans la liste');
-            setError('Match non trouvé.');
-            return;
-        }
-
-        let teamId = null;
-        if (teamColor === 'RED') {
-            teamId = currentMatch.redTeamId;
-        } else if (teamColor === 'BLUE') {
-            teamId = currentMatch.blueTeamId;
-        }
-        // Si teamColor est null, on laisse teamId à null pour retirer le joueur
-
-        console.log('teamId calculé:', teamId);
-        console.log('currentMatch:', currentMatch);
+        console.log('Tentative d\'assignation:', { userId, teamId, matchId, selectedMatch });
 
         setLoading(true);
         setError(null);
 
         try {
             const requestBody = { userId, teamId, matchId };
-            console.log('=== REQUETE ENVOYEE ===');
-            console.log('Body:', JSON.stringify(requestBody, null, 2));
-
+            console.log('Assignation d\'équipe - requête:', requestBody);
             const token = Cookies.get('token');
             const res = await fetch('https://cyberskills.onrender.com/match/assign-team', {
                 method: 'POST',
@@ -362,56 +323,29 @@ function Game() {
                 body: JSON.stringify(requestBody),
             });
 
-            console.log('Status de la réponse:', res.status);
-
             if (!res.ok) {
-                const errorText = await res.text();
-                console.error('Erreur HTTP:', res.status, errorText);
-                throw new Error(`HTTP ${res.status}: ${errorText}`);
+                const errorData = await res.json();
+                throw new Error(errorData.message || `HTTP ${res.status}`);
             }
 
             const data = await res.json();
-            console.log('=== REPONSE RECUE ===');
-            console.log('Réponse complète:', data);
+            console.log('Réponse assign-team:', data);
 
             if (!data.success) {
-                console.error('Erreur dans la réponse:', data.message);
+                console.error('Erreur d\'assignation d\'équipe:', data.message);
                 setError(data.message || 'Erreur lors de l\'assignation de l\'équipe');
             } else {
-                console.log('✅ Assignation réussie');
-                // Rafraîchir les données des équipes
-                await fetchTeamMembers(matchId, token);
-                if (role === 'ADMIN') {
-                    await fetchUsers(token);
-                }
+                console.log('Utilisateur assigné avec succès:', { userId, teamId, matchId });
+                // Le WebSocket se chargera de la mise à jour
             }
         } catch (error) {
-            console.error('=== ERREUR CATCH ===');
-            console.error('Erreur complète:', error);
+            console.error('Erreur lors de l\'assignation d\'équipe:', error);
             setError(`Erreur lors de l'assignation: ${error.message}`);
         } finally {
             setLoading(false);
-            console.log('=== FIN handleAssignTeam ===');
         }
     };
 
-    // Fonction de débogage
-    const debugMatchData = () => {
-        console.log('=== DEBUG MATCH DATA ===');
-        console.log('matches:', matches);
-        console.log('selectedMatch:', selectedMatch);
-        console.log('teamMembersByMatch:', teamMembersByMatch);
-
-        if (selectedMatch) {
-            console.log('selectedMatch détails:');
-            console.log('- id:', selectedMatch.id);
-            console.log('- redTeamId:', selectedMatch.redTeamId);
-            console.log('- blueTeamId:', selectedMatch.blueTeamId);
-        }
-        console.log('=== FIN DEBUG ===');
-    };
-
-    // Filter users by role
     const admins = users.filter(user => user.role === 'ADMIN');
     const nonAdmins = users.filter(user => user.role !== 'ADMIN');
 
@@ -422,7 +356,7 @@ function Game() {
         usersCount: users.length,
         adminsCount: admins.length,
         nonAdminsCount: nonAdmins.length,
-        selectedMatchId: selectedMatch?.id
+        users: users.map(u => ({ id: u.id, username: u.username, role: u.role, isConnected: u.isConnected }))
     });
 
     return (
@@ -433,11 +367,6 @@ function Game() {
                     <span className="user-info">
                         Connecté en tant que: {username || 'Inconnu'} ({role || 'Rôle inconnu'})
                     </span>
-                    {role === 'ADMIN' && (
-                        <button onClick={debugMatchData} className="btn-modern" style={{marginRight: '10px'}}>
-                            Debug
-                        </button>
-                    )}
                     <button
                         onClick={() => {
                             Cookies.remove('token');
@@ -455,7 +384,7 @@ function Game() {
                 {role === 'ADMIN' ? (
                     <div className="admin-panel">
                         <div className="sidebar">
-                            <h3>Utilisateurs Connectés ({users.length})</h3>
+                            <h3>Utilisateurs ({users.length})</h3>
                             <div className="users-list">
                                 {users.length > 0 ? (
                                     <>
@@ -464,37 +393,29 @@ function Game() {
                                                 <h4>Administrateurs ({admins.length})</h4>
                                                 {admins.map((user) => (
                                                     <div key={user.id} className="user-item">
-                                                        <span className="user-status"></span>
+                                                        <span className={`user-status ${user.isConnected ? 'connected' : 'disconnected'}`}></span>
                                                         <span className="user-username">
                                                             {user.username || 'Inconnu'}
                                                             {user.id === userId && ' (vous)'}
+                                                            {!user.isConnected && ' (déconnecté)'}
                                                         </span>
                                                         <div className="user-actions cyber-buttons">
                                                             <button
-                                                                onClick={() => {
-                                                                    console.log('Clic équipe rouge - Admin');
-                                                                    handleAssignTeam(user.id, 'RED', selectedMatch?.id);
-                                                                }}
+                                                                onClick={() => handleAssignTeam(user.id, selectedMatch?.redTeamId, selectedMatch?.id)}
                                                                 disabled={!selectedMatch || loading}
                                                                 className="btn-cyber btn-red"
                                                             >
                                                                 Équipe Rouge
                                                             </button>
                                                             <button
-                                                                onClick={() => {
-                                                                    console.log('Clic équipe bleue - Admin');
-                                                                    handleAssignTeam(user.id, 'BLUE', selectedMatch?.id);
-                                                                }}
+                                                                onClick={() => handleAssignTeam(user.id, selectedMatch?.blueTeamId, selectedMatch?.id)}
                                                                 disabled={!selectedMatch || loading}
                                                                 className="btn-cyber btn-blue"
                                                             >
                                                                 Équipe Bleue
                                                             </button>
                                                             <button
-                                                                onClick={() => {
-                                                                    console.log('Clic retirer - Admin');
-                                                                    handleAssignTeam(user.id, null, selectedMatch?.id);
-                                                                }}
+                                                                onClick={() => handleAssignTeam(user.id, null, selectedMatch?.id)}
                                                                 disabled={!selectedMatch || loading}
                                                                 className="btn-cyber btn-remove"
                                                             >
@@ -511,37 +432,29 @@ function Game() {
                                         {nonAdmins.length > 0 ? (
                                             nonAdmins.map((user) => (
                                                 <div key={user.id} className="user-item">
-                                                    <span className="user-status"></span>
+                                                    <span className={`user-status ${user.isConnected ? 'connected' : 'disconnected'}`}></span>
                                                     <span className="user-username">
                                                         {user.username || 'Inconnu'}
                                                         {user.id === userId && ' (vous)'}
+                                                        {!user.isConnected && ' (déconnecté)'}
                                                     </span>
                                                     <div className="user-actions cyber-buttons">
                                                         <button
-                                                            onClick={() => {
-                                                                console.log('Clic équipe rouge - Joueur');
-                                                                handleAssignTeam(user.id, 'RED', selectedMatch?.id);
-                                                            }}
+                                                            onClick={() => handleAssignTeam(user.id, selectedMatch?.redTeamId, selectedMatch?.id)}
                                                             disabled={!selectedMatch || loading}
                                                             className="btn-cyber btn-red"
                                                         >
                                                             Équipe Rouge
                                                         </button>
                                                         <button
-                                                            onClick={() => {
-                                                                console.log('Clic équipe bleue - Joueur');
-                                                                handleAssignTeam(user.id, 'BLUE', selectedMatch?.id);
-                                                            }}
+                                                            onClick={() => handleAssignTeam(user.id, selectedMatch?.blueTeamId, selectedMatch?.id)}
                                                             disabled={!selectedMatch || loading}
                                                             className="btn-cyber btn-blue"
                                                         >
                                                             Équipe Bleue
                                                         </button>
                                                         <button
-                                                            onClick={() => {
-                                                                console.log('Clic retirer - Joueur');
-                                                                handleAssignTeam(user.id, null, selectedMatch?.id);
-                                                            }}
+                                                            onClick={() => handleAssignTeam(user.id, null, selectedMatch?.id)}
                                                             disabled={!selectedMatch || loading}
                                                             className="btn-cyber btn-remove"
                                                         >
@@ -551,11 +464,11 @@ function Game() {
                                                 </div>
                                             ))
                                         ) : (
-                                            <p>Aucun joueur connecté.</p>
+                                            <p>Aucun joueur disponible.</p>
                                         )}
                                     </>
                                 ) : (
-                                    <p>Aucun utilisateur connecté.</p>
+                                    <p>Aucun utilisateur disponible.</p>
                                 )}
                             </div>
                         </div>
@@ -577,7 +490,6 @@ function Game() {
                                     onChange={(e) => {
                                         const match = matches.find((m) => m.id === e.target.value);
                                         setSelectedMatch(match || null);
-                                        console.log('Match sélectionné:', match);
                                     }}
                                     className="match-selector"
                                     disabled={loading}
@@ -599,7 +511,6 @@ function Game() {
                                             className={`match-card ${selectedMatch?.id === match.id ? 'matched' : ''}`}
                                             onClick={() => {
                                                 setSelectedMatch(match);
-                                                console.log('Match sélectionné par clic:', match);
                                             }}
                                         >
                                             <div className="match-header">

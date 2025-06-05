@@ -34,15 +34,13 @@ export const setupSocket = (io: SocketIOServer) => {
                     userId: decoded.userId,
                     username: user.username || 'Inconnu',
                     socketId: socket.id,
-                    role: user.role, // Ajout du rôle stocké en base
+                    role: user.role,
                 });
 
                 console.log('Utilisateur authentifié:', { userId: decoded.userId, username: user.username, role: user.role });
 
-                // Envoyer la liste des utilisateurs connectés à tous les clients
                 io.emit('connectedUsers', Array.from(connectedUsers.values()));
 
-                // Confirmer l'authentification au client
                 socket.emit('authenticated', { success: true, userId: decoded.userId });
 
             } catch (err: any) {
@@ -96,7 +94,6 @@ const requireAdmin = (req: AuthenticatedRequest, res: Response, next: NextFuncti
     next();
 };
 
-// Fonction helper pour obtenir l'instance Socket.IO
 const getSocketIO = (req: Request): SocketIOServer | null => {
     try {
         return req.app.get('io') as SocketIOServer;
@@ -106,7 +103,6 @@ const getSocketIO = (req: Request): SocketIOServer | null => {
     }
 };
 
-// @ts-ignore
 router.post('/create', authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
     try {
         const redTeam = await prisma.team.create({ data: { name: 'Équipe Rouge' } });
@@ -125,7 +121,6 @@ router.post('/create', authenticateToken, requireAdmin, async (req: Authenticate
 
         console.log('Match créé:', { matchId: match.id, redTeamId: redTeam.id, blueTeamId: blueTeam.id });
 
-        // Émission Socket.IO avec gestion d'erreur
         const io = getSocketIO(req);
         if (io) {
             io.emit('matchCreated', match);
@@ -144,7 +139,6 @@ router.post('/create', authenticateToken, requireAdmin, async (req: Authenticate
     }
 });
 
-// @ts-ignore
 router.get('/list', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
     try {
         const matches = await prisma.match.findMany({
@@ -166,7 +160,6 @@ router.get('/list', authenticateToken, async (req: AuthenticatedRequest, res: Re
     }
 });
 
-// @ts-ignore
 router.get('/:matchId/teams', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
     const { matchId } = req.params;
 
@@ -196,66 +189,57 @@ router.get('/:matchId/teams', authenticateToken, async (req: AuthenticatedReques
     }
 });
 
-// CORRECTION : Endpoint pour récupérer les utilisateurs connectés avec leur rôle
-// @ts-ignore
 router.get('/users', authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
     try {
-        // Récupérer tous les utilisateurs connectés avec leurs infos complètes
-        const connectedUserIds = Array.from(connectedUsers.keys());
         const users = await prisma.user.findMany({
-            where: { id: { in: connectedUserIds } },
             select: { id: true, username: true, teamId: true, role: true }
         });
 
-        // Enrichir avec les infos de connexion
         const usersWithConnectionInfo = users.map(user => {
             const connectedUser = connectedUsers.get(user.id);
             return {
                 ...user,
-                isConnected: true,
-                socketId: connectedUser?.socketId,
-                // Utiliser le rôle de la base de données (plus fiable)
+                isConnected: !!connectedUser,
+                socketId: connectedUser?.socketId || null,
                 role: user.role
             };
         });
 
-        console.log('Utilisateurs connectés envoyés:', usersWithConnectionInfo.length);
+        console.log('Utilisateurs envoyés:', usersWithConnectionInfo.length);
         return res.status(200).json({
             success: true,
             users: usersWithConnectionInfo,
         });
     } catch (err: any) {
         console.error('Erreur lors de la récupération des utilisateurs:', err.message, err.stack);
-        res.status(500).json({ success: false, message: 'Erreur lors de la récupération des utilisateurs', error: err.message });
+        res.status(500).json({
+            success: false,
+            message: 'Erreur lors de la récupération des utilisateurs',
+            error: err.message
+        });
     }
 });
 
-// @ts-ignore
 router.post('/assign-team', authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
     const { userId, teamId, matchId } = req.body;
 
     console.log('Requête assign-team reçue:', { userId, teamId, matchId, body: req.body });
 
     try {
-        // Validation des paramètres
-        if (!userId) {
-            return res.status(400).json({ success: false, message: 'userId est requis' });
-        }
-        if (!matchId) {
-            return res.status(400).json({ success: false, message: 'matchId est requis' });
+        if (!userId || !matchId) {
+            console.error('Paramètres manquants:', { userId, matchId });
+            return res.status(400).json({ success: false, message: 'userId et matchId sont requis' });
         }
 
-        // Vérifier l'existence de l'utilisateur
         const user = await prisma.user.findUnique({
             where: { id: userId },
             include: { team: true }
         });
         if (!user) {
-            console.log('Utilisateur non trouvé:', userId);
+            console.error('Utilisateur non trouvé:', userId);
             return res.status(404).json({ success: false, message: 'Utilisateur non trouvé' });
         }
 
-        // Vérifier l'existence du match
         const match = await prisma.match.findUnique({
             where: { id: matchId },
             include: {
@@ -264,36 +248,24 @@ router.post('/assign-team', authenticateToken, requireAdmin, async (req: Authent
             },
         });
         if (!match) {
-            console.log('Match non trouvé:', matchId);
+            console.error('Match non trouvé:', matchId);
             return res.status(404).json({ success: false, message: 'Match non trouvé' });
         }
 
-        // Validation du teamId si fourni
         if (teamId && teamId !== match.redTeamId && teamId !== match.blueTeamId) {
-            console.log('teamId invalide pour ce match:', {
-                teamId,
-                redTeamId: match.redTeamId,
-                blueTeamId: match.blueTeamId
-            });
+            console.error('teamId invalide:', { teamId, redTeamId: match.redTeamId, blueTeamId: match.blueTeamId });
             return res.status(400).json({
                 success: false,
                 message: 'teamId ne correspond pas au match'
             });
         }
 
-        // Si l'utilisateur était déjà dans une équipe du même match, on le retire d'abord
-        if (user.teamId && (user.teamId === match.redTeamId || user.teamId === match.blueTeamId)) {
-            console.log('Utilisateur déjà dans une équipe de ce match, retrait en cours...');
-        }
-
-        // Mise à jour de l'utilisateur
         const updatedUser = await prisma.user.update({
             where: { id: userId },
             data: { teamId },
             include: { team: true }
         });
 
-        // Récupérer le match mis à jour avec les équipes
         const updatedMatch = await prisma.match.findUnique({
             where: { id: matchId },
             include: {
@@ -302,15 +274,8 @@ router.post('/assign-team', authenticateToken, requireAdmin, async (req: Authent
             },
         });
 
-        console.log('Utilisateur assigné:', {
-            userId,
-            teamId,
-            matchId,
-            previousTeam: user.teamId,
-            newTeam: teamId
-        });
+        console.log('Utilisateur assigné:', { userId, teamId, matchId });
 
-        // Émission Socket.IO
         const io = getSocketIO(req);
         if (io) {
             io.emit('teamAssigned', {
@@ -320,8 +285,6 @@ router.post('/assign-team', authenticateToken, requireAdmin, async (req: Authent
                 username: user.username,
                 updatedMatch
             });
-
-            // Émettre aussi la liste des utilisateurs connectés mise à jour
             io.emit('connectedUsers', Array.from(connectedUsers.values()));
         }
 
@@ -341,7 +304,6 @@ router.post('/assign-team', authenticateToken, requireAdmin, async (req: Authent
     }
 });
 
-// @ts-ignore
 router.post('/join', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
     return res.status(403).json({
         success: false,
@@ -349,7 +311,6 @@ router.post('/join', authenticateToken, async (req: AuthenticatedRequest, res: R
     });
 });
 
-// @ts-ignore
 router.post('/leave-team', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
     return res.status(403).json({
         success: false,
@@ -357,16 +318,13 @@ router.post('/leave-team', authenticateToken, async (req: AuthenticatedRequest, 
     });
 });
 
-// @ts-ignore
 router.delete('/:matchId', authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
     const { matchId } = req.params;
 
     console.log('Requête de suppression de match reçue:', { matchId, user: req.user });
 
     try {
-        // Utiliser une transaction pour garantir la cohérence
         const result = await prisma.$transaction(async (tx) => {
-            // Vérifier l'existence du match
             const match = await tx.match.findUnique({
                 where: { id: matchId },
                 include: {
@@ -387,7 +345,6 @@ router.delete('/:matchId', authenticateToken, requireAdmin, async (req: Authenti
                 blueTeamUsers: match.blueTeam.users.length,
             });
 
-            // Étape 1 : Dissocier les utilisateurs des équipes
             console.log('Dissociation des utilisateurs des équipes');
             const updatedUsers = await tx.user.updateMany({
                 where: { teamId: { in: [match.redTeamId, match.blueTeamId] } },
@@ -395,13 +352,11 @@ router.delete('/:matchId', authenticateToken, requireAdmin, async (req: Authenti
             });
             console.log('Utilisateurs dissociés:', updatedUsers.count);
 
-            // Étape 2 : Supprimer le match
             console.log('Suppression du match:', matchId);
             await tx.match.delete({
                 where: { id: matchId },
             });
 
-            // Étape 3 : Supprimer les équipes
             console.log('Suppression des équipes');
             const deletedTeams = await tx.team.deleteMany({
                 where: { id: { in: [match.redTeamId, match.blueTeamId] } },
@@ -413,11 +368,9 @@ router.delete('/:matchId', authenticateToken, requireAdmin, async (req: Authenti
 
         console.log('Match supprimé avec succès:', matchId);
 
-        // Émission Socket.IO
         const io = getSocketIO(req);
         if (io) {
             io.emit('matchDeleted', { matchId });
-            // Réémettre la liste des utilisateurs connectés
             io.emit('connectedUsers', Array.from(connectedUsers.values()));
         }
 
