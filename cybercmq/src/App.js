@@ -4,6 +4,7 @@ import Home from './home';
 import Login from './login';
 import Register from './register';
 import Game from './game';
+import AttackSimulator from './attack';
 
 function App() {
   return (
@@ -13,6 +14,7 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path="/game" element={<Game />} />
+            <Route path="/attack" element={<AttackSimulator />} />
         </Routes>
       </Router>
   );
