@@ -1,88 +1,99 @@
 import React, { useState, useEffect } from 'react';
 
-// Simulated network servers
-const servers = [
+// Simulated systems
+const systems = [
     {
         id: 1,
-        name: "Web Server",
-        ip: "192.168.1.10",
-        services: ["HTTP:80", "SSH:22"],
+        name: "Web Application",
+        description: "NeonCorp’s public-facing web portal with login, profile, and comment features.",
         vulnerabilities: [
-            { id: 1, name: "XSS", points: 80, exploit: "curl -X POST http://192.168.1.10/login -d 'input=<script>alert(document.cookie)</script>'", fix: "iptables -A INPUT -p tcp --dport 80 -m string --string '<script>' --algo bm -j DROP", log: "POST /login with <script> detected" },
-            { id: 2, name: "CSRF", points: 90, exploit: "curl -X POST http://192.168.1.10/change-email -d 'email=hacker@evil.com'", fix: "echo 'CSRF_TOKEN=$(uuidgen)' >> /etc/nginx.conf", log: "Unauthorized POST to /change-email" }
+            { id: 1, name: "XSS", points: 80, role: "Web Exploiter", exploit: "<script>alert(document.cookie)</script>", fix: "Enable Content-Security-Policy: script-src 'self'", log: "Malicious script detected in comment form" },
+            { id: 2, name: "CSRF", points: 90, role: "Web Exploiter", exploit: "<form action='/profile' method='POST'><input name='email' value='hacker@evil.com'><input type='submit'></form>", fix: "Add CSRF token validation", log: "Unauthorized POST to /profile" },
+            { id: 3, name: "SQL Injection", points: 120, role: "SQL Injector", exploit: "' OR '1'='1'--", fix: "Use prepared statements", log: "SQL error: unexpected input on /login" }
         ],
-        status: "online",
-        logs: []
+        interface: "web"
     },
     {
         id: 2,
-        name: "API Server",
-        ip: "192.168.1.15",
-        services: ["HTTP:8080"],
+        name: "File Server",
+        description: "NeonCorp’s internal file server with directory access.",
         vulnerabilities: [
-            { id: 3, name: "API Key Leak", points: 100, exploit: "curl http://192.168.1.15/.env", fix: "chmod 600 /var/www/.env", log: "GET /.env accessed" }
+            { id: 4, name: "File Inclusion", points: 110, role: "File Hacker", exploit: "curl http://192.168.1.30/file?path=../../etc/passwd", fix: "echo 'open_basedir=/var/www' >> /etc/php.ini", log: "Path traversal attempt on /file" },
+            { id: 5, name: "Privilege Escalation", points: 130, role: "Privilege Escalator", exploit: "sudo -u root /bin/sh", fix: "chmod 750 /bin/sh; echo 'root ALL=(ALL) NOPASSWD: NONE' >> /etc/sudoers", log: "Unauthorized sudo attempt" }
         ],
-        status: "online",
-        logs: []
+        interface: "terminal"
     },
     {
         id: 3,
-        name: "Database Server",
-        ip: "192.168.1.20",
-        services: ["MySQL:3306"],
+        name: "Database",
+        description: "NeonCorp’s MySQL database with user and order tables.",
         vulnerabilities: [
-            { id: 4, name: "SQL Injection", points: 120, exploit: "sqlmap -u http://192.168.1.20/login --data 'user=admin&pass=1' --level 2", fix: "mysql -e 'SET GLOBAL sql_mode=\"STRICT_TRANS_TABLES,NO_ENGINE_SUBSTITUTION\"'", log: "SQL error: unexpected input on /login" }
+            { id: 6, name: "Weak Credentials", points: 100, role: "SQL Injector", exploit: "mysql -u admin -ppassword123", fix: "ALTER USER 'admin'@'localhost' IDENTIFIED BY 'Str0ngP@ssw0rd!'", log: "Login attempt with weak password" },
+            { id: 7, name: "Unfiltered Query", points: 120, role: "SQL Injector", exploit: "SELECT * FROM users WHERE id=1; DROP TABLE users;--", fix: "Grant SELECT only to app user", log: "DROP TABLE attempt detected" }
         ],
-        status: "online",
-        logs: []
+        interface: "database"
     },
     {
         id: 4,
-        name: "File Server",
-        ip: "192.168.1.30",
-        services: ["FTP:21"],
+        name: "Network",
+        description: "NeonCorp’s network infrastructure with open ports.",
         vulnerabilities: [
-            { id: 5, name: "File Inclusion", points: 110, exploit: "curl http://192.168.1.30/file?path=../../etc/passwd", fix: "echo 'open_basedir=/var/www' >> /etc/php.ini", log: "GET /file with path traversal attempt" }
+            { id: 8, name: "Open Port Exploit", points: 90, role: "Network Scanner", exploit: "nmap -sV 192.168.1.10; msfconsole -q -x 'use exploit/multi/http/tomcat_mgr_upload; set RHOSTS 192.168.1.10; run'", fix: "iptables -A INPUT -p tcp --dport 8080 -j DROP", log: "Port 8080 exploit attempt" },
+            { id: 9, name: "Weak SSH Config", points: 100, role: "Network Scanner", exploit: "ssh -oKexAlgorithms=+diffie-hellman-group1-sha1 admin@192.168.1.10", fix: "echo 'KexAlgorithms curve25519-sha256' >> /etc/ssh/sshd_config", log: "Weak SSH key exchange detected" }
         ],
-        status: "online",
-        logs: []
+        interface: "network"
     }
 ];
 
-// Reconnaissance commands
-const reconCommands = [
-    { command: "nmap -sV 192.168.1.10", output: "80/tcp open http Apache 2.4.41\n22/tcp open ssh OpenSSH 7.9", serverId: 1 },
-    { command: "nmap -sV 192.168.1.15", output: "8080/tcp open http Node.js 14.17", serverId: 2 },
-    { command: "nmap -sV 192.168.1.20", output: "3306/tcp open mysql MySQL 8.0.22", serverId: 3 },
-    { command: "nmap -sV 192.168.1.30", output: "21/tcp open ftp vsftpd 3.0.3", serverId: 4 },
-    { command: "hydra -l admin -P /wordlist.txt 192.168.1.10 ssh", output: "Found: admin:password123", serverId: 1 }
-];
+// Reconnaissance commands (for terminal and network interfaces)
+const reconCommands = {
+    web: [
+        { command: "curl http://192.168.1.10", output: "Forms: /login, /profile, /comments" },
+        { command: "dirb http://192.168.1.10", output: "Hidden: /admin (401), /.git (403)" }
+    ],
+    terminal: [
+        { command: "ls -la /var/www", output: "index.php, file.php, .env (rw-r--r--)" },
+        { command: "whoami", output: "www-data" }
+    ],
+    database: [
+        { command: "SHOW TABLES;", output: "users, orders" },
+        { command: "SELECT * FROM users LIMIT 1;", output: "admin, password123" }
+    ],
+    network: [
+        { command: "nmap -sV 192.168.1.10", output: "80/tcp open http Apache 2.4.41, 22/tcp open ssh OpenSSH 7.9, 8080/tcp open http Tomcat 9.0" },
+        { command: "netstat -tuln", output: "tcp 0 0 0.0.0.0:80, tcp 0 0 0.0.0.0:22, tcp 0 0 0.0.0.0:8080" }
+    ]
+};
 
-// Player roles
-const attackerRoles = ["Recon Specialist", "Web Exploiter", "API Hacker", "Database Cracker", "File Intruder"];
-const defenderRoles = ["Firewall Admin", "Log Analyst", "Config Hardener", "Database Securer", "File Protector"];
+// Roles
+const attackerRoles = ["Web Exploiter", "SQL Injector", "File Hacker", "Network Scanner", "Privilege Escalator"];
+const defenderRoles = ["Web Sanitizer", "Database Hardener", "File Securer", "Firewall Admin", "System Monitor"];
 
 const AttackSimulator = () => {
-    const [gameState, setGameState] = useState({
-        turn: 1,
-        maxTurns: 7,
-        timeLeft: 120, // 2 minutes per turn
-        systemHealth: 100,
-        attackersScore: 0,
-        defendersScore: 0,
-        attackerActions: [], // { serverId, vulnId, playerId }
-        defenderActions: [], // { serverId, vulnId, playerId }
-        actionLog: ["NeonCorp’s network online. Pentest begins! 10:13 AM CEST, June 10, 2025"],
-        gameOver: false,
-        attackerTerminalInput: "",
-        defenderTerminalInput: "",
-        terminalOutput: { attackers: [], defenders: [] },
-        selectedServer: null, // { team, serverId }
-        servers: servers.map(s => ({ ...s, logs: [] })),
-        playerAssignments: {
-            attackers: Array(5).fill(null).map((_, i) => ({ id: i + 1, role: attackerRoles[i], action: null })),
-            defenders: Array(5).fill(null).map((_, i) => ({ id: i + 1, role: defenderRoles[i], action: null }))
-        }
+    const [gameState, setGameState] = useState(() => {
+        const selectedSystem = systems[Math.floor(Math.random() * systems.length)];
+        return {
+            turn: 1,
+            maxTurns: 7,
+            timeLeft: 120, // 2 minutes per turn
+            systemHealth: 100,
+            attackersScore: 0,
+            defendersScore: 0,
+            attackerActions: [], // { vulnId, playerId }
+            defenderActions: [], // { vulnId, playerId }
+            actionLog: [`NeonCorp’s ${selectedSystem.name} targeted. Pentest begins! 11:50 AM CEST, June 10, 2025`],
+            gameOver: false,
+            attackerInput: "",
+            defenderInput: "",
+            terminalOutput: { attackers: [], defenders: [] },
+            selectedSystem,
+            webForm: { login: "", comment: "", profileEmail: "" },
+            webPage: "home", // home, login, profile, comments
+            playerAssignments: {
+                attackers: attackerRoles.map((role, i) => ({ id: i + 1, role, action: null })),
+                defenders: defenderRoles.map((role, i) => ({ id: i + 1, role, action: null }))
+            }
+        };
     });
 
     // Timer and sound effects
@@ -91,7 +102,7 @@ const AttackSimulator = () => {
             endTurn();
             playSound('turn-end');
         } else if (gameState.timeLeft <= 0 && gameState.turn === gameState.maxTurns) {
-            setGameState({ ...gameState, gameOver: true });
+            setGameState(prev => ({ ...prev, gameOver: true }));
             playSound('game-over');
         } else {
             const timer = setInterval(() => {
@@ -112,131 +123,226 @@ const AttackSimulator = () => {
         sounds[type]?.play().catch(() => {});
     };
 
-    // Handle terminal command
-    const handleTerminalCommand = (team) => {
-        const input = team === 'attackers' ? gameState.attackerTerminalInput : gameState.defenderTerminalInput;
+    // Handle terminal or query input
+    const handleInput = (team, inputType) => {
+        const input = team === 'attackers' ? gameState.attackerInput : gameState.defenderInput;
         const command = input.trim();
         const terminalOutput = { ...gameState.terminalOutput };
-        let output = "Command not recognized.";
-        let newServers = [...gameState.servers];
+        let output = "Invalid input.";
         let newActionLog = [...gameState.actionLog];
+        const systemInterface = gameState.selectedSystem.interface;
 
         if (command === "help") {
             output = team === 'attackers'
-                ? "Commands: nmap -sV <ip>, hydra -l <user> -P <wordlist> <ip> <service>, curl, sqlmap"
-                : "Commands: tail -n 10 /var/log/syslog, iptables, chmod, echo, mysql";
+                ? `Commands: ${reconCommands[systemInterface].map(c => c.command).join(', ')}, exploits for ${gameState.selectedSystem.vulnerabilities.map(v => v.name).join(', ')}`
+                : `Commands: tail -n 10 /var/log/syslog, fixes for ${gameState.selectedSystem.vulnerabilities.map(v => v.name).join(', ')}`;
             terminalOutput[team].push(`> ${command}`, output);
             setGameState({
-                ...gameState,
-                [team === 'attackers' ? 'attackerTerminalInput' : 'defenderTerminalInput']: "",
-                terminalOutput
+                ...prev => ({
+                    ...prev,
+                    [team === 'attackers' ? 'attackerInput' : 'defenderInput']: "",
+                    terminalOutput
+                })
             });
             return;
         }
 
+        if (systemInterface === 'web' && inputType === 'form') {
+            if (team === 'attackers') {
+                const vuln = gameState.selectedSystem.vulnerabilities.find(v => v.exploit === input && v.role === gameState.playerAssignments.attackers.find(p => !p.action)?.role);
+                const player = gameState.playerAssignments.attackers.find(p => !p.action && p.role === vuln?.role);
+                if (vuln && player && gameState.attackerActions.length < 5) {
+                    newActionLog.push(`💥 ${player.role} exploits ${vuln.name} on ${gameState.selectedSystem.name}!`);
+                    terminalOutput.attackers.push(`Form input: ${input}`, `Exploit successful: ${vuln.name}.`);
+                    const newPlayerAssignments = {
+                        ...gameState.playerAssignments,
+                        attackers: gameState.playerAssignments.attackers.map(p =>
+                            p.id === player.id ? { ...p, action: vuln.id } : p
+                        )
+                    };
+                    setGameState({
+                        ...prev => ({
+                            ...prev,
+                            attackerActions: [...prev.attackerActions, { vulnId: vuln.id, playerId: player.id }],
+                            actionLog: newActionLog,
+                            webForm: { login: "", comment: "", profileEmail: "" },
+                            attackerInput: "",
+                            terminalOutput,
+                            playerAssignments: newPlayerAssignments
+                        })
+                    });
+                    playSound('warning');
+                } else {
+                    terminalOutput.attackers.push(`Form input: ${input}`, output);
+                    setGameState({
+                        ...prev => ({
+                            ...prev,
+                            webForm: { login: "", comment: "", profileEmail: "" },
+                            attackerInput: "",
+                            terminalOutput
+                        })
+                    });
+                }
+            }
+            return;
+        }
+
+        if (systemInterface === 'database' && inputType === 'query' && team === 'attackers') {
+            const vuln = gameState.selectedSystem.vulnerabilities.find(v => v.exploit === command && v.role === gameState.playerAssignments.attackers.find(p => !p.action)?.role);
+            const player = gameState.playerAssignments.attackers.find(p => !p.action && p.role === vuln?.role);
+            if (vuln && player && gameState.attackerActions.length < 5) {
+                newActionLog.push(`💥 ${player.role} exploits ${vuln.name} on ${gameState.selectedSystem.name}!`);
+                terminalOutput.attackers.push(`> ${command}`, `Exploit successful: ${vuln.name}.`);
+                const newPlayerAssignments = {
+                    ...gameState.playerAssignments,
+                    attackers: gameState.playerAssignments.attackers.map(p =>
+                        p.id === player.id ? { ...p, action: vuln.id } : p
+                    )
+                };
+                setGameState({
+                    ...prev => ({
+                        ...prev,
+                        attackerActions: [...prev.attackerActions, { vulnId: vuln.id, playerId: player.id }],
+                        actionLog: newActionLog,
+                        attackerInput: "",
+                        terminalOutput,
+                        playerAssignments: newPlayerAssignments
+                    })
+                });
+                playSound('warning');
+            } else {
+                terminalOutput.attackers.push(`> ${command}`, output);
+                setGameState({
+                    ...prev => ({
+                        ...prev,
+                        attackerInput: "",
+                        terminalOutput
+                    })
+                });
+            }
+            return;
+        }
+
         if (team === 'attackers') {
-            const recon = reconCommands.find(rc => rc.command === command);
+            const recon = reconCommands[systemInterface].find(rc => rc.command === command);
             if (recon) {
                 output = `Recon: ${recon.output}`;
                 terminalOutput.attackers.push(`> ${command}`, output);
                 setGameState({
-                    ...gameState,
-                    attackerTerminalInput: "",
-                    terminalOutput
+                    ...prev => ({
+                        ...prev,
+                        attackerInput: "",
+                        terminalOutput
+                    })
                 });
                 return;
             }
 
-            const server = newServers.find(s => s.vulnerabilities.some(v => v.exploit === command));
-            const vuln = server?.vulnerabilities.find(v => v.exploit === command);
-            const player = gameState.playerAssignments.attackers.find(p => !p.action);
+            const vuln = gameState.selectedSystem.vulnerabilities.find(v => v.exploit === command && v.role === gameState.playerAssignments.attackers.find(p => !p.action)?.role);
+            const player = gameState.playerAssignments.attackers.find(p => !p.action && p.role === vuln?.role);
             if (vuln && player && gameState.attackerActions.length < 5) {
-                newServers = newServers.map(s =>
-                    s.id === server.id ? { ...s, logs: [...s.logs, vuln.log] } : s
-                );
+                newActionLog.push(`💥 ${player.role} exploits ${vuln.name} on ${gameState.selectedSystem.name}!`);
+                terminalOutput.attackers.push(`> ${command}`, `Exploit successful: ${vuln.name}.`);
                 const newPlayerAssignments = {
                     ...gameState.playerAssignments,
                     attackers: gameState.playerAssignments.attackers.map(p =>
-                        p.id === player.id ? { ...p, action: { serverId: server.id, vulnId: vuln.id } } : p
+                        p.id === player.id ? { ...p, action: vuln.id } : p
                     )
                 };
-                newActionLog.push(`💥 ${player.role} exploits ${vuln.name} on ${server.name}!`);
-                terminalOutput.attackers.push(`> ${command}`, `Exploit successful: ${vuln.name} executed.`);
                 setGameState({
-                    ...gameState,
-                    attackerActions: [...gameState.attackerActions, { serverId: server.id, vulnId: vuln.id, playerId: player.id }],
-                    actionLog: newActionLog,
-                    attackerTerminalInput: "",
-                    terminalOutput,
-                    servers: newServers,
-                    playerAssignments: newPlayerAssignments
+                    ...prev => ({
+                        ...prev,
+                        attackerActions: [...prev.attackerActions, { vulnId: vuln.id, playerId: player.id }],
+                        actionLog: newActionLog,
+                        attackerInput: "",
+                        terminalOutput,
+                        playerAssignments: newPlayerAssignments
+                    })
                 });
                 playSound('warning');
             } else {
                 terminalOutput.attackers.push(`> ${command}`, output);
                 setGameState({
-                    ...gameState,
-                    attackerTerminalInput: "",
-                    terminalOutput
+                    ...prev => ({
+                        ...prev,
+                        attackerInput: "",
+                        terminalOutput
+                    })
                 });
             }
         } else {
             if (command === "tail -n 10 /var/log/syslog") {
-                const server = newServers.find(s => s.id === gameState.selectedServer?.serverId);
-                output = server?.logs.length ? server.logs.join('\n') : "No recent logs.";
+                output = gameState.actionLog
+                    .filter(log => log.includes('💥'))
+                    .slice(-10)
+                    .map(log => log.replace('💥', 'ALERT:'))
+                    .join('\n') || "No recent attack logs.";
                 terminalOutput.defenders.push(`> ${command}`, output);
                 setGameState({
-                    ...gameState,
-                    defenderTerminalInput: "",
-                    terminalOutput
+                    ...prev => ({
+                        ...prev,
+                        defenderInput: "",
+                        terminalOutput
+                    })
                 });
                 return;
             }
 
-            const server = newServers.find(s => s.vulnerabilities.some(v => v.fix === command));
-            const vuln = server?.vulnerabilities.find(v => v.fix === command);
-            const player = gameState.playerAssignments.defenders.find(p => !p.action);
+            const vuln = gameState.selectedSystem.vulnerabilities.find(v => v.fix === command && v.role.replace('Attacker', 'Defender') === gameState.playerAssignments.defenders.find(p => !p.action)?.role);
+            const player = gameState.playerAssignments.defenders.find(p => !p.action && p.role === vuln?.role.replace('Attacker', 'Defender'));
             if (vuln && player && gameState.defenderActions.length < 5) {
+                newActionLog.push(`🛡️ ${player.role} patches ${vuln.name} on ${gameState.selectedSystem.name}!`);
+                terminalOutput.defenders.push(`> ${command}`, `Patch successful: ${vuln.name} secured.`);
                 const newPlayerAssignments = {
                     ...gameState.playerAssignments,
                     defenders: gameState.playerAssignments.defenders.map(p =>
-                        p.id === player.id ? { ...p, action: { serverId: server.id, vulnId: vuln.id } } : p
+                        p.id === player.id ? { ...p, action: vuln.id } : p
                     )
                 };
-                newActionLog.push(`🛡️ ${player.role} patches ${vuln.name} on ${server.name}!`);
-                terminalOutput.defenders.push(`> ${command}`, `Patch successful: ${vuln.name} secured.`);
                 setGameState({
-                    ...gameState,
-                    defenderActions: [...gameState.defenderActions, { serverId: server.id, vulnId: vuln.id, playerId: player.id }],
-                    actionLog: newActionLog,
-                    defenderTerminalInput: "",
-                    terminalOutput,
-                    servers: newServers,
-                    playerAssignments: newPlayerAssignments
+                    ...prev => ({
+                        ...prev,
+                        defenderActions: [...prev.defenderActions, { vulnId: vuln.id, playerId: player.id }],
+                        actionLog: newActionLog,
+                        defenderInput: "",
+                        terminalOutput,
+                        playerAssignments: newPlayerAssignments
+                    })
                 });
                 playSound('warning');
             } else {
                 terminalOutput.defenders.push(`> ${command}`, output);
                 setGameState({
-                    ...gameState,
-                    defenderTerminalInput: "",
-                    terminalOutput
+                    ...prev => ({
+                        ...prev,
+                        defenderInput: "",
+                        terminalOutput
+                    })
                 });
             }
         }
     };
 
-    // Select server
-    const selectServer = (team, serverId) => {
-        setGameState({
-            ...gameState,
-            selectedServer: { team, serverId },
+    // Navigate web app
+    const navigateWeb = (page) => {
+        setGameState(prev => ({
+            ...prev,
+            webPage: page,
+            attackerInput: "",
             terminalOutput: {
-                ...gameState.terminalOutput,
-                [team]: [...gameState.terminalOutput[team], `Selected ${servers.find(s => s.id === serverId).name} (${team})`]
-            },
-            [team === 'attackers' ? 'attackerTerminalInput' : 'defenderTerminalInput']: ""
-        });
+                ...prev.terminalOutput,
+                attackers: [...prev.terminalOutput.attackers, `Navigated to ${page}`]
+            }
+        }));
+    };
+
+    // Handle web form input
+    const handleWebForm = (field, value) => {
+        setGameState(prev => ({
+            ...prev,
+            webForm: { ...prev.webForm, [field]: value },
+            attackerInput: value
+        }));
     };
 
     // End turn
@@ -245,24 +351,17 @@ const AttackSimulator = () => {
         let newDefendersScore = gameState.defendersScore;
         let newSystemHealth = gameState.systemHealth;
         let newActionLog = [...gameState.actionLog];
-        let newServers = [...gameState.servers];
 
         gameState.attackerActions.forEach(action => {
-            const server = newServers.find(s => s.id === action.serverId);
-            const vuln = server.vulnerabilities.find(v => v.id === action.vulnId);
-            const isBlocked = gameState.defenderActions.some(d =>
-                d.serverId === action.serverId && d.vulnId === action.vulnId
-            );
+            const vuln = gameState.selectedSystem.vulnerabilities.find(v => v.id === action.vulnId);
+            const isBlocked = gameState.defenderActions.some(d => d.vulnId === action.vulnId);
             if (!isBlocked) {
                 newAttackersScore += vuln.points;
                 newSystemHealth = Math.max(0, newSystemHealth - vuln.points / 10);
-                newActionLog.push(`💥 ${vuln.name} on ${server.name} deals ${vuln.points} points, health -${(vuln.points / 10).toFixed(1)}%`);
-                newServers = newServers.map(s =>
-                    s.id === server.id && newSystemHealth <= 0 ? { ...s, status: "compromised" } : s
-                );
+                newActionLog.push(`💥 ${vuln.name} deals ${vuln.points} points, health -${(vuln.points / 10).toFixed(1)}%`);
             } else {
                 newDefendersScore += vuln.points;
-                newActionLog.push(`🛡️ ${vuln.name} on ${server.name} blocked: ${vuln.points} points`);
+                newActionLog.push(`🛡️ ${vuln.name} blocked: ${vuln.points} points`);
             }
         });
 
@@ -272,31 +371,149 @@ const AttackSimulator = () => {
         };
 
         setGameState({
-            ...gameState,
-            turn: gameState.turn + 1,
-            timeLeft: 120,
-            systemHealth: newSystemHealth,
-            attackersScore: newAttackersScore,
-            defendersScore: newDefendersScore,
-            attackerActions: [],
-            defenderActions: [],
-            actionLog: newActionLog,
-            servers: newServers,
-            playerAssignments: newPlayerAssignments,
-            gameOver: gameState.turn + 1 > gameState.maxTurns || newSystemHealth <= 0,
-            selectedServer: null,
-            terminalOutput: { attackers: [], defenders: [] },
-            attackerTerminalInput: "",
-            defenderTerminalInput: ""
+            ...prev => ({
+                ...prev,
+                turn: prev.turn + 1,
+                timeLeft: 120,
+                systemHealth: newSystemHealth,
+                attackersScore: newAttackersScore,
+                defendersScore: newDefendersScore,
+                attackerActions: [],
+                defenderActions: [],
+                actionLog: newActionLog,
+                playerAssignments: newPlayerAssignments,
+                gameOver: prev.turn + 1 > prev.maxTurns || newSystemHealth <= 0,
+                attackerInput: "",
+                defenderInput: "",
+                terminalOutput: { attackers: [], defenders: [] },
+                webForm: { login: "", comment: "", profileEmail: "" },
+                webPage: "home"
+            })
         });
     };
 
     // Winner determination
     const getWinner = () => {
-        if (gameState.systemHealth <= 0) return "Hackers Win! NeonCorp Network Compromised!";
-        if (gameState.defendersScore > gameState.attackersScore) return "Defenders Win! NeonCorp Network Secured!";
-        if (gameState.attackersScore > gameState.defendersScore) return "Hackers Win! Score Domination!";
-        return "Stalemate! NeonCorp Network in Limbo!";
+        if (gameState.systemHealth <= 0) return `Hackers Win! ${gameState.selectedSystem.name} Compromised!`;
+        if (gameState.defendersScore > gameState.attackersScore) return `Defenders Win! ${gameState.selectedSystem.name} Secured!`;
+        if (gameState.attackersScore > gameState.defendersScore) return `Hackers Win! Score Domination!`;
+        return `Stalemate! ${gameState.selectedSystem.name} in Limbo!`;
+    };
+
+    // Render system interface
+    const renderSystemInterface = (team) => {
+        const { interface: systemInterface } = gameState.selectedSystem;
+        if (systemInterface === 'web' && team === 'attackers') {
+            return (
+                <div className="bg-gray-900 p-6 rounded-lg shadow-lg border-2 border-red-500">
+                    <div className="mb-4">
+                        <button onClick={() => navigateWeb('home')} className="mr-2 text-cyan-400 hover:underline">Home</button>
+                        <button onClick={() => navigateWeb('login')} className="mr-2 text-cyan-400 hover:underline">Login</button>
+                        <button onClick={() => navigateWeb('profile')} className="mr-2 text-cyan-400 hover:underline">Profile</button>
+                        <button onClick={() => navigateWeb('comments')} className="text-cyan-400 hover:underline">Comments</button>
+                    </div>
+                    {gameState.webPage === 'home' && <p className="text-gray-300">Welcome to NeonCorp’s portal. Navigate to exploit vulnerabilities.</p>}
+                    {gameState.webPage === 'login' && (
+                        <div>
+                            <p className="text-gray-300 mb-2">Login Form</p>
+                            <input
+                                type="text"
+                                value={gameState.webForm.login}
+                                onChange={(e) => handleWebForm('login', e.target.value)}
+                                className="w-full px-4 py-2 bg-gray-800 text-white border border-gray-600 rounded-md mb-2"
+                                placeholder="Username or SQL injection"
+                            />
+                            <button
+                                onClick={() => handleInput('attackers', 'form')}
+                                className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md"
+                            >
+                                Submit
+                            </button>
+                        </div>
+                    )}
+                    {gameState.webPage === 'profile' && (
+                        <div>
+                            <p className="text-gray-300 mb-2">Update Profile</p>
+                            <input
+                                type="text"
+                                value={gameState.webForm.profileEmail}
+                                onChange={(e) => handleWebForm('profileEmail', e.target.value)}
+                                className="w-full px-4 py-2 bg-gray-800 text-white border border-gray-600 rounded-md mb-2"
+                                placeholder="Email or CSRF payload"
+                            />
+                            <button
+                                onClick={() => handleInput('attackers', 'form')}
+                                className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md"
+                            >
+                                Update
+                            </button>
+                        </div>
+                    )}
+                    {gameState.webPage === 'comments' && (
+                        <div>
+                            <p className="text-gray-300 mb-2">Comment Section</p>
+                            <textarea
+                                value={gameState.webForm.comment}
+                                onChange={(e) => handleWebForm('comment', e.target.value)}
+                                className="w-full px-4 py-2 bg-gray-800 text-white border border-gray-600 rounded-md mb-2"
+                                placeholder="Comment or XSS payload"
+                            />
+                            <button
+                                onClick={() => handleInput('attackers', 'form')}
+                                className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md"
+                            >
+                                Post
+                            </button>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+        if (systemInterface === 'database' && team === 'attackers') {
+            return (
+                <div className="bg-gray-900 p-6 rounded-lg shadow-lg border-2 border-red-500">
+                    <p className="text-gray-300 mb-2">MySQL Query Interface</p>
+                    <textarea
+                        value={gameState.attackerInput}
+                        onChange={(e) => setGameState({ ...prev => ({ ...prev, attackerInput: e.target.value }) })}
+                        className="w-full h-24 px-4 py-2 bg-gray-800 text-white border border-gray-600 rounded-md mb-2"
+                        placeholder="Enter SQL query or credentials"
+                    />
+                    <button
+                        onClick={() => handleInput('attackers', 'query')}
+                        className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md"
+                    >
+                        Execute
+                    </button>
+                </div>
+            );
+        }
+        return (
+            <div className="bg-gray-900 p-6 rounded-lg shadow-lg border-2 border-{team === 'attackers' ? 'red' : 'blue'}-500">
+                <p className="text-gray-300 mb-2">{team === 'attackers' ? 'Hacker' : 'Defender'} Terminal (type 'help' for commands):</p>
+                <div className="bg-black p-4 rounded-md h-48 overflow-y-auto mb-4">
+                    {gameState.terminalOutput[team].map((line, index) => (
+                        <p key={index} className="text-sm text-green-400">{line}</p>
+                    ))}
+                </div>
+                <div className="flex items-center">
+                    <input
+                        type="text"
+                        value={team === 'attackers' ? gameState.attackerInput : gameState.defenderInput}
+                        onChange={(e) => setGameState({ ...prev => ({ ...prev, [team === 'attackers' ? 'attackerInput' : 'defenderInput']: e.target.value }) })}
+                        onKeyPress={(e) => e.key === 'Enter' && handleInput(team)}
+                        className="flex-1 px-4 py-2 bg-gray-800 text-white border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-{team === 'attackers' ? 'red' : 'blue'}-500"
+                        placeholder={`Command for ${gameState.selectedSystem.name}`}
+                    />
+                    <button
+                        onClick={() => handleInput(team)}
+                        className={`ml-2 bg-${team === 'attackers' ? 'red' : 'blue'}-600 hover:bg-${team === 'attackers' ? 'red' : 'blue'}-700 text-white px-4 py-2 rounded-md`}
+                    >
+                        Run
+                    </button>
+                </div>
+            </div>
+        );
     };
 
     return (
@@ -306,7 +523,7 @@ const AttackSimulator = () => {
                 NeonCorp: CyberWar
             </h1>
             <p className="text-center text-lg text-gray-300 mb-6">
-                5v5 Pentest: Hackers vs. Defenders. Breach or secure NeonCorp’s network! (10:13 AM CEST, June 10, 2025)
+                5v5 Pentest: Hackers vs. Defenders. Target: {gameState.selectedSystem.name} (11:50 AM CEST, June 10, 2025)
             </p>
 
             {/* Game Status */}
@@ -316,7 +533,7 @@ const AttackSimulator = () => {
                     Time: {Math.floor(gameState.timeLeft / 60)}:{(gameState.timeLeft % 60).toString().padStart(2, '0')}
                 </div>
                 <div className="text-xl">
-                    Network Health: <span className={gameState.systemHealth < 30 ? 'text-red-500' : 'text-green-500'}>
+                    System Health: <span className={gameState.systemHealth < 30 ? 'text-red-500' : 'text-green-500'}>
                         {gameState.systemHealth.toFixed(1)}%
                     </span>
                 </div>
@@ -324,7 +541,7 @@ const AttackSimulator = () => {
                 <div className="text-xl">Defenders: {gameState.defendersScore}</div>
             </div>
 
-            {/* Network Health Bar */}
+            {/* System Health Bar */}
             <div className="mb-8">
                 <div className="relative w-full bg-gray-700 rounded-full h-8 border-2 border-cyan-500 overflow-hidden">
                     <div
@@ -332,7 +549,7 @@ const AttackSimulator = () => {
                         style={{ width: `${gameState.systemHealth}%` }}
                     ></div>
                     <div className="absolute inset-0 flex items-center justify-center text-sm font-bold text-white">
-                        NeonCorp Network
+                        {gameState.selectedSystem.name}
                     </div>
                 </div>
             </div>
@@ -349,35 +566,10 @@ const AttackSimulator = () => {
                 </div>
             ) : (
                 <>
-                    {/* Network Map */}
+                    {/* System Info */}
                     <div className="mb-8 bg-gray-800 p-6 rounded-lg shadow-lg border-2 border-cyan-500">
-                        <h2 className="text-2xl text-cyan-400 mb-4 font-bold">Network Map</h2>
-                        <div className="grid grid-cols-4 gap-4">
-                            {gameState.servers.map(server => (
-                                <div
-                                    key={server.id}
-                                    className={`p-4 rounded-md text-center transition-transform hover:scale-105 ${server.status === 'online' ? 'bg-green-900 border-2 border-green-500' : 'bg-red-900 border-2 border-red-500'}`}
-                                >
-                                    <p className="text-lg font-bold">{server.name}</p>
-                                    <p className="text-sm text-gray-300">IP: {server.ip}</p>
-                                    <p className="text-sm text-gray-300">Services: {server.services.join(', ')}</p>
-                                    <button
-                                        onClick={() => selectServer('attackers', server.id)}
-                                        className="mt-2 bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded-md mr-2"
-                                        disabled={gameState.selectedServer?.team === 'defenders'}
-                                    >
-                                        Attack
-                                    </button>
-                                    <button
-                                        onClick={() => selectServer('defenders', server.id)}
-                                        className="mt-2 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-md"
-                                        disabled={gameState.selectedServer?.team === 'attackers'}
-                                    >
-                                        Defend
-                                    </button>
-                                </div>
-                            ))}
-                        </div>
+                        <h2 className="text-2xl text-cyan-400 mb-4 font-bold">Target System: {gameState.selectedSystem.name}</h2>
+                        <p className="text-gray-300">{gameState.selectedSystem.description}</p>
                     </div>
 
                     {/* Teams */}
@@ -390,35 +582,12 @@ const AttackSimulator = () => {
                                     <div key={player.id} className="flex items-center justify-between mb-2 bg-gray-900 p-3 rounded-md">
                                         <span className="text-gray-300">{player.role} (#{player.id})</span>
                                         <span className="text-sm text-gray-400">
-                                            {player.action ? `Exploiting ${gameState.servers.find(s => s.id === player.action.serverId).name}` : 'Awaiting Action'}
+                                            {player.action ? `Exploited ${gameState.selectedSystem.vulnerabilities.find(v => v.id === player.action).name}` : 'Awaiting Action'}
                                         </span>
                                     </div>
                                 ))}
                             </div>
-                            <div className="mb-4 text-gray-300">Hacker Terminal (type 'help' for commands):</div>
-                            <div className="bg-black p-4 rounded-md h-48 overflow-y-auto mb-4">
-                                {gameState.terminalOutput.attackers.map((line, index) => (
-                                    <p key={index} className="text-sm text-green-400">{line}</p>
-                                ))}
-                            </div>
-                            {gameState.selectedServer?.team === 'attackers' && (
-                                <div className="flex items-center">
-                                    <input
-                                        type="text"
-                                        value={gameState.attackerTerminalInput}
-                                        onChange={(e) => setGameState({ ...gameState, attackerTerminalInput: e.target.value })}
-                                        onKeyPress={(e) => e.key === 'Enter' && handleTerminalCommand('attackers')}
-                                        className="flex-1 px-4 py-2 bg-gray-900 text-white border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
-                                        placeholder={`Command for ${gameState.servers.find(s => s.id === gameState.selectedServer.serverId).name}`}
-                                    />
-                                    <button
-                                        onClick={() => handleTerminalCommand('attackers')}
-                                        className="ml-2 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md"
-                                    >
-                                        Run
-                                    </button>
-                                </div>
-                            )}
+                            {renderSystemInterface('attackers')}
                         </div>
 
                         {/* Defenders */}
@@ -429,35 +598,12 @@ const AttackSimulator = () => {
                                     <div key={player.id} className="flex items-center justify-between mb-2 bg-gray-900 p-3 rounded-md">
                                         <span className="text-gray-300">{player.role} (#{player.id})</span>
                                         <span className="text-sm text-gray-400">
-                                            {player.action ? `Patching ${gameState.servers.find(s => s.id === player.action.serverId).name}` : 'Awaiting Action'}
+                                            {player.action ? `Patched ${gameState.selectedSystem.vulnerabilities.find(v => v.id === player.action).name}` : 'Awaiting Action'}
                                         </span>
                                     </div>
                                 ))}
                             </div>
-                            <div className="mb-4 text-gray-300">Defender Terminal (type 'help' for commands):</div>
-                            <div className="bg-black p-4 rounded-md h-48 overflow-y-auto mb-4">
-                                {gameState.terminalOutput.defenders.map((line, index) => (
-                                    <p key={index} className="text-sm text-green-400">{line}</p>
-                                ))}
-                            </div>
-                            {gameState.selectedServer?.team === 'defenders' && (
-                                <div className="flex items-center">
-                                    <input
-                                        type="text"
-                                        value={gameState.defenderTerminalInput}
-                                        onChange={(e) => setGameState({ ...gameState, defenderTerminalInput: e.target.value })}
-                                        onKeyPress={(e) => e.key === 'Enter' && handleTerminalCommand('defenders')}
-                                        className="flex-1 px-4 py-2 bg-gray-900 text-white border border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        placeholder={`Command for ${gameState.servers.find(s => s.id === gameState.selectedServer.serverId).name}`}
-                                    />
-                                    <button
-                                        onClick={() => handleTerminalCommand('defenders')}
-                                        className="ml-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md"
-                                    >
-                                        Run
-                                    </button>
-                                </div>
-                            )}
+                            {renderSystemInterface('defenders')}
                         </div>
                     </div>
 
