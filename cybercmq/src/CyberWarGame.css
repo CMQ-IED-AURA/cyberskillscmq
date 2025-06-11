@@ -1,6 +1,6 @@
-/* CyberWarGame.css - Enhanced styles for the Cyber War Game with cyberpunk animations and transitions */
+/* CyberWarGame.css - Enhanced cyberpunk styles for the Cyber War Game */
 
-/* Import d'une police "hacker" */
+/* Import hacker fonts */
 @import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;700&family=Orbitron:wght@400;700&display=swap');
 
 :root {
@@ -8,6 +8,7 @@
     --cyber-blue: #00ccff;
     --cyber-yellow: #fffb00;
     --cyber-green: #00ff6a;
+    --cyber-white: #ffffff;
     --bg-dark: #02040a;
     --bg-panel: rgba(10, 23, 46, 0.6);
     --border-color: rgba(0, 204, 255, 0.3);
@@ -19,6 +20,8 @@
 
 * {
     box-sizing: border-box;
+    margin: 0;
+    padding: 0;
 }
 
 .cyber-game-container {
@@ -28,9 +31,10 @@
     overflow: hidden;
     min-height: 100vh;
     z-index: 1;
+    color: var(--cyber-white);
 }
 
-/* Effet de scanlines CRT pour l'ambiance */
+/* CRT scanline effect */
 .cyber-game-container::before {
     content: "";
     position: fixed;
@@ -53,7 +57,7 @@
     to { background-position: 0 100vh; }
 }
 
-/* Effet de glitch pour textes et éléments */
+/* Glitch effect */
 .glitch {
     position: relative;
     animation: glitch-anim 0.6s infinite alternate;
@@ -102,7 +106,7 @@
     100% { transform: translate(3px, 0); }
 }
 
-/* Texte néon avec effet pulsant */
+/* Neon text effects */
 .neon-text-red {
     color: var(--cyber-red);
     text-shadow: 0 0 5px var(--cyber-red), 0 0 15px var(--cyber-red), 0 0 25px var(--cyber-red);
@@ -133,32 +137,46 @@
     animation: neon-pulse 1.5s ease-in-out infinite;
 }
 
+.neon-text-white {
+    color: var(--cyber-white);
+    text-shadow: 0 0 5px var(--cyber-white), 0 0 15px var(--cyber-white), 0 0 25px var(--cyber-white);
+    animation: neon-pulse 1.5s ease-in-out infinite;
+}
+
 @keyframes neon-pulse {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.7; }
 }
 
-/* Lobby Screen Styling (Integrated) */
-.lobby-screen {
-    background: linear-gradient(135deg, var(--bg-dark) 0%, #0a1730 100%);
-    padding: 2rem;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    position: relative;
-    overflow: hidden;
+/* Title flicker effect */
+.lobby-title, .team-title {
+    font-family: 'Orbitron', sans-serif;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    animation: flicker 3s infinite;
 }
 
 .lobby-title {
-    font-family: 'Orbitron', sans-serif;
     font-size: clamp(2.5rem, 6vw, 4rem);
     color: var(--cyber-yellow);
     text-shadow: 0 0 20px var(--cyber-yellow), 0 0 40px var(--cyber-yellow);
     margin-bottom: 2rem;
-    animation: flicker 3s infinite;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
+}
+
+.team-title {
+    font-size: 2rem;
+    margin-bottom: 1.5rem;
+    text-align: center;
+}
+
+.team-title.attackers {
+    color: var(--cyber-red);
+    text-shadow: 0 0 15px var(--cyber-red);
+}
+
+.team-title.defenders {
+    color: var(--cyber-blue);
+    text-shadow: 0 0 15px var(--cyber-blue);
 }
 
 @keyframes flicker {
@@ -167,15 +185,7 @@
     70% { opacity: 0.98; }
 }
 
-/* Role Selection Containers */
-.team-container {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-    gap: 2rem;
-    max-width: 1200px;
-    width: 100%;
-}
-
+/* Panel styling */
 .team-panel {
     background: var(--bg-panel);
     border: 2px solid var(--border-color);
@@ -210,127 +220,6 @@
 
 .team-panel.defenders {
     border-color: var(--cyber-blue);
-}
-
-.team-title {
-    font-family: 'Orbitron', sans-serif;
-    font-size: 2rem;
-    margin-bottom: 1.5rem;
-    text-align: center;
-    text-transform: uppercase;
-}
-
-.team-title.attackers {
-    color: var(--cyber-red);
-    text-shadow: 0 0 15px var(--cyber-red);
-}
-
-.team-title.defenders {
-    color: var(--cyber-blue);
-    text-shadow: 0 0 15px var(--cyber-blue);
-}
-
-/* Role Buttons */
-.role-button {
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    padding: 1rem;
-    margin-bottom: 0.75rem;
-    background: rgba(255, 255, 255, 0.05);
-    border: 2px solid transparent;
-    border-radius: 8px;
-    color: #ffffff;
-    font-family: 'Fira Code', monospace;
-    font-size: 1rem;
-    cursor: pointer;
-    transition: var(--transition-smooth);
-    position: relative;
-    overflow: hidden;
-    animation: slide-in 0.5s ease-out;
-}
-
-@keyframes slide-in {
-    from { transform: translateX(-20px); opacity: 0; }
-    to { transform: translateX(0); opacity: 1; }
-}
-
-.role-button:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 5px 15px var(--shadow-dark);
-}
-
-.role-button.selected {
-    border-color: var(--cyber-yellow);
-    background: rgba(255, 251, 0, 0.2);
-    box-shadow: 0 0 20px var(--cyber-yellow);
-}
-
-.role-button.attackers:hover {
-    background: rgba(255, 51, 51, 0.3);
-    border-color: var(--cyber-red);
-    box-shadow: 0 0 15px var(--cyber-red);
-}
-
-.role-button.defenders:hover {
-    background: rgba(0, 204, 255, 0.3);
-    border-color: var(--cyber-blue);
-    box-shadow: 0 0 15px var(--cyber-blue);
-}
-
-.role-icon {
-    font-size: 1.5rem;
-    text-shadow: 0 0 10px currentColor;
-}
-
-.role-name {
-    font-weight: 700;
-    letter-spacing: 0.05em;
-}
-
-.role-speciality {
-    font-size: 0.85rem;
-    color: rgba(255, 255, 255, 0.7);
-}
-
-/* Start Battle Button */
-.start-battle-btn {
-    margin-top: 2rem;
-    padding: 1rem 2rem;
-    background: linear-gradient(135deg, var(--cyber-green) 0%, var(--cyber-blue) 100%);
-    border: none;
-    border-radius: 8px;
-    color: #000;
-    font-family: 'Orbitron', sans-serif;
-    font-size: 1.2rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    cursor: pointer;
-    box-shadow: 0 0 20px var(--cyber-green);
-    transition: var(--transition-smooth);
-    position: relative;
-    overflow: hidden;
-}
-
-.start-battle-btn:hover {
-    background: linear-gradient(135deg, var(--cyber-blue) 0%, var(--cyber-green) 100%);
-    transform: scale(1.05);
-    box-shadow: 0 0 30px var(--cyber-blue);
-}
-
-.start-battle-btn::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
-    transition: left 0.5s;
-}
-
-.start-battle-btn:hover::before {
-    left: 100%;
 }
 
 /* Intro Animation Styling */
@@ -420,7 +309,6 @@
     align-items: center;
     gap: 1rem;
     padding: 0.5rem;
-    color: #ffffff;
     font-family: 'Fira Code', monospace;
     font-size: 1rem;
 }
@@ -433,6 +321,21 @@
     text-shadow: 0 0 10px var(--cyber-blue);
 }
 
+.role-icon {
+    font-size: 1.5rem;
+    text-shadow: 0 0 10px currentColor;
+}
+
+.role-name {
+    font-weight: 700;
+    letter-spacing: 0.05em;
+}
+
+.role-speciality {
+    font-size: 0.85rem;
+    color: var(--cyber-green);
+}
+
 /* Action Buttons */
 .action-btn {
     position: relative;
@@ -440,7 +343,7 @@
     border: 1px solid var(--border-color);
     border-radius: 8px;
     background: var(--bg-panel);
-    color: #ffffff;
+    color: var(--cyber-white);
     font-family: 'Fira Code', monospace;
     font-size: 0.95rem;
     cursor: pointer;
@@ -474,6 +377,61 @@
     box-shadow: 0 0 20px var(--cyber-blue);
 }
 
+/* Start Battle Button */
+.start-battle-btn {
+    margin-top: 2rem;
+    padding: 1rem 2rem;
+    background: linear-gradient(135deg, var(--cyber-green) 0%, var(--cyber-blue) 100%);
+    border: none;
+    border-radius: 8px;
+    color: #000;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 1.2rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    cursor: pointer;
+    box-shadow: 0 0 20px var(--cyber-green);
+    transition: var(--transition-smooth);
+    position: relative;
+    overflow: hidden;
+}
+
+.start-battle-btn:hover {
+    background: linear-gradient(135deg, var(--cyber-blue) 0%, var(--cyber-green) 100%);
+    transform: scale(1.05);
+    box-shadow: 0 0 30px var(--cyber-blue);
+}
+
+.start-battle-btn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+    transition: left 0.5s;
+}
+
+.start-battle-btn:hover::before {
+    left: 100%;
+}
+
+/* Terminal Styling */
+.terminal-input {
+    background: transparent;
+    border: none;
+    color: var(--cyber-green);
+    font-family: 'Fira Code', monospace;
+    font-size: 0.95rem;
+    width: 100%;
+}
+
+.terminal-input:focus {
+    outline: none;
+    box-shadow: none;
+}
+
 /* Vulnerability Status */
 .vuln-status-icon {
     transition: var(--transition-fast);
@@ -493,19 +451,13 @@
     50% { transform: scale(1.2); opacity: 0.7; }
 }
 
-/* Terminal Styling */
-.terminal-input {
-    background: transparent;
-    border: none;
-    color: var(--cyber-green);
-    font-family: 'Fira Code', monospace;
-    font-size: 0.95rem;
-    width: 100%;
-}
-
-.terminal-input:focus {
-    outline: none;
-    box-shadow: none;
+/* Background Panel for Content */
+.bg-panel {
+    background: var(--bg-panel);
+    border-radius: 8px;
+    padding: 1rem;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 0 15px var(--shadow-dark);
 }
 
 /* Responsive Design */
@@ -514,8 +466,8 @@
         font-size: clamp(2rem, 5vw, 3rem);
     }
 
-    .team-container {
-        grid-template-columns: 1fr;
+    .team-panel {
+        padding: 1rem;
     }
 
     .role-grid {
@@ -523,14 +475,14 @@
     }
 
     .intro-title {
-        font-size: clamp(2rem, 6vw, 3.5rem);
+        font-size: clamp(2rem, 4vw, 3.5rem);
     }
 
     .player-grid {
         grid-template-columns: repeat(3, 1fr);
     }
 
-    .role-button {
+    .action-btn {
         font-size: 0.9rem;
         padding: 0.8rem;
     }
@@ -544,10 +496,6 @@
 @media screen and (max-width: 480px) {
     .lobby-title {
         font-size: clamp(1.5rem, 4vw, 2.5rem);
-    }
-
-    .team-panel {
-        padding: 1rem;
     }
 
     .team-title {
