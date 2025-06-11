@@ -1,21 +1,17 @@
-/* CyberWarGame.css - Enhanced cyberpunk styles for the Cyber War Game */
+/* CyberWarGame.css - Clean, modern styles for Cyber War Game */
 
-/* Import hacker fonts */
-@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;700&family=Orbitron:wght@400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=Roboto+Mono:wght@400;500&display=swap');
 
 :root {
-    --cyber-red: #ff3333;
-    --cyber-blue: #00ccff;
-    --cyber-yellow: #fffb00;
-    --cyber-green: #00ff6a;
-    --cyber-white: #ffffff;
-    --bg-dark: #02040a;
-    --bg-panel: rgba(10, 23, 46, 0.6);
-    --border-color: rgba(0, 204, 255, 0.3);
-    --neon-glow: rgba(0, 204, 255, 0.5);
-    --shadow-dark: rgba(0, 0, 0, 0.5);
-    --transition-fast: all 0.2s ease;
-    --transition-smooth: all 0.4s ease-in-out;
+    --primary-dark: #1a1a2e;
+    --secondary-dark: #2c2c44;
+    --accent-blue: #4a90e2;
+    --accent-red: #e94e77;
+    --text-primary: #e0e0e5;
+    --text-secondary: #a0a0b0;
+    --border-color: #3a3a55;
+    --shadow: rgba(0, 0, 0, 0.2);
+    --transition: all 0.2s ease;
 }
 
 * {
@@ -24,227 +20,413 @@
     padding: 0;
 }
 
-.cyber-game-container {
-    font-family: 'Fira Code', monospace;
-    background-color: var(--bg-dark);
-    position: relative;
-    overflow: hidden;
+body {
+    font-family: 'Inter', sans-serif;
+    background-color: var(--primary-dark);
+    color: var(--text-primary);
+}
+
+.game-container {
     min-height: 100vh;
-    z-index: 1;
-    color: var(--cyber-white);
+    display: flex;
+    flex-direction: column;
+    background-color: var(--primary-dark);
 }
 
-/* CRT scanline effect */
-.cyber-game-container::before {
-    content: "";
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background-image: repeating-linear-gradient(
-            transparent 0,
-            rgba(0, 0, 0, 0.5) 2px,
-            transparent 4px
-    );
-    z-index: 2;
-    pointer-events: none;
-    animation: scanline 12s linear infinite;
+/* Header */
+.header {
+    background-color: var(--secondary-dark);
+    border-bottom: 1px solid var(--border-color);
+    padding: 1rem;
 }
 
-@keyframes scanline {
-    from { background-position: 0 0; }
-    to { background-position: 0 100vh; }
+.header-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    max-width: 1200px;
+    margin: 0 auto;
 }
 
-/* Glitch effect */
-.glitch {
-    position: relative;
-    animation: glitch-anim 0.6s infinite alternate;
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
 }
 
-.glitch::before,
-.glitch::after {
-    content: attr(data-text);
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
+.header-title {
+    font-size: 1.5rem;
+    font-weight: 700;
 }
 
-.glitch::before {
-    color: var(--cyber-red);
-    animation: glitch-top 0.5s infinite;
-    clip-path: polygon(0 0, 100% 0, 100% 33%, 0 33%);
+.phase-info {
+    font-size: 1rem;
+    color: var(--text-secondary);
 }
 
-.glitch::after {
-    color: var(--cyber-blue);
-    animation: glitch-bottom 0.5s infinite;
-    clip-path: polygon(0 67%, 100% 67%, 100% 100%, 0 100%);
+.phase-name {
+    color: var(--accent-blue);
+    font-weight: 500;
 }
 
-@keyframes glitch-anim {
-    0% { transform: translate(0); }
-    20% { transform: translate(-2px, 2px); }
-    40% { transform: translate(2px, -2px); }
-    60% { transform: translate(-2px, 0); }
-    80% { transform: translate(2px, 2px); }
-    100% { transform: translate(0); }
+.header-right {
+    display: flex;
+    gap: 2rem;
 }
 
-@keyframes glitch-top {
-    0% { transform: translate(0); }
-    50% { transform: translate(3px, 0); }
-    100% { transform: translate(-3px, 0); }
-}
-
-@keyframes glitch-bottom {
-    0% { transform: translate(0); }
-    50% { transform: translate(-3px, 0); }
-    100% { transform: translate(3px, 0); }
-}
-
-/* Neon text effects */
-.neon-text-red {
-    color: var(--cyber-red);
-    text-shadow: 0 0 5px var(--cyber-red), 0 0 15px var(--cyber-red), 0 0 25px var(--cyber-red);
-    animation: neon-pulse 1.5s ease-in-out infinite;
-}
-
-.neon-text-blue {
-    color: var(--cyber-blue);
-    text-shadow: 0 0 5px var(--cyber-blue), 0 0 15px var(--cyber-blue), 0 0 25px var(--cyber-blue);
-    animation: neon-pulse 1.5s ease-in-out infinite;
-}
-
-.neon-text-cyan {
-    color: #0ff;
-    text-shadow: 0 0 5px #0ff, 0 0 15px #0ff, 0 0 25px #0ff;
-    animation: neon-pulse 1.5s ease-in-out infinite;
-}
-
-.neon-text-yellow {
-    color: var(--cyber-yellow);
-    text-shadow: 0 0 5px var(--cyber-yellow), 0 0 15px var(--cyber-yellow), 0 0 25px var(--cyber-yellow);
-    animation: neon-pulse 1.5s ease-in-out infinite;
-}
-
-.neon-text-green {
-    color: var(--cyber-green);
-    text-shadow: 0 0 5px var(--cyber-green), 0 0 15px var(--cyber-green), 0 0 25px var(--cyber-green);
-    animation: neon-pulse 1.5s ease-in-out infinite;
-}
-
-.neon-text-white {
-    color: var(--cyber-white);
-    text-shadow: 0 0 5px var(--cyber-white), 0 0 15px var(--cyber-white), 0 0 25px var(--cyber-white);
-    animation: neon-pulse 1.5s ease-in-out infinite;
-}
-
-@keyframes neon-pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.7; }
-}
-
-/* Title flicker effect */
-.lobby-title, .team-title {
-    font-family: 'Orbitron', sans-serif;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    animation: flicker 3s infinite;
-}
-
-.lobby-title {
-    font-size: clamp(2.5rem, 6vw, 4rem);
-    color: var(--cyber-yellow);
-    text-shadow: 0 0 20px var(--cyber-yellow), 0 0 40px var(--cyber-yellow);
-    margin-bottom: 2rem;
-}
-
-.team-title {
-    font-size: 2rem;
-    margin-bottom: 1.5rem;
+.timer, .scores {
     text-align: center;
 }
 
-.team-title.attackers {
-    color: var(--cyber-red);
-    text-shadow: 0 0 15px var(--cyber-red);
+.timer-label, .score-label {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
 }
 
-.team-title.defenders {
-    color: var(--cyber-blue);
-    text-shadow: 0 0 15px var(--cyber-blue);
+.timer-value, .score-value {
+    font-size: 1.25rem;
+    font-family: 'Roboto Mono', monospace;
 }
 
-@keyframes flicker {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.95; }
-    70% { opacity: 0.98; }
+.score-value .attackers {
+    color: var(--accent-red);
 }
 
-/* Panel styling */
-.team-panel {
-    background: var(--bg-panel);
-    border: 2px solid var(--border-color);
-    border-radius: 12px;
+.score-value .defenders {
+    color: var(--accent-blue);
+}
+
+/* Main Content */
+.main-content {
+    display: flex;
+    flex: 1;
+    max-width: 1200px;
+    margin: 0 auto;
     padding: 1.5rem;
-    backdrop-filter: blur(10px);
-    box-shadow: 0 0 20px var(--shadow-dark);
-    transition: var(--transition-smooth);
-    position: relative;
-    overflow: hidden;
+    gap: 1.5rem;
 }
 
-.team-panel::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
-    transition: transform 0.5s;
-    transform: translateX(-100%);
+.sidebar {
+    width: 300px;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
 }
 
-.team-panel:hover::before {
-    transform: translateX(100%);
+.content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
 }
 
-.team-panel.attackers {
-    border-color: var(--cyber-red);
+/* Panels */
+.panel {
+    background-color: var(--secondary-dark);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1.5rem;
+    box-shadow: 0 2px 8px var(--shadow);
 }
 
-.team-panel.defenders {
-    border-color: var(--cyber-blue);
+.panel-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+    color: var(--text-primary);
 }
 
-/* Intro Animation Styling */
-.intro-container {
-    background: linear-gradient(135deg, #1a0033 0%, #0a1730 100%);
-    min-height: 100vh;
+.role-panel {
+    text-align: center;
+}
+
+.role-panel.attackers {
+    border-color: var(--accent-red);
+}
+
+.role-panel.defenders {
+    border-color: var(--accent-blue);
+}
+
+.role-icon {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+}
+
+.role-name {
+    font-size: 1.125rem;
+    font-weight: 600;
+}
+
+.role-speciality {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+}
+
+.objective-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+}
+
+.objective-list .icon {
+    margin-right: 0.5rem;
+}
+
+.activity-log {
+    background-color: var(--primary-dark);
+    border-radius: 4px;
+    padding: 1rem;
+    max-height: 200px;
+    overflow-y: auto;
+    font-family: 'Roboto Mono', monospace;
+    font-size: 0.875rem;
+}
+
+.log-entry {
+    margin-bottom: 0.5rem;
+}
+
+/* Tabs */
+.tabs {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.tab {
+    padding: 0.75rem 1.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background-color: var(--secondary-dark);
+    color: var(--text-primary);
+    font-size: 1rem;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.tab:hover {
+    background-color: var(--primary-dark);
+}
+
+.tab.active.attackers {
+    border-color: var(--accent-red);
+    background-color: var(--accent-red);
+    color: #fff;
+}
+
+.tab.active.defenders {
+    border-color: var(--accent-blue);
+    background-color: var(--accent-blue);
+    color: #fff;
+}
+
+/* Interface */
+.interface {
+    flex: 1;
+}
+
+.sub-tabs {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 0.5rem;
+}
+
+.sub-tab {
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.sub-tab:hover {
+    color: var(--text-primary);
+}
+
+.sub-tab.active {
+    color: var(--accent-blue);
+    font-weight: 500;
+}
+
+.interface-content {
+    background-color: var(--primary-dark);
+    border-radius: 6px;
+    padding: 1.5rem;
+}
+
+.interface-title {
+    font-size: 1.125rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+}
+
+.form {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.input {
+    padding: 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background-color: var(--secondary-dark);
+    color: var(--text-primary);
+    font-family: 'Roboto Mono', monospace;
+    font-size: 0.875rem;
+}
+
+.input:focus {
+    outline: none;
+    border-color: var(--accent-blue);
+}
+
+.textarea {
+    resize: vertical;
+    min-height: 100px;
+}
+
+.actions {
+    margin-top: 1.5rem;
+}
+
+.action-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 0.75rem;
+}
+
+/* Buttons */
+.button {
+    padding: 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    background-color: var(--secondary-dark);
+    color: var(--text-primary);
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.button:hover {
+    background-color: var(--primary-dark);
+}
+
+.button.attackers {
+    border-color: var(--accent-red);
+}
+
+.button.attackers:hover {
+    background-color: var(--accent-red);
+    color: #fff;
+}
+
+.button.defenders {
+    border-color: var(--accent-blue);
+}
+
+.button.defenders:hover {
+    background-color: var(--accent-blue);
+    color: #fff;
+}
+
+.button.replay {
+    border-color: var(--accent-blue);
+    background-color: var(--accent-blue);
+    color: #fff;
+    font-weight: 500;
+}
+
+.button.replay:hover {
+    background-color: darken(var(--accent-blue), 10%);
+}
+
+/* Terminal */
+.terminal {
+    background-color: var(--primary-dark);
+    border-radius: 6px;
+    padding: 1rem;
+    font-family: 'Roboto Mono', monospace;
+    font-size: 0.875rem;
+    max-height: 300px;
+    display: flex;
+    flex-direction: column;
+}
+
+.terminal-output {
+    flex: 1;
+    overflow-y: auto;
+}
+
+.terminal-line {
+    margin-bottom: 0.5rem;
+}
+
+.terminal-prompt {
     display: flex;
     align-items: center;
+}
+
+.terminal-prompt span {
+    color: var(--accent-blue);
+}
+
+.terminal-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: var(--text-primary);
+    font-family: 'Roboto Mono', monospace;
+    font-size: 0.875rem;
+}
+
+.terminal-input:focus {
+    outline: none;
+}
+
+/* Status Cards */
+.status-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.status-card {
+    background-color: var(--secondary-dark);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 1rem;
+}
+
+.status-title {
+    font-size: 1rem;
+    font-weight: 500;
+    margin-bottom: 0.5rem;
+}
+
+.status-content {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+}
+
+/* Intro Animation */
+.intro-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
     justify-content: center;
-    position: relative;
-    overflow: hidden;
+    min-height: 100vh;
+    padding: 2rem;
 }
 
 .intro-title {
-    font-family: 'Orbitron', sans-serif;
-    font-size: clamp(3rem, 8vw, 5rem);
-    color: var(--cyber-yellow);
-    text-shadow: 0 0 30px var(--cyber-yellow);
-    animation: pulse 2s infinite;
-    text-transform: uppercase;
-}
-
-@keyframes pulse {
-    0%, 100% { transform: scale(1); }
-    50% { transform: scale(1.05); }
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin-bottom: 2rem;
 }
 
 .player-grid {
@@ -255,261 +437,156 @@
 }
 
 .player-icon {
-    width: 60px;
-    height: 60px;
+    width: 50px;
+    height: 50px;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 1.5rem;
-    transition: var(--transition-smooth);
-    animation: bounce 0.5s ease-in-out;
-    background: var(--bg-panel);
+    font-size: 1.25rem;
+    background-color: var(--secondary-dark);
+    border: 1px solid var(--border-color);
+    transition: var(--transition);
 }
 
 .player-icon.attackers {
-    background: var(--cyber-red);
-    box-shadow: 0 0 15px var(--cyber-red);
+    background-color: var(--accent-red);
+    color: #fff;
 }
 
 .player-icon.defenders {
-    background: var(--cyber-blue);
-    box-shadow: 0 0 15px var(--cyber-blue);
-}
-
-@keyframes bounce {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-10px); }
+    background-color: var(--accent-blue);
+    color: #fff;
 }
 
 .role-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 2rem;
-    max-width: 1000px;
+    gap: 1.5rem;
+    max-width: 800px;
     width: 100%;
-}
-
-.role-panel {
-    background: var(--bg-panel);
-    border-radius: 12px;
-    padding: 1.5rem;
-    backdrop-filter: blur(10px);
-    box-shadow: 0 0 20px var(--shadow-dark);
-    animation: fade-in 1s ease-in;
-}
-
-@keyframes fade-in {
-    from { opacity: 0; transform: translateY(20px); }
-    to { opacity: 1; transform: translateY(0); }
 }
 
 .role-item {
     display: flex;
     align-items: center;
-    gap: 1rem;
-    padding: 0.5rem;
-    font-family: 'Fira Code', monospace;
-    font-size: 1rem;
+    gap: 0.5rem;
+    font-size: 0.875rem;
 }
 
 .role-item.attackers {
-    text-shadow: 0 0 10px var(--cyber-red);
+    color: var(--accent-red);
 }
 
 .role-item.defenders {
-    text-shadow: 0 0 10px var(--cyber-blue);
+    color: var(--accent-blue);
 }
 
-.role-icon {
-    font-size: 1.5rem;
-    text-shadow: 0 0 10px currentColor;
+.intro-text {
+    font-size: 1rem;
+    color: var(--text-secondary);
+    margin-top: 1rem;
 }
 
-.role-name {
-    font-weight: 700;
-    letter-spacing: 0.05em;
-}
-
-.role-speciality {
-    font-size: 0.85rem;
-    color: var(--cyber-green);
-}
-
-/* Action Buttons */
-.action-btn {
-    position: relative;
-    padding: 0.75rem 1.5rem;
+/* Results Screen */
+.results-panel {
+    background-color: var(--secondary-dark);
     border: 1px solid var(--border-color);
     border-radius: 8px;
-    background: var(--bg-panel);
-    color: var(--cyber-white);
-    font-family: 'Fira Code', monospace;
-    font-size: 0.95rem;
-    cursor: pointer;
-    transition: var(--transition-fast);
-    overflow: hidden;
-    backdrop-filter: blur(5px);
+    padding: 2rem;
+    max-width: 600px;
+    margin: 2rem auto;
+    text-align: center;
 }
 
-.action-btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 0 15px var(--neon-glow);
+.results-title {
+    font-size: 2rem;
+    font-weight: 600;
+    margin-bottom: 1.5rem;
 }
 
-.action-btn.attack-btn {
-    border-color: var(--cyber-red);
-    background: rgba(255, 51, 51, 0.2);
+.results-title.attackers {
+    color: var(--accent-red);
 }
 
-.action-btn.attack-btn:hover {
-    background: rgba(255, 51, 51, 0.4);
-    box-shadow: 0 0 20px var(--cyber-red);
+.results-title.defenders {
+    color: var(--accent-blue);
 }
 
-.action-btn.defend-btn {
-    border-color: var(--cyber-blue);
-    background: rgba(0, 204, 255, 0.2);
+.score-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    margin-bottom: 2rem;
 }
 
-.action-btn.defend-btn:hover {
-    background: rgba(0, 204, 255, 0.4);
-    box-shadow: 0 0 20px var(--cyber-blue);
-}
-
-/* Start Battle Button */
-.start-battle-btn {
-    margin-top: 2rem;
-    padding: 1rem 2rem;
-    background: linear-gradient(135deg, var(--cyber-green) 0%, var(--cyber-blue) 100%);
-    border: none;
-    border-radius: 8px;
-    color: #000;
-    font-family: 'Orbitron', sans-serif;
-    font-size: 1.2rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    cursor: pointer;
-    box-shadow: 0 0 20px var(--cyber-green);
-    transition: var(--transition-smooth);
-    position: relative;
-    overflow: hidden;
-}
-
-.start-battle-btn:hover {
-    background: linear-gradient(135deg, var(--cyber-blue) 0%, var(--cyber-green) 100%);
-    transform: scale(1.05);
-    box-shadow: 0 0 30px var(--cyber-blue);
-}
-
-.start-battle-btn::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
-    transition: left 0.5s;
-}
-
-.start-battle-btn:hover::before {
-    left: 100%;
-}
-
-/* Terminal Styling */
-.terminal-input {
-    background: transparent;
-    border: none;
-    color: var(--cyber-green);
-    font-family: 'Fira Code', monospace;
-    font-size: 0.95rem;
-    width: 100%;
-}
-
-.terminal-input:focus {
-    outline: none;
-    box-shadow: none;
-}
-
-/* Vulnerability Status */
-.vuln-status-icon {
-    transition: var(--transition-fast);
-}
-
-.vuln-status-icon.exploited {
-    color: var(--cyber-red);
-    animation: pulse-red 1s infinite;
-}
-
-.vuln-status-icon.patched {
-    color: var(--cyber-green);
-}
-
-@keyframes pulse-red {
-    0%, 100% { transform: scale(1); opacity: 1; }
-    50% { transform: scale(1.2); opacity: 0.7; }
-}
-
-/* Background Panel for Content */
-.bg-panel {
-    background: var(--bg-panel);
-    border-radius: 8px;
+.score-card {
     padding: 1rem;
-    backdrop-filter: blur(10px);
-    box-shadow: 0 0 15px var(--shadow-dark);
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+}
+
+.score-card.attackers {
+    border-color: var(--accent-red);
+}
+
+.score-card.defenders {
+    border-color: var(--accent-blue);
+}
+
+.score-label {
+    font-size: 1rem;
+    color: var(--text-secondary);
+}
+
+.score-value {
+    font-size: 2rem;
+    font-family: 'Roboto Mono', monospace;
 }
 
 /* Responsive Design */
 @media screen and (max-width: 768px) {
-    .lobby-title {
-        font-size: clamp(2rem, 5vw, 3rem);
+    .main-content {
+        flex-direction: column;
     }
 
-    .team-panel {
-        padding: 1rem;
+    .sidebar {
+        width: 100%;
     }
 
     .role-grid {
         grid-template-columns: 1fr;
     }
 
+    .status-grid {
+        grid-template-columns: 1fr;
+    }
+
     .intro-title {
-        font-size: clamp(2rem, 4vw, 3.5rem);
+        font-size: 2rem;
     }
 
     .player-grid {
         grid-template-columns: repeat(3, 1fr);
     }
-
-    .action-btn {
-        font-size: 0.9rem;
-        padding: 0.8rem;
-    }
-
-    .start-battle-btn {
-        font-size: 1rem;
-        padding: 0.8rem 1.5rem;
-    }
 }
 
 @media screen and (max-width: 480px) {
-    .lobby-title {
-        font-size: clamp(1.5rem, 4vw, 2.5rem);
+    .header-content {
+        flex-direction: column;
+        gap: 1rem;
     }
 
-    .team-title {
+    .header-right {
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .results-title {
         font-size: 1.5rem;
     }
 
-    .player-icon {
-        width: 50px;
-        height: 50px;
-        font-size: 1.2rem;
-    }
-
-    .action-btn {
-        font-size: 0.85rem;
-        padding: 0.6rem 1rem;
+    .score-grid {
+        grid-template-columns: 1fr;
     }
 }

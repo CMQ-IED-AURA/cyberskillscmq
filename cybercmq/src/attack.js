@@ -1,18 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Users, Shield, Sword, Timer, Target, Server, Globe, Terminal, Lock, Unlock, Zap, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Shield, Sword, Timer, Target, Server, Globe, Terminal, Lock, Zap, AlertTriangle, CheckCircle } from 'lucide-react';
 import './CyberWarGame.css';
 
 const CyberWarGame = () => {
     const [gameState, setGameState] = useState('intro'); // intro, game, results
     const [currentPhase, setCurrentPhase] = useState('website'); // website, server
-    const [timeLeft, setTimeLeft] = useState(420); // 7 minutes en secondes
+    const [timeLeft, setTimeLeft] = useState(420); // 7 minutes
     const [selectedTeam, setSelectedTeam] = useState(null);
     const [selectedRole, setSelectedRole] = useState(null);
     const [scores, setScores] = useState({ attackers: 0, defenders: 0 });
     const [gameLog, setGameLog] = useState([]);
     const [roleAssigned, setRoleAssigned] = useState(false);
 
-    // États spécifiques au jeu
     const initialWebsiteState = {
         currentPage: 'home',
         vulnerabilities: {
@@ -40,25 +39,24 @@ const CyberWarGame = () => {
 
     const terminalInputRef = useRef(null);
 
-    // Rôles et leurs capacités
     const roles = {
         attackers: [
             { id: 'web-hacker', name: 'Web Hacker', icon: '🕷️', speciality: 'XSS, SQL Injection', actions: ['Scan XSS', 'SQL Injection', 'CSRF Test'] },
             { id: 'social-engineer', name: 'Social Engineer', icon: '👤', speciality: 'Phishing, OSINT', actions: ['Phish User', 'Gather OSINT', 'Spoof Email'] },
-            { id: 'network-scanner', name: 'Network Scanner', icon: '📡', speciality: 'Port Scan, Reconnaissance', actions: ['Port Scan', 'Network Recon', 'Ping Sweep'] },
+            { id: 'network-scanner', name: 'Network Scanner', icon: '📡', speciality: 'Port Scan, Recon', actions: ['Port Scan', 'Network Recon', 'Ping Sweep'] },
             { id: 'exploit-dev', name: 'Exploit Developer', icon: '⚡', speciality: 'Buffer Overflow, RCE', actions: ['Exploit RCE', 'Buffer Overflow', 'Shellcode Inject'] },
-            { id: 'crypto-breaker', name: 'Crypto Breaker', icon: '🔓', speciality: 'Hash Cracking, Encryption', actions: ['Crack Hash', 'Decrypt File', 'Keylog'] }
+            { id: 'crypto-breaker', name: 'Crypto Breaker', icon: '🔓', speciality: 'Hash Cracking', actions: ['Crack Hash', 'Decrypt File', 'Keylog'] }
         ],
         defenders: [
             { id: 'security-analyst', name: 'Security Analyst', icon: '🛡️', speciality: 'Monitoring, Detection', actions: ['Monitor Logs', 'Detect Intrusion', 'Analyze Traffic'] },
             { id: 'incident-responder', name: 'Incident Responder', icon: '🚨', speciality: 'Forensics, Mitigation', actions: ['Run Forensics', 'Mitigate Attack', 'Isolate Host'] },
             { id: 'network-admin', name: 'Network Admin', icon: '🌐', speciality: 'Firewall, IDS/IPS', actions: ['Configure Firewall', 'Enable IDS', 'Block IP'] },
-            { id: 'sys-hardener', name: 'System Hardener', icon: '🔒', speciality: 'Patches, Configuration', actions: ['Apply Patch', 'Harden Config', 'Disable Service'] },
-            { id: 'threat-hunter', name: 'Threat Hunter', icon: '🎯', speciality: 'IOC Detection, Analysis', actions: ['Hunt IOCs', 'Analyze Malware', 'Trace Attacker'] }
+            { id: 'sys-hardener', name: 'System Hardener', icon: '🔒', speciality: 'Patches, Config', actions: ['Apply Patch', 'Harden Config', 'Disable Service'] },
+            { id: 'threat-hunter', name: 'Threat Hunter', icon: '🎯', speciality: 'IOC Detection', actions: ['Hunt IOCs', 'Analyze Malware', 'Trace Attacker'] }
         ]
     };
 
-    // Assign random role at game start
+    // Random role assignment
     useEffect(() => {
         if (!roleAssigned) {
             const teams = ['attackers', 'defenders'];
@@ -66,12 +64,27 @@ const CyberWarGame = () => {
             const randomRole = roles[randomTeam][Math.floor(Math.random() * roles[randomTeam].length)];
             setSelectedTeam(randomTeam);
             setSelectedRole(randomRole.id);
-            setGameLog([`[${new Date().toLocaleTimeString()}] Vous êtes ${randomRole.name} (${randomTeam === 'attackers' ? '⚔️ Attaquants' : '🛡️ Défenseurs'})`]);
+            setGameLog([`[${new Date().toLocaleTimeString()}] Assigned: ${randomRole.name} (${randomTeam === 'attackers' ? '⚔️ Attackers' : '🛡️ Defenders'})`]);
             setRoleAssigned(true);
         }
     }, [roleAssigned]);
 
-    // --- Fonctions de base du jeu ---
+    // Timer management
+    useEffect(() => {
+        let timer;
+        if (gameState === 'game' && timeLeft > 0) {
+            timer = setInterval(() => setTimeLeft(prev => prev - 1), 1000);
+        } else if (timeLeft === 0) {
+            if (currentPhase === 'website') {
+                setCurrentPhase('server');
+                setTimeLeft(420);
+                addLog('Phase ended. Switching to server attack.');
+            } else {
+                setGameState('results');
+            }
+        }
+        return () => clearInterval(timer);
+    }, [gameState, timeLeft, currentPhase]);
 
     const addLog = (message) => {
         const newLog = `[${new Date().toLocaleTimeString()}] ${selectedTeam === 'attackers' ? '⚔️' : '🛡️'} ${message}`;
@@ -80,11 +93,10 @@ const CyberWarGame = () => {
 
     const handleAction = (team, message, points) => {
         addLog(message);
-        if (team === 'attackers') {
-            setScores(prev => ({ ...prev, attackers: prev.attackers + points }));
-        } else {
-            setScores(prev => ({ ...prev, defenders: prev.defenders + points }));
-        }
+        setScores(prev => ({
+            ...prev,
+            [team]: prev[team] + points
+        }));
     };
 
     const handleRestartGame = () => {
@@ -100,8 +112,6 @@ const CyberWarGame = () => {
         setRoleAssigned(false);
     };
 
-    // --- Composants d'UI ---
-
     const IntroAnimation = () => {
         const [currentPlayer, setCurrentPlayer] = useState(0);
         const [showRoles, setShowRoles] = useState(false);
@@ -114,11 +124,7 @@ const CyberWarGame = () => {
                     return prev;
                 });
             }, 500);
-
-            const gameTimer = setTimeout(() => {
-                setGameState('game');
-            }, 8000);
-
+            const gameTimer = setTimeout(() => setGameState('game'), 6000);
             return () => {
                 clearInterval(timer);
                 clearTimeout(gameTimer);
@@ -126,170 +132,125 @@ const CyberWarGame = () => {
         }, []);
 
         return (
-            <div className="cyber-game-container intro-container">
-                <div className="text-center">
-                    <h1 className="intro-title glitch" data-text="CYBER WAR 5v5">🚀 CYBER WAR 5v5 🚀</h1>
-                    <div className="player-grid">
-                        {[...Array(10)].map((_, i) => (
-                            <div
-                                key={i}
-                                className={`player-icon ${i < currentPlayer ? (i < 5 ? 'attackers' : 'defenders') : ''}`}
-                            >
-                                {i < currentPlayer && (i < 5 ? '⚔️' : '🛡️')}
-                            </div>
-                        ))}
-                    </div>
-                    {showRoles && (
-                        <div className="role-grid">
-                            <div className="role-panel">
-                                <h3 className="team-title attackers neon-text-red">🔴 ATTACKERS</h3>
-                                {roles.attackers.map((role, i) => (
-                                    <div
-                                        key={role.id}
-                                        className="role-item attackers neon-text-red"
-                                        style={{ animationDelay: `${i * 0.2}s` }}
-                                    >
-                                        <span className="role-icon">{role.icon}</span> {role.name}
-                                    </div>
-                                ))}
-                            </div>
-                            <div className="role-panel">
-                                <h3 className="team-title defenders neon-text-blue">🔵 DEFENDERS</h3>
-                                {roles.defenders.map((role, i) => (
-                                    <div
-                                        key={role.id}
-                                        className="role-item defenders neon-text-blue"
-                                        style={{ animationDelay: `${i * 0.2}s` }}
-                                    >
-                                        <span className="role-icon">{role.icon}</span> {role.name}
-                                    </div>
-                                ))}
-                            </div>
+            <div className="game-container intro-container">
+                <h1 className="intro-title">Cyber War 5v5</h1>
+                <div className="player-grid">
+                    {[...Array(10)].map((_, i) => (
+                        <div
+                            key={i}
+                            className={`player-icon ${i < currentPlayer ? (i < 5 ? 'attackers' : 'defenders') : ''}`}
+                        >
+                            {i < currentPlayer && (i < 5 ? '⚔️' : '🛡️')}
                         </div>
-                    )}
-                    <div className="neon-text-cyan mt-8 text-xl">Préparez-vous au combat cyber...</div>
+                    ))}
                 </div>
+                {showRoles && (
+                    <div className="role-grid">
+                        <div className="panel">
+                            <h3 className="panel-title attackers">Attackers</h3>
+                            {roles.attackers.map((role, i) => (
+                                <div key={role.id} className="role-item attackers" style={{ animationDelay: `${i * 0.2}s` }}>
+                                    <span className="role-icon">{role.icon}</span> {role.name}
+                                </div>
+                            ))}
+                        </div>
+                        <div className="panel">
+                            <h3 className="panel-title defenders">Defenders</h3>
+                            {roles.defenders.map((role, i) => (
+                                <div key={role.id} className="role-item defenders" style={{ animationDelay: `${i * 0.2}s` }}>
+                                    <span className="role-icon">{role.icon}</span> {role.name}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+                <div className="intro-text">Initializing cyber battlefield...</div>
             </div>
         );
     };
 
     const GameInterface = () => {
         const [activeTab, setActiveTab] = useState(currentPhase);
-
-        useEffect(() => {
-            if (gameState === 'game' && timeLeft > 0) {
-                const timer = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
-                return () => clearTimeout(timer);
-            } else if (timeLeft === 0) {
-                if (currentPhase === 'website') {
-                    setCurrentPhase('server');
-                    setActiveTab('server');
-                    setTimeLeft(420);
-                    addLog("Phase terminée. Passage à l'attaque du serveur.");
-                } else {
-                    setGameState('results');
-                }
-            }
-        }, [timeLeft, gameState]);
-
-        const formatTime = (s) => `${Math.floor(s / 60).toString().padStart(2, '0')}:${(s % 60).toString().padStart(2, '0')}`;
         const role = roles[selectedTeam]?.find(r => r.id === selectedRole);
 
+        const formatTime = (s) => `${Math.floor(s / 60).toString().padStart(2, '0')}:${(s % 60).toString().padStart(2, '0')}`;
+
         return (
-            <div className="cyber-game-container">
-                <header className="bg-panel border-b-2 border-cyber-blue p-4">
-                    <div className="flex justify-between items-center max-w-7xl mx-auto">
-                        <div className="flex items-center space-x-4">
-                            <h1 className="neon-text-cyan text-2xl font-bold">CYBER WAR</h1>
-                            <div className="neon-text-blue text-lg">
-                                Phase: <span className="neon-text-yellow">{currentPhase.toUpperCase()}</span>
+            <div className="game-container">
+                <header className="header">
+                    <div className="header-content">
+                        <div className="header-left">
+                            <h1 className="header-title">Cyber War</h1>
+                            <div className="phase-info">
+                                Phase: <span className="phase-name">{currentPhase.toUpperCase()}</span>
                             </div>
                         </div>
-                        <div className="flex items-center space-x-6">
-                            <div className="text-center">
-                                <div className="text-sm neon-text-green">TEMPS</div>
-                                <div className="text-2xl font-mono neon-text-yellow">{formatTime(timeLeft)}</div>
+                        <div className="header-right">
+                            <div className="timer">
+                                <span className="timer-label">Time</span>
+                                <span className="timer-value">{formatTime(timeLeft)}</span>
                             </div>
-                            <div className="text-center">
-                                <div className="text-sm neon-text-green">SCORE</div>
-                                <div className="text-lg">
-                                    <span className="neon-text-red">{scores.attackers}</span> -{' '}
-                                    <span className="neon-text-blue">{scores.defenders}</span>
-                                </div>
+                            <div className="scores">
+                                <span className="score-label">Score</span>
+                                <span className="score-value">
+                                    <span className="attackers">{scores.attackers}</span> - <span className="defenders">{scores.defenders}</span>
+                                </span>
                             </div>
                         </div>
                     </div>
                 </header>
-                <main className="flex flex-1 overflow-hidden">
-                    <aside className="w-80 bg-panel border-r-2 border-cyber-blue p-4 flex flex-col">
+                <main className="main-content">
+                    <aside className="sidebar">
                         {role && (
-                            <div className={`team-panel ${selectedTeam}`}>
-                                <div className="text-center">
-                                    <div className="role-icon text-3xl mb-2 neon-text-yellow">{role.icon}</div>
-                                    <div className={`role-name font-bold text-lg neon-text-${selectedTeam === 'attackers' ? 'red' : 'blue'}`}>
-                                        {role.name}
-                                    </div>
-                                    <div className="role-speciality text-sm neon-text-green">{role.speciality}</div>
-                                </div>
+                            <div className={`panel role-panel ${selectedTeam}`}>
+                                <div className="role-icon">{role.icon}</div>
+                                <div className="role-name">{role.name}</div>
+                                <div className="role-speciality">{role.speciality}</div>
                             </div>
                         )}
-                        <div className="mb-6">
-                            <h3 className="neon-text-cyan text-lg font-bold mb-3">🎯 OBJECTIFS</h3>
-                            <div className="space-y-2 text-sm">
+                        <div className="panel objectives">
+                            <h3 className="panel-title">Objectives</h3>
+                            <div className="objective-list">
                                 {selectedTeam === 'attackers' ? (
                                     <>
-                                        <div className="neon-text-green">
-                                            <CheckCircle className="inline mr-2" size={16} /> Découvrir des failles
-                                        </div>
-                                        <div className="neon-text-yellow">
-                                            <AlertTriangle className="inline mr-2" size={16} /> Exploiter les failles
-                                        </div>
-                                        <div className="neon-text-red">
-                                            <Target className="inline mr-2" size={16} /> Accès Admin
-                                        </div>
+                                        <div><CheckCircle className="icon" size={16} /> Find vulnerabilities</div>
+                                        <div><AlertTriangle className="icon" size={16} /> Exploit vulnerabilities</div>
+                                        <div><Target className="icon" size={16} /> Gain admin access</div>
                                     </>
                                 ) : (
                                     <>
-                                        <div className="neon-text-blue">
-                                            <Shield className="inline mr-2" size={16} /> Détecter les attaques
-                                        </div>
-                                        <div className="neon-text-green">
-                                            <Lock className="inline mr-2" size={16} /> Corriger les failles
-                                        </div>
-                                        <div className="neon-text-red">
-                                            <Zap className="inline mr-2" size={16} /> Bloquer l'IP
-                                        </div>
+                                        <div><Shield className="icon" size={16} /> Detect attacks</div>
+                                        <div><Lock className="icon" size={16} /> Patch vulnerabilities</div>
+                                        <div><Zap className="icon" size={16} /> Block attacker IPs</div>
                                     </>
                                 )}
                             </div>
                         </div>
-                        <div className="flex-1 flex flex-col min-h-0">
-                            <h3 className="neon-text-cyan text-lg font-bold mb-3">📋 ACTIVITÉ</h3>
-                            <div className="bg-black rounded p-3 flex-1 overflow-y-auto text-xs font-mono">
+                        <div className="panel activity">
+                            <h3 className="panel-title">Activity</h3>
+                            <div className="activity-log">
                                 {gameLog.map((log, i) => (
-                                    <div key={i} className="mb-1 neon-text-green">{log}</div>
+                                    <div key={i} className="log-entry">{log}</div>
                                 ))}
                             </div>
                         </div>
                     </aside>
-                    <div className="flex-1 p-6 flex flex-col">
-                        <div className="mb-6">
-                            <div className="flex space-x-4">
-                                <button
-                                    onClick={() => setActiveTab('website')}
-                                    className={`action-btn ${activeTab === 'website' ? 'attack-btn' : ''}`}
-                                >
-                                    🌐 Site Web
-                                </button>
-                                <button
-                                    onClick={() => setActiveTab('server')}
-                                    className={`action-btn ${activeTab === 'server' ? 'defend-btn' : ''}`}
-                                >
-                                    🖥️ Serveur
-                                </button>
-                            </div>
+                    <div className="content">
+                        <div className="tabs">
+                            <button
+                                onClick={() => setActiveTab('website')}
+                                className={`tab ${activeTab === 'website' ? 'active attackers' : ''}`}
+                            >
+                                🌐 Website
+                            </button>
+                            <button
+                                onClick={() => setActiveTab('server')}
+                                className={`tab ${activeTab === 'server' ? 'active defenders' : ''}`}
+                            >
+                                🖥️ Server
+                            </button>
                         </div>
-                        <div className="flex-1 overflow-y-auto">
+                        <div className="interface">
                             {activeTab === 'website' ? <WebsiteInterface role={role} /> : <ServerInterface role={role} />}
                         </div>
                     </div>
@@ -303,82 +264,78 @@ const CyberWarGame = () => {
         const [formData, setFormData] = useState({ username: '', password: '', comment: '' });
 
         return (
-            <div className="team-panel">
-                <h2 className="team-title neon-text-cyan">🌐 TechCorp Website</h2>
-                <div className="flex space-x-2 mb-4 border-b border-cyber-blue pb-4">
+            <div className="panel">
+                <h2 className="panel-title">TechCorp Website</h2>
+                <div className="sub-tabs">
                     {['home', 'login', 'contact'].map(p => (
                         <button
                             key={p}
                             onClick={() => setCurrentPage(p)}
-                            className={`action-btn ${currentPage === p ? 'attack-btn' : ''}`}
+                            className={`sub-tab ${currentPage === p ? 'active' : ''}`}
                         >
                             {p.charAt(0).toUpperCase() + p.slice(1)}
                         </button>
                     ))}
                 </div>
-                <div className="bg-panel text-white rounded-lg p-6 flex-1">
+                <div className="interface-content">
                     {currentPage === 'home' && (
                         <div>
-                            <h1 className="neon-text-blue text-3xl font-bold mb-4">Bienvenue chez TechCorp</h1>
-                            <p className="neon-text-green">Votre partenaire de confiance en solutions technologiques.</p>
+                            <h3 className="interface-title">Welcome to TechCorp</h3>
+                            <p>Your trusted partner in technology solutions.</p>
                         </div>
                     )}
                     {currentPage === 'login' && (
                         <div>
-                            <h2 className="neon-text-blue text-2xl font-bold mb-4">Connexion</h2>
-                            <div className="space-y-4">
+                            <h3 className="interface-title">Login</h3>
+                            <div className="form">
                                 <input
                                     type="text"
                                     onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                                    className="terminal-input w-full p-2 rounded"
-                                    placeholder="Utilisateur"
+                                    className="input"
+                                    placeholder="Username"
                                 />
                                 <input
                                     type="password"
                                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                                    className="terminal-input w-full p-2 rounded"
-                                    placeholder="Mot de passe"
+                                    className="input"
+                                    placeholder="Password"
                                 />
                                 <button
-                                    type="button"
-                                    onClick={() => handleAction(selectedTeam, `Tentative SQLi avec user: ${formData.username}`, 15)}
-                                    className="action-btn attack-btn"
+                                    onClick={() => handleAction(selectedTeam, `SQLi attempt with user: ${formData.username}`, 15)}
+                                    className="button attackers"
                                 >
-                                    Se connecter
+                                    Login
                                 </button>
                             </div>
                         </div>
                     )}
                     {currentPage === 'contact' && (
                         <div>
-                            <h2 className="neon-text-blue text-2xl font-bold mb-4">Contact</h2>
-                            <div className="space-y-4">
+                            <h3 className="interface-title">Contact</h3>
+                            <div className="form">
                                 <textarea
                                     onChange={(e) => setFormData({ ...formData, comment: e.target.value })}
-                                    className="terminal-input w-full p-2 rounded h-24"
-                                    placeholder="Votre message..."
+                                    className="input textarea"
+                                    placeholder="Your message..."
                                 />
                                 <button
-                                    type="button"
-                                    onClick={() => handleAction(selectedTeam, `Tentative XSS: ${formData.comment.substring(0, 20)}...`, 10)}
-                                    className="action-btn defend-btn"
+                                    onClick={() => handleAction(selectedTeam, `XSS attempt: ${formData.comment.substring(0, 20)}...`, 10)}
+                                    className="button defenders"
                                 >
-                                    Envoyer
+                                    Send
                                 </button>
                             </div>
                         </div>
                     )}
                 </div>
-                <div className="mt-4 bg-panel rounded-lg p-4">
-                    <h3 className="team-title neon-text-cyan">
-                        {selectedTeam === 'attackers' ? '⚔️ Outils d\'Attaque' : '🛡️ Outils de Défense'}
-                    </h3>
-                    <div className="grid grid-cols-3 gap-3">
+                <div className="actions">
+                    <h3 className="panel-title">{selectedTeam === 'attackers' ? 'Attack Tools' : 'Defense Tools'}</h3>
+                    <div className="action-grid">
                         {role.actions.map((action, i) => (
                             <button
                                 key={i}
-                                onClick={() => handleAction(selectedTeam, `${action} exécuté`, 10)}
-                                className={`action-btn ${selectedTeam === 'attackers' ? 'attack-btn' : 'defend-btn'}`}
+                                onClick={() => handleAction(selectedTeam, `${action} executed`, 10)}
+                                className={`button ${selectedTeam}`}
                             >
                                 {action}
                             </button>
@@ -392,8 +349,8 @@ const CyberWarGame = () => {
     const ServerInterface = ({ role }) => {
         const [terminalInput, setTerminalInput] = useState('');
         const [terminalHistory, setTerminalHistory] = useState([
-            'Bienvenue sur le serveur TechCorp (Linux v5.4)',
-            'Tapez "help" pour les commandes.'
+            'Welcome to TechCorp server (Linux v5.4)',
+            'Type "help" for commands.'
         ]);
         const terminalEndRef = useRef(null);
 
@@ -404,11 +361,11 @@ const CyberWarGame = () => {
         const executeCommand = (command) => {
             let output = '';
             const cmdParts = command.toLowerCase().split(' ');
-            addLog(`Commande exécutée: ${command}`);
+            addLog(`Command executed: ${command}`);
 
             switch (cmdParts[0]) {
                 case 'help':
-                    output = 'Commandes: ls, ps, netstat, cat, nmap, ssh, whoami';
+                    output = 'Commands: ls, ps, netstat, cat, nmap, ssh, whoami';
                     break;
                 case 'ls':
                     output = 'config.txt  logs/  passwords.bak  run.sh';
@@ -420,81 +377,72 @@ const CyberWarGame = () => {
                     output = 'TCP\t0.0.0.0:22\tLISTENING\nTCP\t0.0.0.0:80\tLISTENING';
                     break;
                 case 'cat':
-                    output = cmdParts[1] === 'passwords.bak' ? 'root:a_sUp3r_S3cr3t_P4ssW0rd' : 'Erreur: Fichier non trouvé ou non lisible.';
+                    output = cmdParts[1] === 'passwords.bak' ? 'root:a_sUp3r_S3cr3t_P4ssW0rd' : 'Error: File not found or unreadable.';
                     break;
                 case 'nmap':
-                    output = 'Scan Nmap... Ports ouverts: 22 (SSH), 80 (HTTP)';
+                    output = 'Nmap scan... Open ports: 22 (SSH), 80 (HTTP)';
                     break;
                 case 'ssh':
-                    output = 'Tentative de connexion SSH...';
+                    output = 'Attempting SSH connection...';
                     break;
                 case 'whoami':
                     output = 'root';
                     break;
                 default:
-                    output = `bash: ${command}: commande introuvable`;
+                    output = `bash: ${command}: command not found`;
             }
             setTerminalHistory(prev => [...prev, `root@techcorp:~# ${command}`, output]);
             setTerminalInput('');
         };
 
         return (
-            <div className="team-panel">
-                <h2 className="team-title neon-text-cyan">🖥️ Accès Serveur TechCorp</h2>
-                <div className="grid grid-cols-3 gap-4 mb-4">
-                    <div className="bg-panel p-3 rounded">
-                        <h3 className="font-bold neon-text-green mb-2">🟢 Services Actifs</h3>
-                        <div className="text-sm neon-text-white">SSH, HTTP, FTP, MySQL</div>
+            <div className="panel">
+                <h2 className="panel-title">TechCorp Server</h2>
+                <div className="status-grid">
+                    <div className="status-card">
+                        <h3 className="status-title">Active Services</h3>
+                        <div className="status-content">SSH, HTTP, FTP, MySQL</div>
                     </div>
-                    <div className="bg-panel p-3 rounded">
-                        <h3 className="font-bold neon-text-yellow mb-2">⚠️ Vulnérabilités</h3>
-                        <div className="text-sm neon-text-white">SSH (Weak Auth), FTP (Anonymous)</div>
+                    <div className="status-card">
+                        <h3 className="status-title">Vulnerabilities</h3>
+                        <div className="status-content">SSH (Weak Auth), FTP (Anonymous)</div>
                     </div>
-                    <div className="bg-panel p-3 rounded">
-                        <h3 className="font-bold neon-text-red mb-2">🚨 Alertes Récentes</h3>
-                        <div className="text-sm neon-text-white">0 nouvelles alertes</div>
+                    <div className="status-card">
+                        <h3 className="status-title">Recent Alerts</h3>
+                        <div className="status-content">0 new alerts</div>
                     </div>
                 </div>
                 <div
-                    className="bg-black font-mono text-sm p-4 rounded-lg flex-1 flex flex-col"
+                    className="terminal"
                     onClick={() => terminalInputRef.current.focus()}
                 >
-                    <div className="overflow-y-auto flex-1">
+                    <div className="terminal-output">
                         {terminalHistory.map((line, i) => (
-                            <div
-                                key={i}
-                                className={line.startsWith('root@techcorp') ? 'neon-text-yellow' : 'neon-text-green'}
-                            >
-                                {line}
-                            </div>
+                            <div key={i} className="terminal-line">{line}</div>
                         ))}
                         <div ref={terminalEndRef} />
                     </div>
-                    <div className="flex">
-                        <span className="neon-text-yellow">root@techcorp:~# </span>
+                    <div className="terminal-prompt">
+                        <span>root@techcorp:~# </span>
                         <input
                             ref={terminalInputRef}
                             type="text"
                             value={terminalInput}
                             onChange={(e) => setTerminalInput(e.target.value)}
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter') executeCommand(terminalInput);
-                            }}
+                            onKeyDown={(e) => e.key === 'Enter' && executeCommand(terminalInput)}
                             className="terminal-input"
                             autoFocus
                         />
                     </div>
                 </div>
-                <div className="mt-4 bg-panel rounded-lg p-4">
-                    <h3 className="team-title neon-text-cyan">
-                        {selectedTeam === 'attackers' ? '⚔️ Actions Serveur' : '🛡️ Contre-mesures'}
-                    </h3>
-                    <div className="grid grid-cols-3 gap-3">
+                <div className="actions">
+                    <h3 className="panel-title">{selectedTeam === 'attackers' ? 'Server Actions' : 'Countermeasures'}</h3>
+                    <div className="action-grid">
                         {role.actions.map((action, i) => (
                             <button
                                 key={i}
-                                onClick={() => handleAction(selectedTeam, `${action} exécuté`, 15)}
-                                className={`action-btn ${selectedTeam === 'attackers' ? 'attack-btn' : 'defend-btn'}`}
+                                onClick={() => handleAction(selectedTeam, `${action} executed`, 15)}
+                                className={`button ${selectedTeam}`}
                             >
                                 {action}
                             </button>
@@ -506,55 +454,42 @@ const CyberWarGame = () => {
     };
 
     const ResultsScreen = () => {
-        const winner = scores.attackers > scores.defenders ? 'Attaquants' : 'Défenseurs';
+        const winner = scores.attackers > scores.defenders ? 'Attackers' : 'Defenders';
         const isTie = scores.attackers === scores.defenders;
 
         return (
-            <div className="cyber-game-container">
-                <div className="text-center bg-panel p-10 rounded-lg backdrop-blur-sm">
-                    <h1 className="lobby-title glitch" data-text="FIN DE LA PARTIE">FIN DE LA PARTIE</h1>
+            <div className="game-container">
+                <div className="results-panel">
+                    <h1 className="intro-title">Game Over</h1>
                     {isTie ? (
-                        <h2 className="neon-text-yellow text-4xl mb-8">ÉGALITÉ !</h2>
+                        <h2 className="results-title">Tie!</h2>
                     ) : (
-                        <h2
-                            className={`neon-text-${winner === 'Attaquants' ? 'red' : 'blue'} text-4xl mb-8`}
-                        >
-                            🏆 LES {winner.toUpperCase()} ONT GAGNÉ ! 🏆
+                        <h2 className={`results-title ${winner.toLowerCase()}`}>
+                            {winner} Win!
                         </h2>
                     )}
-                    <div className="flex justify-center items-center space-x-8 text-2xl mb-8">
-                        <div className="team-panel attackers">
-                            <div className="neon-text-red">ATTAQUANTS</div>
-                            <div className="font-bold text-4xl">{scores.attackers}</div>
+                    <div className="score-grid">
+                        <div className="score-card attackers">
+                            <div className="score-label">Attackers</div>
+                            <div className="score-value">{scores.attackers}</div>
                         </div>
-                        <div className="team-panel defenders">
-                            <div className="neon-text-blue">DÉFENSEURS</div>
-                            <div className="font-bold text-4xl">{scores.defenders}</div>
+                        <div className="score-card defenders">
+                            <div className="score-label">Defenders</div>
+                            <div className="score-value">{scores.defenders}</div>
                         </div>
                     </div>
-                    <button
-                        onClick={handleRestartGame}
-                        className="start-battle-btn glitch"
-                        data-text="REJOUER"
-                    >
-                        🕹️ REJOUER 🕹️
+                    <button onClick={handleRestartGame} className="button replay">
+                        Replay
                     </button>
                 </div>
             </div>
         );
     };
 
-    if (gameState === 'intro') {
-        return <IntroAnimation />;
-    }
-    if (gameState === 'game') {
-        return <GameInterface />;
-    }
-    if (gameState === 'results') {
-        return <ResultsScreen />;
-    }
-
-    return <div className="cyber-game-container neon-text-cyan">Chargement...</div>;
+    if (gameState === 'intro') return <IntroAnimation />;
+    if (gameState === 'game') return <GameInterface />;
+    if (gameState === 'results') return <ResultsScreen />;
+    return <div className="game-container">Loading...</div>;
 };
 
 export default CyberWarGame;
