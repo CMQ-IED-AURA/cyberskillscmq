@@ -1,0 +1,120 @@
+/* CyberWarGame.css - Fichier de style dédié pour le jeu */
+
+/* Import d'une police "hacker" */
+@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;700&display=swap');
+
+.cyber-game-container {
+    --cyber-red: #ff3333;
+    --cyber-blue: #00ccff;
+    --cyber-yellow: #fffb00;
+    --cyber-green: #00ff6a;
+    --bg-dark: #02040a;
+    --bg-panel: rgba(10, 23, 46, 0.6);
+    --border-color: rgba(0, 204, 255, 0.3);
+    font-family: 'Fira Code', monospace;
+    background-color: var(--bg-dark);
+    position: relative;
+    overflow: hidden;
+}
+
+/* Effet de scanlines CRT pour l'ambiance */
+.cyber-game-container::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-image: repeating-linear-gradient(
+            transparent 0,
+            rgba(0, 0, 0, 0.5) 2px,
+            transparent 4px
+    );
+    z-index: 1;
+    pointer-events: none;
+    animation: scanline 10s linear infinite;
+}
+
+@keyframes scanline {
+    from { background-position: 0 0; }
+    to { background-position: 0 100vh; }
+}
+
+/* Effet de "glitch" pour le terminal ou les actions */
+.glitch {
+    animation: glitch-anim 0.5s infinite;
+}
+
+@keyframes glitch-anim {
+    0% { transform: translate(0); }
+    20% { transform: translate(-3px, 3px); }
+    40% { transform: translate(-3px, -3px); }
+    60% { transform: translate(3px, 3px); }
+    80% { transform: translate(3px, -3px); }
+    to { transform: translate(0); }
+}
+
+/* Texte néon */
+.neon-text-red {
+    text-shadow: 0 0 5px var(--cyber-red), 0 0 10px var(--cyber-red);
+}
+.neon-text-blue {
+    text-shadow: 0 0 5px var(--cyber-blue), 0 0 10px var(--cyber-blue);
+}
+.neon-text-cyan {
+    text-shadow: 0 0 5px #0ff, 0 0 10px #0ff;
+}
+
+/* Boutons d'action améliorés */
+.action-btn {
+    position: relative;
+    overflow: hidden;
+    transition: all 0.2s ease;
+    border: 1px solid var(--border-color);
+    backdrop-filter: blur(5px);
+}
+
+.action-btn:hover {
+    transform: translateY(-2px);
+}
+
+.action-btn.attack-btn {
+    background-color: rgba(255, 51, 51, 0.2);
+    border-color: var(--cyber-red);
+}
+.action-btn.attack-btn:hover {
+    box-shadow: 0 0 15px var(--cyber-red);
+    background-color: rgba(255, 51, 51, 0.4);
+}
+
+.action-btn.defend-btn {
+    background-color: rgba(0, 204, 255, 0.2);
+    border-color: var(--cyber-blue);
+}
+.action-btn.defend-btn:hover {
+    box-shadow: 0 0 15px var(--cyber-blue);
+    background-color: rgba(0, 204, 255, 0.4);
+}
+
+/* Style pour les vulnérabilités */
+.vuln-status-icon {
+    transition: all 0.3s ease;
+}
+.vuln-status-icon.exploited {
+    color: var(--cyber-red);
+    animation: pulse-red 1s infinite;
+}
+.vuln-status-icon.patched {
+    color: var(--cyber-green);
+}
+
+@keyframes pulse-red {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.2); opacity: 0.7; }
+}
+
+/* Amélioration du terminal */
+.terminal-input:focus {
+    outline: none;
+    box-shadow: none;
+}
