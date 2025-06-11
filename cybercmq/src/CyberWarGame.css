@@ -1,4 +1,4 @@
-/* CyberWarGame.css - Clean, modern styles for Cyber War Game */
+/* CyberWarGame.css - Style épuré et moderne pour Guerre Cybernétique */
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=Roboto+Mono:wght@400;500&display=swap');
 
@@ -88,11 +88,11 @@ body {
     font-family: 'Roboto Mono', monospace;
 }
 
-.score-value .attackers {
+.score-value .attaquants {
     color: var(--accent-red);
 }
 
-.score-value .defenders {
+.score-value .défenseurs {
     color: var(--accent-blue);
 }
 
@@ -129,7 +129,7 @@ body {
     box-shadow: 0 2px 8px var(--shadow);
 }
 
-.panel-title {
+.team-title {
     font-size: 1.25rem;
     font-weight: 600;
     margin-bottom: 1rem;
@@ -140,11 +140,11 @@ body {
     text-align: center;
 }
 
-.role-panel.attackers {
+.role-panel.attaquants {
     border-color: var(--accent-red);
 }
 
-.role-panel.defenders {
+.role-panel.défenseurs {
     border-color: var(--accent-blue);
 }
 
@@ -158,7 +158,7 @@ body {
     font-weight: 600;
 }
 
-.role-speciality {
+.speciality {
     font-size: 0.875rem;
     color: var(--text-secondary);
 }
@@ -178,7 +178,7 @@ body {
     background-color: var(--primary-dark);
     border-radius: 4px;
     padding: 1rem;
-    max-height: 200px;
+    max-height: 250px;
     overflow-y: auto;
     font-family: 'Roboto Mono', monospace;
     font-size: 0.875rem;
@@ -209,24 +209,24 @@ body {
     background-color: var(--primary-dark);
 }
 
-.tab.active.attackers {
+.tab.active.attaquants {
     border-color: var(--accent-red);
     background-color: var(--accent-red);
     color: #fff;
 }
 
-.tab.active.defenders {
+.tab.active.défenseurs {
     border-color: var(--accent-blue);
     background-color: var(--accent-blue);
     color: #fff;
 }
 
 /* Interface */
-.interface {
+.section {
     flex: 1;
 }
 
-.sub-tabs {
+.sub-nav {
     display: flex;
     gap: 0.5rem;
     margin-bottom: 1rem;
@@ -234,7 +234,7 @@ body {
     padding-bottom: 0.5rem;
 }
 
-.sub-tab {
+.sub-nav-btn {
     padding: 0.5rem 1rem;
     border-radius: 4px;
     color: var(--text-secondary);
@@ -242,25 +242,69 @@ body {
     transition: var(--transition);
 }
 
-.sub-tab:hover {
+.sub-nav-btn:hover {
     color: var(--text-primary);
 }
 
-.sub-tab.active {
+.sub-nav-btn.active {
     color: var(--accent-blue);
     font-weight: 500;
 }
 
-.interface-content {
+.section-content {
     background-color: var(--primary-dark);
     border-radius: 6px;
     padding: 1.5rem;
 }
 
-.interface-title {
+.section-title {
     font-size: 1.125rem;
     font-weight: 600;
     margin-bottom: 1rem;
+}
+
+.lead {
+    font-size: 1rem;
+    color: var(--text-secondary);
+    margin-bottom: 1rem;
+}
+
+.hero {
+    margin-top: 1rem;
+}
+
+.hero-img {
+    width: 100%;
+    border-radius: 6px;
+    margin-bottom: 1rem;
+}
+
+.product-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+}
+
+.product-card {
+    background-color: var(--secondary-dark);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 1rem;
+    text-align: center;
+}
+
+.product-card img {
+    width: 100%;
+    height: 150px;
+    object-fit: cover;
+    border-radius: 4px;
+    margin-bottom: 0.5rem;
+}
+
+.product-card h4 {
+    font-size: 1rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
 }
 
 .form {
@@ -315,20 +359,20 @@ body {
     background-color: var(--primary-dark);
 }
 
-.button.attackers {
+.button.attaquants {
     border-color: var(--accent-red);
 }
 
-.button.attackers:hover {
+.button.attaquants:hover {
     background-color: var(--accent-red);
     color: #fff;
 }
 
-.button.defenders {
+.button.défenseurs {
     border-color: var(--accent-blue);
 }
 
-.button.defenders:hover {
+.button.défenseurs:hover {
     background-color: var(--accent-blue);
     color: #fff;
 }
@@ -429,63 +473,24 @@ body {
     margin-bottom: 2rem;
 }
 
-.player-grid {
-    display: grid;
-    grid-template-columns: repeat(5, 1fr);
-    gap: 1rem;
+.progress-bar {
+    width: 300px;
+    height: 8px;
+    background-color: var(--secondary-dark);
+    border-radius: 4px;
+    overflow: hidden;
     margin-bottom: 2rem;
 }
 
-.player-icon {
-    width: 50px;
-    height: 50px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.25rem;
-    background-color: var(--secondary-dark);
-    border: 1px solid var(--border-color);
-    transition: var(--transition);
-}
-
-.player-icon.attackers {
-    background-color: var(--accent-red);
-    color: #fff;
-}
-
-.player-icon.defenders {
+.progress {
+    height: 100%;
     background-color: var(--accent-blue);
-    color: #fff;
-}
-
-.role-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1.5rem;
-    max-width: 800px;
-    width: 100%;
-}
-
-.role-item {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-size: 0.875rem;
-}
-
-.role-item.attackers {
-    color: var(--accent-red);
-}
-
-.role-item.defenders {
-    color: var(--accent-blue);
+    transition: width 0.5s ease;
 }
 
 .intro-text {
     font-size: 1rem;
     color: var(--text-secondary);
-    margin-top: 1rem;
 }
 
 /* Results Screen */
@@ -505,11 +510,11 @@ body {
     margin-bottom: 1.5rem;
 }
 
-.results-title.attackers {
+.results-title.attaquants {
     color: var(--accent-red);
 }
 
-.results-title.defenders {
+.results-title.défenseurs {
     color: var(--accent-blue);
 }
 
@@ -526,11 +531,11 @@ body {
     border: 1px solid var(--border-color);
 }
 
-.score-card.attackers {
+.score-card.attaquants {
     border-color: var(--accent-red);
 }
 
-.score-card.defenders {
+.score-card.défenseurs {
     border-color: var(--accent-blue);
 }
 
@@ -554,10 +559,6 @@ body {
         width: 100%;
     }
 
-    .role-grid {
-        grid-template-columns: 1fr;
-    }
-
     .status-grid {
         grid-template-columns: 1fr;
     }
@@ -566,8 +567,8 @@ body {
         font-size: 2rem;
     }
 
-    .player-grid {
-        grid-template-columns: repeat(3, 1fr);
+    .product-grid {
+        grid-template-columns: 1fr;
     }
 }
 
@@ -588,5 +589,9 @@ body {
 
     .score-grid {
         grid-template-columns: 1fr;
+    }
+
+    .sub-nav {
+        flex-wrap: wrap;
     }
 }

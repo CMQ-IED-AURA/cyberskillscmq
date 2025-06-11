@@ -3,35 +3,37 @@ import { Shield, Sword, Timer, Target, Server, Globe, Terminal, Lock, Zap, Alert
 import './CyberWarGame.css';
 
 const CyberWarGame = () => {
-    const [gameState, setGameState] = useState('intro'); // intro, game, results
-    const [currentPhase, setCurrentPhase] = useState('website'); // website, server
-    const [timeLeft, setTimeLeft] = useState(420); // 7 minutes
+    const [gameState, setGameState] = useState('intro'); // intro, jeu, résultats
+    const [currentPhase, setCurrentPhase] = useState('site'); // site, serveur
+    const [timeLeft, setTimeLeft] = useState(600); // 10 minutes par phase
     const [selectedTeam, setSelectedTeam] = useState(null);
     const [selectedRole, setSelectedRole] = useState(null);
-    const [scores, setScores] = useState({ attackers: 0, defenders: 0 });
+    const [scores, setScores] = useState({ attaquants: 0, défenseurs: 0 });
     const [gameLog, setGameLog] = useState([]);
     const [roleAssigned, setRoleAssigned] = useState(false);
 
     const initialWebsiteState = {
-        currentPage: 'home',
+        currentPage: 'accueil',
         vulnerabilities: {
             xss: { discovered: false, exploited: false, patched: false },
             sqli: { discovered: false, exploited: false, patched: false },
-            csrf: { discovered: false, exploited: false, patched: false }
+            csrf: { discovered: false, exploited: false, patched: false },
+            fake_form: { discovered: false, exploited: false, patched: false } // Fausse piste
         },
-        userAccounts: ['admin', 'user1', 'guest'],
-        database: ['users', 'orders', 'products']
+        userAccounts: ['admin', 'utilisateur1', 'invité'],
+        database: ['utilisateurs', 'commandes', 'produits']
     };
 
     const initialServerState = {
         services: {
             ssh: { running: true, vulnerable: true, patched: false },
             ftp: { running: true, vulnerable: true, patched: false },
-            web: { running: true, vulnerable: false, patched: false }
+            web: { running: true, vulnerable: false, patched: false },
+            fake_db: { running: true, vulnerable: false, patched: true } // Fausse piste
         },
-        files: ['/etc/passwd', '/var/log/auth.log', '/home/user/.ssh/id_rsa'],
-        processes: ['apache2', 'sshd', 'mysql'],
-        ports: [22, 80, 443, 21, 3306]
+        files: ['/etc/passwd', '/var/log/auth.log', '/home/user/.ssh/id_rsa', '/var/www/decoy.txt'], // Fausse piste
+        processes: ['apache2', 'sshd', 'mysql', 'fake_service'], // Fausse piste
+        ports: [22, 80, 443, 21, 3306, 8080] // Port 8080 non utilisé
     };
 
     const [websiteState, setWebsiteState] = useState(initialWebsiteState);
@@ -40,55 +42,55 @@ const CyberWarGame = () => {
     const terminalInputRef = useRef(null);
 
     const roles = {
-        attackers: [
-            { id: 'web-hacker', name: 'Web Hacker', icon: '🕷️', speciality: 'XSS, SQL Injection', actions: ['Scan XSS', 'SQL Injection', 'CSRF Test'] },
-            { id: 'social-engineer', name: 'Social Engineer', icon: '👤', speciality: 'Phishing, OSINT', actions: ['Phish User', 'Gather OSINT', 'Spoof Email'] },
-            { id: 'network-scanner', name: 'Network Scanner', icon: '📡', speciality: 'Port Scan, Recon', actions: ['Port Scan', 'Network Recon', 'Ping Sweep'] },
-            { id: 'exploit-dev', name: 'Exploit Developer', icon: '⚡', speciality: 'Buffer Overflow, RCE', actions: ['Exploit RCE', 'Buffer Overflow', 'Shellcode Inject'] },
-            { id: 'crypto-breaker', name: 'Crypto Breaker', icon: '🔓', speciality: 'Hash Cracking', actions: ['Crack Hash', 'Decrypt File', 'Keylog'] }
+        attaquants: [
+            { id: 'pirate-web', name: 'Pirate Web', icon: '🕷️', spécialité: 'XSS, Injection SQL', actions: ['Scanner XSS', 'Injection SQL', 'Tester CSRF', 'Analyser Faux Formulaire'] },
+            { id: 'ingénieur-social', name: 'Ingénieur Social', icon: '👤', spécialité: 'Hameçonnage, OSINT', actions: ['Hameçonner', 'Collecter OSINT', 'Usurper Email', 'Simuler Appel'] },
+            { id: 'scanner-réseau', name: 'Scanner Réseau', icon: '📡', spécialité: 'Scan de Ports, Reconnaissance', actions: ['Scanner Ports', 'Reconnaissance Réseau', 'Ping Sweep', 'Tester Port Inutilisé'] },
+            { id: 'développeur-exploits', name: 'Développeur d’Exploits', icon: '⚡', spécialité: 'Débordement de Tampon, RCE', actions: ['Exploiter RCE', 'Débordement Tampon', 'Injecter Shellcode', 'Analyser Faux Service'] },
+            { id: 'casseur-crypto', name: 'Casseur Crypto', icon: '🔓', spécialité: 'Craquage de Hash, Chiffrement', actions: ['Craquer Hash', 'Déchiffrer Fichier', 'Keylogger', 'Tester Faux Hash'] }
         ],
-        defenders: [
-            { id: 'security-analyst', name: 'Security Analyst', icon: '🛡️', speciality: 'Monitoring, Detection', actions: ['Monitor Logs', 'Detect Intrusion', 'Analyze Traffic'] },
-            { id: 'incident-responder', name: 'Incident Responder', icon: '🚨', speciality: 'Forensics, Mitigation', actions: ['Run Forensics', 'Mitigate Attack', 'Isolate Host'] },
-            { id: 'network-admin', name: 'Network Admin', icon: '🌐', speciality: 'Firewall, IDS/IPS', actions: ['Configure Firewall', 'Enable IDS', 'Block IP'] },
-            { id: 'sys-hardener', name: 'System Hardener', icon: '🔒', speciality: 'Patches, Config', actions: ['Apply Patch', 'Harden Config', 'Disable Service'] },
-            { id: 'threat-hunter', name: 'Threat Hunter', icon: '🎯', speciality: 'IOC Detection', actions: ['Hunt IOCs', 'Analyze Malware', 'Trace Attacker'] }
+        défenseurs: [
+            { id: 'analyste-sécurité', name: 'Analyste Sécurité', icon: '🛡️', spécialité: 'Surveillance, Détection', actions: ['Surveiller Logs', 'Détecter Intrusion', 'Analyser Trafic', 'Vérifier Faux Log'] },
+            { id: 'répondeur-incidents', name: 'Répondeur Incidents', icon: '🚨', spécialité: 'Forensique, Mitigation', actions: ['Analyser Forensique', 'Mitiger Attaque', 'Isoler Hôte', 'Examiner Faux Fichier'] },
+            { id: 'admin-réseau', name: 'Admin Réseau', icon: '🌐', spécialité: 'Pare-feu, IDS/IPS', actions: ['Configurer Pare-feu', 'Activer IDS', 'Bloquer IP', 'Bloquer Faux Port'] },
+            { id: 'durcisseur-système', name: 'Durcisseur Système', icon: '🔒', spécialité: 'Correctifs, Configuration', actions: ['Appliquer Correctif', 'Durcir Config', 'Désactiver Service', 'Désactiver Faux Service'] },
+            { id: 'chasseur-menaces', name: 'Chasseur de Menaces', icon: '🎯', spécialité: 'Détection IOC, Analyse', actions: ['Chasser IOCs', 'Analyser Malware', 'Tracer Attaquant', 'Analyser Fausse Alerte'] }
         ]
     };
 
-    // Random role assignment
+    // Attribution aléatoire du rôle
     useEffect(() => {
         if (!roleAssigned) {
-            const teams = ['attackers', 'defenders'];
+            const teams = ['attaquants', 'défenseurs'];
             const randomTeam = teams[Math.floor(Math.random() * teams.length)];
             const randomRole = roles[randomTeam][Math.floor(Math.random() * roles[randomTeam].length)];
             setSelectedTeam(randomTeam);
             setSelectedRole(randomRole.id);
-            setGameLog([`[${new Date().toLocaleTimeString()}] Assigned: ${randomRole.name} (${randomTeam === 'attackers' ? '⚔️ Attackers' : '🛡️ Defenders'})`]);
+            setGameLog([`[${new Date().toLocaleTimeString('fr-FR')}] Rôle assigné : ${randomRole.name} (${randomTeam === 'attaquants' ? '⚔️ Attaquants' : '🛡️ Défenseurs'})`]);
             setRoleAssigned(true);
         }
     }, [roleAssigned]);
 
-    // Timer management
+    // Gestion du timer
     useEffect(() => {
         let timer;
-        if (gameState === 'game' && timeLeft > 0) {
+        if (gameState === 'jeu' && timeLeft > 0) {
             timer = setInterval(() => setTimeLeft(prev => prev - 1), 1000);
         } else if (timeLeft === 0) {
-            if (currentPhase === 'website') {
-                setCurrentPhase('server');
-                setTimeLeft(420);
-                addLog('Phase ended. Switching to server attack.');
+            if (currentPhase === 'site') {
+                setCurrentPhase('serveur');
+                setTimeLeft(600);
+                addLog('Phase site terminée. Passage à l’attaque du serveur.');
             } else {
-                setGameState('results');
+                setGameState('résultats');
             }
         }
         return () => clearInterval(timer);
     }, [gameState, timeLeft, currentPhase]);
 
     const addLog = (message) => {
-        const newLog = `[${new Date().toLocaleTimeString()}] ${selectedTeam === 'attackers' ? '⚔️' : '🛡️'} ${message}`;
-        setGameLog(prev => [...prev.slice(-9), newLog]);
+        const newLog = `[${new Date().toLocaleTimeString('fr-FR')}] ${selectedTeam === 'attaquants' ? '⚔️' : '🛡️'} ${message}`;
+        setGameLog(prev => [...prev.slice(-15), newLog]); // Plus de logs visibles
     };
 
     const handleAction = (team, message, points) => {
@@ -101,11 +103,11 @@ const CyberWarGame = () => {
 
     const handleRestartGame = () => {
         setGameState('intro');
-        setCurrentPhase('website');
-        setTimeLeft(420);
+        setCurrentPhase('site');
+        setTimeLeft(600);
         setSelectedTeam(null);
         setSelectedRole(null);
-        setScores({ attackers: 0, defenders: 0 });
+        setScores({ attaquants: 0, défenseurs: 0 });
         setGameLog([]);
         setWebsiteState(initialWebsiteState);
         setServerState(initialServerState);
@@ -113,18 +115,16 @@ const CyberWarGame = () => {
     };
 
     const IntroAnimation = () => {
-        const [currentPlayer, setCurrentPlayer] = useState(0);
-        const [showRoles, setShowRoles] = useState(false);
+        const [progress, setProgress] = useState(0);
 
         useEffect(() => {
             const timer = setInterval(() => {
-                setCurrentPlayer(prev => {
-                    if (prev < 9) return prev + 1;
-                    setShowRoles(true);
+                setProgress(prev => {
+                    if (prev < 100) return prev + 10;
                     return prev;
                 });
             }, 500);
-            const gameTimer = setTimeout(() => setGameState('game'), 6000);
+            const gameTimer = setTimeout(() => setGameState('jeu'), 6000);
             return () => {
                 clearInterval(timer);
                 clearTimeout(gameTimer);
@@ -133,38 +133,11 @@ const CyberWarGame = () => {
 
         return (
             <div className="game-container intro-container">
-                <h1 className="intro-title">Cyber War 5v5</h1>
-                <div className="player-grid">
-                    {[...Array(10)].map((_, i) => (
-                        <div
-                            key={i}
-                            className={`player-icon ${i < currentPlayer ? (i < 5 ? 'attackers' : 'defenders') : ''}`}
-                        >
-                            {i < currentPlayer && (i < 5 ? '⚔️' : '🛡️')}
-                        </div>
-                    ))}
+                <h1 className="intro-title">Guerre Cybernétique</h1>
+                <div className="progress-bar">
+                    <div className="progress" style={{ width: `${progress}%` }}></div>
                 </div>
-                {showRoles && (
-                    <div className="role-grid">
-                        <div className="panel">
-                            <h3 className="panel-title attackers">Attackers</h3>
-                            {roles.attackers.map((role, i) => (
-                                <div key={role.id} className="role-item attackers" style={{ animationDelay: `${i * 0.2}s` }}>
-                                    <span className="role-icon">{role.icon}</span> {role.name}
-                                </div>
-                            ))}
-                        </div>
-                        <div className="panel">
-                            <h3 className="panel-title defenders">Defenders</h3>
-                            {roles.defenders.map((role, i) => (
-                                <div key={role.id} className="role-item defenders" style={{ animationDelay: `${i * 0.2}s` }}>
-                                    <span className="role-icon">{role.icon}</span> {role.name}
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
-                <div className="intro-text">Initializing cyber battlefield...</div>
+                <div className="intro-text">Initialisation du champ de bataille cybernétique...</div>
             </div>
         );
     };
@@ -180,20 +153,20 @@ const CyberWarGame = () => {
                 <header className="header">
                     <div className="header-content">
                         <div className="header-left">
-                            <h1 className="header-title">Cyber War</h1>
+                            <h1 className="header-title">Guerre Cybernétique</h1>
                             <div className="phase-info">
-                                Phase: <span className="phase-name">{currentPhase.toUpperCase()}</span>
+                                Phase : <span className="phase-name">{currentPhase === 'site' ? 'Site Web' : 'Serveur'}</span>
                             </div>
                         </div>
                         <div className="header-right">
                             <div className="timer">
-                                <span className="timer-label">Time</span>
+                                <span className="timer-label">Temps</span>
                                 <span className="timer-value">{formatTime(timeLeft)}</span>
                             </div>
                             <div className="scores">
                                 <span className="score-label">Score</span>
                                 <span className="score-value">
-                                    <span className="attackers">{scores.attackers}</span> - <span className="defenders">{scores.defenders}</span>
+                                    <span className="attaquants">{scores.attaquants}</span> - <span className="défenseurs">{scores.défenseurs}</span>
                                 </span>
                             </div>
                         </div>
@@ -205,29 +178,29 @@ const CyberWarGame = () => {
                             <div className={`panel role-panel ${selectedTeam}`}>
                                 <div className="role-icon">{role.icon}</div>
                                 <div className="role-name">{role.name}</div>
-                                <div className="role-speciality">{role.speciality}</div>
+                                <div className="speciality">{role.spécialité}</div>
                             </div>
                         )}
-                        <div className="panel objectives">
-                            <h3 className="panel-title">Objectives</h3>
-                            <div className="objective-list">
-                                {selectedTeam === 'attackers' ? (
+                        <div className="panel">
+                            <h3 className="team-title">Objectifs</h3>
+                            <div class="objective-list">
+                                {selectedTeam === 'attaquants' ? (
                                     <>
-                                        <div><CheckCircle className="icon" size={16} /> Find vulnerabilities</div>
-                                        <div><AlertTriangle className="icon" size={16} /> Exploit vulnerabilities</div>
-                                        <div><Target className="icon" size={16} /> Gain admin access</div>
+                                        <div><CheckCircle className="item" size={16} /> Trouver des vulnérabilités</div>
+                                        <div><AlertTriangle className="item" size={16} /> Exploiter les vulnérabilités</div>
+                                        <div><Target className="item" size={16} /> Obtenir l’accès admin</div>
                                     </>
                                 ) : (
                                     <>
-                                        <div><Shield className="icon" size={16} /> Detect attacks</div>
-                                        <div><Lock className="icon" size={16} /> Patch vulnerabilities</div>
-                                        <div><Zap className="icon" size={16} /> Block attacker IPs</div>
+                                        <div><Shield className="item" size={16} /> Détecter les attaques</div>
+                                        <div><Lock className="item" size={16} /> Corriger les failles</div>
+                                        <div><Zap className="item" size={16} /> Bloquer les attaquants</div>
                                     </>
                                 )}
                             </div>
                         </div>
                         <div className="panel activity">
-                            <h3 className="panel-title">Activity</h3>
+                            <h3 className="team-title">Activité</h3>
                             <div className="activity-log">
                                 {gameLog.map((log, i) => (
                                     <div key={i} className="log-entry">{log}</div>
@@ -238,20 +211,20 @@ const CyberWarGame = () => {
                     <div className="content">
                         <div className="tabs">
                             <button
-                                onClick={() => setActiveTab('website')}
-                                className={`tab ${activeTab === 'website' ? 'active attackers' : ''}`}
+                                onClick={() => setActiveTab('site')}
+                                className={`tab ${activeTab === 'site' ? 'active attaquants' : ''}`}
                             >
-                                🌐 Website
+                                🌐 Site Web
                             </button>
                             <button
-                                onClick={() => setActiveTab('server')}
-                                className={`tab ${activeTab === 'server' ? 'active defenders' : ''}`}
+                                onClick={() => setActiveTab('serveur')}
+                                className={`tab ${activeTab === 'serveur' ? 'active défenseurs' : ''}`}
                             >
-                                🖥️ Server
+                                🛠️ Serveur
                             </button>
                         </div>
-                        <div className="interface">
-                            {activeTab === 'website' ? <WebsiteInterface role={role} /> : <ServerInterface role={role} />}
+                        <div className="section">
+                            {activeTab === 'site' ? <WebsiteSection role={role} /> : <ServerSection role={role} />}
                         </div>
                     </div>
                 </main>
@@ -259,82 +232,138 @@ const CyberWarGame = () => {
         );
     };
 
-    const WebsiteInterface = ({ role }) => {
-        const [currentPage, setCurrentPage] = useState('home');
-        const [formData, setFormData] = useState({ username: '', password: '', comment: '' });
+    const WebsiteSection = ({ role }) => {
+        const [currentPage, setCurrentPage] = useState('accueil');
+        const [formData, setFormData] = useState({ username: '', password: '', comment: '', newsletter: '' });
+
+        const pages = [
+            { id: 'accueil', name: 'Accueil' },
+            { id: 'produits', name: 'Produits' },
+            { id: 'à-propos', name: 'À propos' },
+            { id: 'connexion', name: 'Connexion' },
+            { id: 'contact', name: 'Contact' }
+        ];
 
         return (
-            <div className="panel">
-                <h2 className="panel-title">TechCorp Website</h2>
-                <div className="sub-tabs">
-                    {['home', 'login', 'contact'].map(p => (
+            <div className="section">
+                <h2 className="team-title">Site Web TechCorp</h2>
+                <div className="sub-nav">
+                    {pages.map(p => (
                         <button
-                            key={p}
-                            onClick={() => setCurrentPage(p)}
-                            className={`sub-tab ${currentPage === p ? 'active' : ''}`}
+                            key={p.id}
+                            onClick={() => setCurrentPage(p.id)}
+                            className={`sub-nav-btn ${currentPage === p.id ? 'active' : ''}`}
                         >
-                            {p.charAt(0).toUpperCase() + p.slice(1)}
+                            {p.name}
                         </button>
                     ))}
                 </div>
-                <div className="interface-content">
-                    {currentPage === 'home' && (
+                <div className="section-content">
+                    {currentPage === 'accueil' && (
                         <div>
-                            <h3 className="interface-title">Welcome to TechCorp</h3>
-                            <p>Your trusted partner in technology solutions.</p>
+                            <h3 className="section-title">Bienvenue chez TechCorp</h3>
+                            <p className="lead">Leader mondial des solutions technologiques innovantes.</p>
+                            <div className="hero">
+                                <img src="https://via.placeholder.com/800x300.png?text=TechCorp+Innovation" alt="Innovation TechCorp" className="hero-img" />
+                                <p>Découvrez nos produits révolutionnaires et rejoignez l’avenir.</p>
+                            </div>
                         </div>
                     )}
-                    {currentPage === 'login' && (
+                    {currentPage === 'produits' && (
                         <div>
-                            <h3 className="interface-title">Login</h3>
+                            <h3 className="section-title">Nos Produits</h3>
+                            <div className="product-grid">
+                                <div className="product-card">
+                                    <img src="https://via.placeholder.com/200.png?text=Produit+1" alt="Produit 1" />
+                                    <h4>CloudSync</h4>
+                                    <p>Synchronisation sécurisée dans le cloud.</p>
+                                </div>
+                                <div className="product-card">
+                                    <img src="https://via.placeholder.com/200.png?text=Produit+2" alt="Produit 2" />
+                                    <h4>AIShield</h4>
+                                    <p>Protection IA contre les cyberattaques.</p>
+                                </div>
+                                <div className="product-card">
+                                    <img src="https://via.placeholder.com/200.png?text=Produit+3" alt="Produit 3" />
+                                    <h4>DataVault</h4>
+                                    <p>Stockage de données ultra-sécurisé.</p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                    {currentPage === 'à-propos' && (
+                        <div>
+                            <h3 className="section-title">À Propos de TechCorp</h3>
+                            <p>Fondée en 2010, TechCorp est pionnière dans la cybersécurité et l’innovation.</p>
+                            <p>Notre mission : protéger le monde numérique.</p>
+                        </div>
+                    )}
+                    {currentPage === 'connexion' && (
+                        <div>
+                            <h3 className="section-title">Connexion</h3>
                             <div className="form">
                                 <input
                                     type="text"
                                     onChange={(e) => setFormData({ ...formData, username: e.target.value })}
                                     className="input"
-                                    placeholder="Username"
+                                    placeholder="Nom d’utilisateur"
                                 />
                                 <input
                                     type="password"
                                     onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                                     className="input"
-                                    placeholder="Password"
+                                    placeholder="Mot de passe"
                                 />
                                 <button
-                                    onClick={() => handleAction(selectedTeam, `SQLi attempt with user: ${formData.username}`, 15)}
-                                    className="button attackers"
+                                    onClick={() => handleAction(selectedTeam, `Tentative d’injection SQL avec utilisateur : ${formData.username}`, 15)}
+                                    className="button attaquants"
                                 >
-                                    Login
+                                    Se connecter
                                 </button>
                             </div>
                         </div>
                     )}
                     {currentPage === 'contact' && (
                         <div>
-                            <h3 className="interface-title">Contact</h3>
+                            <h3 className="section-title">Contactez-nous</h3>
                             <div className="form">
                                 <textarea
                                     onChange={(e) => setFormData({ ...formData, comment: e.target.value })}
                                     className="input textarea"
-                                    placeholder="Your message..."
+                                    placeholder="Votre message..."
+                                />
+                                <input
+                                    type="email"
+                                    onChange={(e) => setFormData({ ...formData, newsletter: e.target.value })}
+                                    className="input"
+                                    placeholder="Email (Newsletter)"
                                 />
                                 <button
-                                    onClick={() => handleAction(selectedTeam, `XSS attempt: ${formData.comment.substring(0, 20)}...`, 10)}
-                                    className="button defenders"
+                                    onClick={() => handleAction(selectedTeam, `Tentative XSS : ${formData.comment.substring(0, 20)}...`, formData.comment.includes('<script>') ? 10 : 0)}
+                                    className="button défenseurs"
                                 >
-                                    Send
+                                    Envoyer
+                                </button>
+                                <button
+                                    onClick={() => handleAction(selectedTeam, `Tentative sur newsletter : ${formData.newsletter}`, 0)}
+                                    className="button défenseurs"
+                                >
+                                    S’inscrire à la Newsletter
                                 </button>
                             </div>
                         </div>
                     )}
                 </div>
                 <div className="actions">
-                    <h3 className="panel-title">{selectedTeam === 'attackers' ? 'Attack Tools' : 'Defense Tools'}</h3>
+                    <h3 className="team-title">{selectedTeam === 'attaquants' ? 'Outils d’Attaque' : 'Outils de Défense'}</h3>
                     <div className="action-grid">
                         {role.actions.map((action, i) => (
                             <button
                                 key={i}
-                                onClick={() => handleAction(selectedTeam, `${action} executed`, 10)}
+                                onClick={() => {
+                                    const isFake = action.includes('Faux') || action.includes('Inutilisé');
+                                    handleAction(selectedTeam, `${action} exécuté${isFake ? ' (aucun résultat)' : ''}`, isFake ? 0 : 10);
+                                }}
                                 className={`button ${selectedTeam}`}
                             >
                                 {action}
@@ -346,11 +375,11 @@ const CyberWarGame = () => {
         );
     };
 
-    const ServerInterface = ({ role }) => {
+    const ServerSection = ({ role }) => {
         const [terminalInput, setTerminalInput] = useState('');
         const [terminalHistory, setTerminalHistory] = useState([
-            'Welcome to TechCorp server (Linux v5.4)',
-            'Type "help" for commands.'
+            'Bienvenue sur le serveur TechCorp (Linux v5.4)',
+            'Tapez "help" pour les commandes.'
         ]);
         const terminalEndRef = useRef(null);
 
@@ -361,55 +390,61 @@ const CyberWarGame = () => {
         const executeCommand = (command) => {
             let output = '';
             const cmdParts = command.toLowerCase().split(' ');
-            addLog(`Command executed: ${command}`);
+            addLog(`Commande exécutée : ${command}`);
 
             switch (cmdParts[0]) {
                 case 'help':
-                    output = 'Commands: ls, ps, netstat, cat, nmap, ssh, whoami';
+                    output = 'Commandes : ls, ps, netstat, cat, nmap, ssh, whoami';
                     break;
                 case 'ls':
-                    output = 'config.txt  logs/  passwords.bak  run.sh';
+                    output = 'config.txt  logs/  passwords.bak  run.sh  decoy.txt';
                     break;
                 case 'ps':
-                    output = 'PID\tCOMMAND\n1234\tapache2\n5678\tsshd\n9012\tmysql';
+                    output = 'PID\tCOMMAND\n1234\tapache2\n5678\tsshd\n9012\tmysql\n9999\tfake_service';
                     break;
                 case 'netstat':
-                    output = 'TCP\t0.0.0.0:22\tLISTENING\nTCP\t0.0.0.0:80\tLISTENING';
+                    output = 'TCP\t0.0.0.0:22\tLISTEN\nTCP\t0.0.0.0:80\tLISTEN\nTCP\t0.0.0.0:8080\tCLOSED';
                     break;
                 case 'cat':
-                    output = cmdParts[1] === 'passwords.bak' ? 'root:a_sUp3r_S3cr3t_P4ssW0rd' : 'Error: File not found or unreadable.';
+                    if (cmdParts[1] === 'passwords.bak') {
+                        output = 'root:Sup3rS3cr3tP4ss';
+                    } else if (cmdParts[1] === 'decoy.txt') {
+                        output = 'Rien d’utile ici, juste un leurre.';
+                    } else {
+                        output = 'Erreur : Fichier non trouvé ou non lisible.';
+                    }
                     break;
                 case 'nmap':
-                    output = 'Nmap scan... Open ports: 22 (SSH), 80 (HTTP)';
+                    output = 'Scan Nmap... Ports ouverts : 22 (SSH), 80 (HTTP), 8080 (Inactif)';
                     break;
                 case 'ssh':
-                    output = 'Attempting SSH connection...';
+                    output = 'Tentative de connexion SSH...';
                     break;
                 case 'whoami':
                     output = 'root';
                     break;
                 default:
-                    output = `bash: ${command}: command not found`;
+                    output = `bash: ${command}: commande introuvable`;
             }
             setTerminalHistory(prev => [...prev, `root@techcorp:~# ${command}`, output]);
             setTerminalInput('');
         };
 
         return (
-            <div className="panel">
-                <h2 className="panel-title">TechCorp Server</h2>
+            <div className="section">
+                <h2 className="team-title">Serveur TechCorp</h2>
                 <div className="status-grid">
                     <div className="status-card">
-                        <h3 className="status-title">Active Services</h3>
-                        <div className="status-content">SSH, HTTP, FTP, MySQL</div>
+                        <h3 className="status-title">Services Actifs</h3>
+                        <div className="status-content">SSH, HTTP, FTP, MySQL, FakeDB (Inactif)</div>
                     </div>
                     <div className="status-card">
-                        <h3 className="status-title">Vulnerabilities</h3>
-                        <div className="status-content">SSH (Weak Auth), FTP (Anonymous)</div>
+                        <h3 className="status-title">Vulnérabilités</h3>
+                        <div className="status-content">SSH (Auth Faible), FTP (Anonyme)</div>
                     </div>
                     <div className="status-card">
-                        <h3 className="status-title">Recent Alerts</h3>
-                        <div className="status-content">0 new alerts</div>
+                        <h3 className="status-title">Alertes Récentes</h3>
+                        <div className="status-content">0 nouvelles alertes</div>
                     </div>
                 </div>
                 <div
@@ -436,12 +471,15 @@ const CyberWarGame = () => {
                     </div>
                 </div>
                 <div className="actions">
-                    <h3 className="panel-title">{selectedTeam === 'attackers' ? 'Server Actions' : 'Countermeasures'}</h3>
+                    <h3 className="team-title">{selectedTeam === 'attaquants' ? 'Actions Serveur' : 'Contre-mesures'}</h3>
                     <div className="action-grid">
                         {role.actions.map((action, i) => (
                             <button
                                 key={i}
-                                onClick={() => handleAction(selectedTeam, `${action} executed`, 15)}
+                                onClick={() => {
+                                    const isFake = action.includes('Faux') || action.includes('Inutilisé');
+                                    handleAction(selectedTeam, `${action} exécuté${isFake ? ' (aucun résultat)' : ''}`, isFake ? 0 : 15);
+                                }}
                                 className={`button ${selectedTeam}`}
                             >
                                 {action}
@@ -454,32 +492,32 @@ const CyberWarGame = () => {
     };
 
     const ResultsScreen = () => {
-        const winner = scores.attackers > scores.defenders ? 'Attackers' : 'Defenders';
-        const isTie = scores.attackers === scores.defenders;
+        const winner = scores.attaquants > scores.défenseurs ? 'Attaquants' : 'Défenseurs';
+        const isTie = scores.attaquants === scores.défenseurs;
 
         return (
             <div className="game-container">
                 <div className="results-panel">
-                    <h1 className="intro-title">Game Over</h1>
+                    <h1 className="intro-title">Fin de la Partie</h1>
                     {isTie ? (
-                        <h2 className="results-title">Tie!</h2>
+                        <h2 className="results-title">Égalité !</h2>
                     ) : (
                         <h2 className={`results-title ${winner.toLowerCase()}`}>
-                            {winner} Win!
+                            Les {winner} gagnent !
                         </h2>
                     )}
                     <div className="score-grid">
-                        <div className="score-card attackers">
-                            <div className="score-label">Attackers</div>
-                            <div className="score-value">{scores.attackers}</div>
+                        <div className="score-card attaquants">
+                            <div className="score-label">Attaquants</div>
+                            <div className="score-value">{scores.attaquants}</div>
                         </div>
-                        <div className="score-card defenders">
-                            <div className="score-label">Defenders</div>
-                            <div className="score-value">{scores.defenders}</div>
+                        <div className="score-card défenseurs">
+                            <div className="score-label">Défenseurs</div>
+                            <div className="score-value">{scores.défenseurs}</div>
                         </div>
                     </div>
                     <button onClick={handleRestartGame} className="button replay">
-                        Replay
+                        Rejouer
                     </button>
                 </div>
             </div>
@@ -487,9 +525,9 @@ const CyberWarGame = () => {
     };
 
     if (gameState === 'intro') return <IntroAnimation />;
-    if (gameState === 'game') return <GameInterface />;
-    if (gameState === 'results') return <ResultsScreen />;
-    return <div className="game-container">Loading...</div>;
+    if (gameState === 'jeu') return <GameInterface />;
+    if (gameState === 'résultats') return <ResultsScreen />;
+    return <div className="game-container">Chargement...</div>;
 };
 
 export default CyberWarGame;
