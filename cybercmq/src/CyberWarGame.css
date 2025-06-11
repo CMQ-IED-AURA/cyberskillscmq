@@ -322,7 +322,7 @@ body {
     margin-bottom: 0.5rem;
 }
 
-.product-card h6 {
+.product-card h4 {
     font-size: 1rem;
     font-weight: 600;
     margin-bottom: 0.5rem;
@@ -404,9 +404,9 @@ body {
     font-weight: 500;
 }
 
-.button.restart:hover {
-    background-color: darken(var(--accent-blue), 10%);
-}
+/* .button.restart:hover {
+  background-color: darken(var(--accent-blue), 10%);
+} Note: darken non-standard, utiliser une couleur fixe si nécessaire */
 
 .button.close-btn {
     position: absolute;
@@ -633,4 +633,31 @@ body {
 .score-value {
     font-size: 2rem;
     font-family: 'Roboto Mono', monospace;
+}
+
+/* Feedback */
+.feedback {
+    padding: 0.8rem;
+    margin-bottom: 1rem;
+    border-radius: 4px;
+    font-size: 1rem;
+    text-align: center;
+}
+
+.feedback:contains("Succès") {
+    background-color: #e0f7e0;
+    color: #2e7d32;
+}
+
+.feedback:contains("Échec") {
+    background-color: #ffebee;
+    color: #c62828;
+}
+
+/* Hints */
+.hint {
+    font-size: 1rem;
+    color: var(--text-secondary);
+    margin-bottom: 1rem;
+    font-style: italic;
 }
