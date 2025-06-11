@@ -11,8 +11,8 @@ const CyberWarGame = () => {
     const [scores, setScores] = useState({ attaquants: 0, défenseurs: 0 });
     const [gameLog, setGameLog] = useState([]);
     const [roleAssigned, setRoleAssigned] = useState(false);
-    const [showRoleDetails, setShowRoleDetails] = useState(false); // Pour la fiche descriptive
-    const [activeTab, setActiveTab] = useState('site'); // Onglet actif, indépendant de currentPhase
+    const [showRoleDetails, setShowRoleDetails] = useState(false);
+    const [activeTab, setActiveTab] = useState('site');
 
     const initialWebsiteState = {
         currentPage: 'accueil',
@@ -20,7 +20,7 @@ const CyberWarGame = () => {
             xss: { discovered: false, exploited: false, patched: false },
             sqli: { discovered: false, exploited: false, patched: false },
             csrf: { discovered: false, exploited: false, patched: false },
-            fake_form: { discovered: false, exploited: false, patched: false } // Fausse piste
+            fake_form: { discovered: false, exploited: false, patched: false }
         },
         userAccounts: ['admin', 'utilisateur1', 'invité'],
         database: ['utilisateurs', 'commandes', 'produits']
@@ -31,7 +31,7 @@ const CyberWarGame = () => {
             ssh: { running: true, vulnerable: true, patched: false },
             ftp: { running: true, vulnerable: true, patched: false },
             web: { running: true, vulnerable: false, patched: false },
-            fake_db: { running: true, vulnerable: false, patched: true } // Fausse piste
+            fake_db: { running: true, vulnerable: false, patched: true }
         },
         files: ['/etc/passwd', '/var/log/auth.log', '/home/user/.ssh/id_rsa', '/var/www/decoy.txt'],
         processes: ['apache2', 'sshd', 'mysql', 'fake_service'],
@@ -45,22 +45,142 @@ const CyberWarGame = () => {
 
     const roles = {
         attaquants: [
-            { id: 'pirate-web', name: 'Pirate Web', icon: '🕷️', spécialité: 'XSS, Injection SQL', actions: ['Scanner XSS', 'Injection SQL', 'Tester CSRF', 'Analyser Faux Formulaire'], description: 'Spécialiste des attaques web, capable d’exploiter des failles XSS et SQLi pour compromettre des sites.' },
-            { id: 'ingénieur-social', name: 'Ingénieur Social', icon: '👤', spécialité: 'Hameçonnage, OSINT', actions: ['Hameçonner', 'Collecter OSINT', 'Usurper Email', 'Simuler Appel'], description: 'Manipule les utilisateurs via des techniques d’ingénierie sociale pour obtenir des accès.' },
-            { id: 'scanner-réseau', name: 'Scanner Réseau', icon: '📡', spécialité: 'Scan de Ports, Reconnaissance', actions: ['Scanner Ports', 'Reconnaissance Réseau', 'Ping Sweep', 'Tester Port Inutilisé'], description: 'Explore les réseaux pour identifier les services vulnérables et les points d’entrée.' },
-            { id: 'développeur-exploits', name: 'Développeur d’Exploits', icon: '⚡', spécialité: 'Débordement de Tampon, RCE', actions: ['Exploiter RCE', 'Débordement Tampon', 'Injecter Shellcode', 'Analyser Faux Service'], description: 'Crée des exploits pour prendre le contrôle des systèmes via des failles critiques.' },
-            { id: 'casseur-crypto', name: 'Casseur Crypto', icon: '🔓', spécialité: 'Craquage de Hash, Chiffrement', actions: ['Craquer Hash', 'Déchiffrer Fichier', 'Keylogger', 'Tester Faux Hash'], description: 'Brise les protections cryptographiques pour accéder aux données sensibles.' }
+            {
+                id: 'hacker-site',
+                name: 'Hacker de Site Web',
+                icon: '🕷️',
+                spécialité: 'Trouver des failles dans les sites',
+                actions: [
+                    { name: 'Scanner XSS', desc: 'Cherche des failles pour insérer du code malveillant' },
+                    { name: 'Injection SQL', desc: 'Tente d’accéder à la base de données via un formulaire' },
+                    { name: 'Tester CSRF', desc: 'Essaie de tromper le site pour faire des actions non autorisées' },
+                    { name: 'Analyser Faux Formulaire', desc: 'Vérifie un formulaire qui semble suspect (leurre)' }
+                ],
+                description: 'Tu attaques des sites web en trouvant des failles simples, comme des formulaires non sécurisés.'
+            },
+            {
+                id: 'pirate-social',
+                name: 'Pirate Social',
+                icon: '👤',
+                spécialité: 'Tromper les utilisateurs',
+                actions: [
+                    { name: 'Hameçonner', desc: 'Envoie un faux email pour voler des mots de passe' },
+                    { name: 'Collecter Infos', desc: 'Rassemble des informations sur les utilisateurs' },
+                    { name: 'Usurper Email', desc: 'Fait semblant d’être quelqu’un d’autre par email' },
+                    { name: 'Simuler Appel', desc: 'Tente une fausse piste par téléphone (leurre)' }
+                ],
+                description: 'Tu utilises des astuces pour piéger les gens et obtenir leurs informations.'
+            },
+            {
+                id: 'explorateur-réseau',
+                name: 'Explorateur Réseau',
+                icon: '📡',
+                spécialité: 'Cartographier les réseaux',
+                actions: [
+                    { name: 'Scanner Ports', desc: 'Découvre quels services sont actifs sur le serveur' },
+                    { name: 'Reconnaissance', desc: 'Collecte des infos sur le réseau' },
+                    { name: 'Ping Sweep', desc: 'Vérifie quels appareils sont connectés' },
+                    { name: 'Tester Port Inutilisé', desc: 'Tente un port qui ne fonctionne pas (leurre)' }
+                ],
+                description: 'Tu explores les réseaux pour trouver des points faibles dans les serveurs.'
+            },
+            {
+                id: 'codeur-attaquant',
+                name: 'Codeur Attaquant',
+                icon: '⚡',
+                spécialité: 'Créer des programmes d’attaque',
+                actions: [
+                    { name: 'Exploiter Faille', desc: 'Utilise une faille pour prendre le contrôle' },
+                    { name: 'Débordement', desc: 'Force un programme à exécuter ton code' },
+                    { name: 'Injecter Code', desc: 'Ajoute un code malveillant dans le serveur' },
+                    { name: 'Analyser Faux Service', desc: 'Vérifie un service qui semble suspect (leurre)' }
+                ],
+                description: 'Tu crées des outils pour exploiter les failles des programmes.'
+            },
+            {
+                id: 'déchiffreur',
+                name: 'Déchiffreur',
+                icon: '🔓',
+                spécialité: 'Casser les mots de passe',
+                actions: [
+                    { name: 'Craquer Mot de Passe', desc: 'Tente de deviner un mot de passe' },
+                    { name: 'Déchiffrer Fichier', desc: 'Ouvre un fichier protégé' },
+                    { name: 'Espionner Clavier', desc: 'Enregistre ce que l’utilisateur tape' },
+                    { name: 'Tester Faux Code', desc: 'Tente un code inutile (leurre)' }
+                ],
+                description: 'Tu casses les protections pour accéder aux données secrètes.'
+            }
         ],
         défenseurs: [
-            { id: 'analyste-sécurité', name: 'Analyste Sécurité', icon: '🛡️', spécialité: 'Surveillance, Détection', actions: ['Surveiller Logs', 'Détecter Intrusion', 'Analyser Trafic', 'Vérifier Faux Log'], description: 'Surveille les systèmes pour détecter et signaler les activités malveillantes.' },
-            { id: 'répondeur-incidents', name: 'Répondeur Incidents', icon: '🚨', spécialité: 'Forensique, Mitigation', actions: ['Analyser Forensique', 'Mitiger Attaque', 'Isoler Hôte', 'Examiner Faux Fichier'], description: 'Réagit rapidement pour limiter l’impact des attaques et enquêter.' },
-            { id: 'admin-réseau', name: 'Admin Réseau', icon: '🌐', spécialité: 'Pare-feu, IDS/IPS', actions: ['Configurer Pare-feu', 'Activer IDS', 'Bloquer IP', 'Bloquer Faux Port'], description: 'Sécurise les réseaux en bloquant les accès non autorisés.' },
-            { id: 'durcisseur-système', name: 'Durcisseur Système', icon: '🔒', spécialité: 'Correctifs, Configuration', actions: ['Appliquer Correctif', 'Durcir Config', 'Désactiver Service', 'Désactiver Faux Service'], description: 'Renforce les systèmes en appliquant des correctifs et configurations sécurisées.' },
-            { id: 'chasseur-menaces', name: 'Chasseur de Menaces', icon: '🎯', spécialité: 'Détection IOC, Analyse', actions: ['Chasser IOCs', 'Analyser Malware', 'Tracer Attaquant', 'Analyser Fausse Alerte'], description: 'Traque les menaces avancées en analysant les indicateurs de compromission.' }
+            {
+                id: 'protecteur-sécurité',
+                name: 'Protecteur Sécurité',
+                icon: '🛡️',
+                spécialité: 'Surveiller les systèmes',
+                actions: [
+                    { name: 'Surveiller Journaux', desc: 'Vérifie les activités suspectes' },
+                    { name: 'Détecter Attaque', desc: 'Repère une tentative d’intrusion' },
+                    { name: 'Analyser Trafic', desc: 'Examine les connexions réseau' },
+                    { name: 'Vérifier Faux Journal', desc: 'Regarde un journal sans importance (leurre)' }
+                ],
+                description: 'Tu surveilles le système pour repérer les attaques.'
+            },
+            {
+                id: 'réparateur-urgence',
+                name: 'Réparateur Urgence',
+                icon: '🚨',
+                spécialité: 'Réagir aux attaques',
+                actions: [
+                    { name: 'Enquêter', desc: 'Analyse une attaque pour comprendre comment elle a eu lieu' },
+                    { name: 'Stopper Attaque', desc: 'Bloque une attaque en cours' },
+                    { name: 'Isoler Machine', desc: 'Déconnecte une machine compromise' },
+                    { name: 'Examiner Faux Fichier', desc: 'Vérifie un fichier inutile (leurre)' }
+                ],
+                description: 'Tu interviens vite pour limiter les dégâts des attaques.'
+            },
+            {
+                id: 'gestionnaire-réseau',
+                name: 'Gestionnaire Réseau',
+                icon: '🌐',
+                spécialité: 'Protéger le réseau',
+                actions: [
+                    { name: 'Configurer Mur', desc: 'Met en place un pare-feu' },
+                    { name: 'Activer Alarme', desc: 'Installe un détecteur d’intrusion' },
+                    { name: 'Bloquer Adresse', desc: 'Empêche une machine d’accéder au réseau' },
+                    { name: 'Bloquer Faux Port', desc: 'Tente de bloquer un port inutile (leurre)' }
+                ],
+                description: 'Tu sécurises le réseau pour bloquer les attaquants.'
+            },
+            {
+                id: 'renforceur-système',
+                name: 'Renforceur Système',
+                icon: '🔒',
+                spécialité: 'Renforcer les machines',
+                actions: [
+                    { name: 'Installer Correctif', desc: 'Met à jour pour corriger une faille' },
+                    { name: 'Sécuriser Config', desc: 'Améliore les paramètres de sécurité' },
+                    { name: 'Désactiver Service', desc: 'Arrête un service vulnérable' },
+                    { name: 'Désactiver Faux Service', desc: 'Tente d’arrêter un service inutile (leurre)' }
+                ],
+                description: 'Tu rends les machines plus difficiles à attaquer.'
+            },
+            {
+                id: 'traqueur-menaces',
+                name: 'Traqueur Menaces',
+                icon: '🎯',
+                spécialité: 'Chasser les dangers',
+                actions: [
+                    { name: 'Repérer Danger', desc: 'Cherche des signes d’attaque' },
+                    { name: 'Analyser Virus', desc: 'Étudie un programme malveillant' },
+                    { name: 'Suivre Attaquant', desc: 'Tente de trouver qui attaque' },
+                    { name: 'Analyser Fausse Alerte', desc: 'Vérifie une alerte sans importance (leurre)' }
+                ],
+                description: 'Tu traques les attaquants pour les neutraliser.'
+            }
         ]
     };
 
-    // Attribution aléatoire du rôle
+    // Attribution du rôle
     useEffect(() => {
         if (!roleAssigned && gameState === 'intro') {
             const teams = ['attaquants', 'défenseurs'];
@@ -81,9 +201,9 @@ const CyberWarGame = () => {
         } else if (timeLeft === 0) {
             if (currentPhase === 'site') {
                 setCurrentPhase('serveur');
-                setActiveTab('serveur'); // Synchroniser onglet
+                setActiveTab('serveur');
                 setTimeLeft(600);
-                addLog('Phase site terminée. Passage à l’attaque du serveur.');
+                addLog('Phase site terminée. Passage au serveur.');
             } else {
                 setGameState('résultats');
             }
@@ -120,18 +240,18 @@ const CyberWarGame = () => {
     };
 
     const IntroAnimation = () => {
-        const [animationStep, setAnimationStep] = useState(0); // 0: chargement, 1: rôle assigné, 2: transition jeu
+        const [animationStep, setAnimationStep] = useState(0);
         const [displayText, setDisplayText] = useState('');
 
         useEffect(() => {
             if (animationStep === 0) {
-                let text = 'INITIALISATION...';
+                let text = 'DÉMARRAGE DU JEU...';
                 let i = 0;
                 const typeText = () => {
                     if (i <= text.length) {
                         setDisplayText(text.slice(0, i));
                         i++;
-                        setTimeout(typeText, 100);
+                        setTimeout(typeText, 80);
                     } else {
                         setTimeout(() => setAnimationStep(1), 1000);
                     }
@@ -139,7 +259,7 @@ const CyberWarGame = () => {
                 typeText();
             } else if (animationStep === 1 && selectedRole) {
                 const role = roles[selectedTeam].find(r => r.id === selectedRole);
-                let text = `RÔLE ASSIGNÉ : ${role.name.toUpperCase()} [${selectedTeam === 'attaquants' ? 'ATTAQUANTS' : 'DÉFENSEURS'}]`;
+                let text = `RÔLE : ${role.name.toUpperCase()} [${selectedTeam === 'attaquants' ? 'ATTAQUANTS' : 'DÉFENSEURS'}]`;
                 let i = 0;
                 const typeText = () => {
                     if (i <= text.length) {
@@ -153,7 +273,7 @@ const CyberWarGame = () => {
                 };
                 typeText();
             } else if (animationStep === 2) {
-                setTimeout(() => setGameState('jeu'), 1000);
+                setTimeout(() => setGameState('jeu'), 500);
             }
         }, [animationStep, selectedRole, selectedTeam]);
 
@@ -172,30 +292,34 @@ const CyberWarGame = () => {
         return (
             <div className={`role-details ${team}`}>
                 <h2 className="role-details-title">{role.name}</h2>
+                <p><strong>Rôle :</strong> {role.description}</p>
                 <p><strong>Spécialité :</strong> {role.spécialité}</p>
-                <p><strong>Description :</strong> {role.description}</p>
-                <p><strong>Actions :</strong></p>
+                <p><strong>Actions possibles :</strong></p>
                 <ul>
                     {role.actions.map((action, i) => (
-                        <li key={i}>{action}</li>
+                        <li key={i}>
+                            <strong>{action.name}</strong>: {action.desc}
+                            {action.name.includes('Faux') || action.name.includes('Inutilisé') ? ' (C’est une fausse piste, inutile d’essayer !)' : ''}
+                        </li>
                     ))}
                 </ul>
                 <p><strong>Objectifs :</strong></p>
                 <ul>
                     {team === 'attaquants' ? (
                         <>
-                            <li>Trouver des vulnérabilités</li>
-                            <li>Exploiter les failles</li>
-                            <li>Obtenir l’accès admin</li>
+                            <li>Repérer des failles dans le site ou le serveur.</li>
+                            <li>Utiliser ces failles pour marquer des points.</li>
+                            <li>Essayer d’obtenir un accès total (admin).</li>
                         </>
                     ) : (
                         <>
-                            <li>Détecter les attaques</li>
-                            <li>Corriger les failles</li>
-                            <li>Bloquer les attaquants</li>
+                            <li>Repérer les attaques des hackers.</li>
+                            <li>Réparer les failles pour protéger le système.</li>
+                            <li>Bloquer les attaquants pour marquer des points.</li>
                         </>
                     )}
                 </ul>
+                <p><strong>Astuce :</strong> Certaines actions sont des fausses pistes ! Lis bien les descriptions pour ne pas perdre de temps.</p>
             </div>
         );
     };
@@ -230,7 +354,7 @@ const CyberWarGame = () => {
                                 onClick={() => setShowRoleDetails(true)}
                                 className="button role-details-btn"
                             >
-                                <Info size={16} /> Fiche Rôle
+                                <Info size={18} /> Voir mon rôle
                             </button>
                         </div>
                     </div>
@@ -249,21 +373,21 @@ const CyberWarGame = () => {
                             <div className="objective-list">
                                 {selectedTeam === 'attaquants' ? (
                                     <>
-                                        <div><CheckCircle className="icon" size={16} /> Trouver des vulnérabilités</div>
-                                        <div><AlertTriangle className="icon" size={16} /> Exploiter les vulnérabilités</div>
-                                        <div><Target className="icon" size={16} /> Obtenir l’accès admin</div>
+                                        <div><CheckCircle className="icon" size={18} /> Trouver des failles</div>
+                                        <div><AlertTriangle className="icon" size={18} /> Exploiter les failles</div>
+                                        <div><Target className="icon" size={18} /> Accéder au contrôle</div>
                                     </>
                                 ) : (
                                     <>
-                                        <div><Shield className="icon" size={16} /> Détecter les attaques</div>
-                                        <div><Lock className="icon" size={16} /> Corriger les failles</div>
-                                        <div><Zap className="icon" size={16} /> Bloquer les attaquants</div>
+                                        <div><Shield className="icon" size={18} /> Détecter les attaques</div>
+                                        <div><Lock className="icon" size={18} /> Réparer les failles</div>
+                                        <div><Zap className="icon" size={18} /> Bloquer les hackers</div>
                                     </>
                                 )}
                             </div>
                         </div>
                         <div className="panel activity">
-                            <h3 className="panel-title">Activité</h3>
+                            <h3 className="panel-title">Journal d’activité</h3>
                             <div className="activity-log">
                                 {gameLog.map((log, i) => (
                                     <div key={i} className="log-entry">{log}</div>
@@ -338,43 +462,43 @@ const CyberWarGame = () => {
                     {currentPage === 'accueil' && (
                         <div>
                             <h3 className="interface-title">Bienvenue chez TechCorp</h3>
-                            <p className="lead">Leader mondial des solutions technologiques.</p>
+                            <p className="lead">TechCorp crée des solutions technologiques pour un monde connecté.</p>
                             <div className="hero">
                                 <div className="hero-placeholder">
-                                    <Globe size={48} />
-                                    <span>Technologie Innovante</span>
+                                    <Globe size={50} />
+                                    <span>Solutions sécurisées</span>
                                 </div>
-                                <p>Découvrez nos solutions pour un avenir sécurisé.</p>
+                                <p>Explorez nos produits et découvrez comment nous protégeons vos données.</p>
                             </div>
                         </div>
                     )}
                     {currentPage === 'produits' && (
                         <div>
-                            <h3 className="interface-title">Nos Produits</h3>
+                            <h3 className="interface-title">Nos produits</h3>
                             <div className="product-grid">
                                 <div className="product-card">
-                                    <div className="product-placeholder"><Server size={32} /></div>
-                                    <h4>CloudSync</h4>
-                                    <p>Synchronisation sécurisée.</p>
+                                    <div className="product-placeholder"><Server size={40} /></div>
+                                    <h6>CloudSync</h6>
+                                    <p>Partagez vos données en toute sécurité.</p>
                                 </div>
                                 <div className="product-card">
-                                    <div className="product-placeholder"><Shield size={32} /></div>
-                                    <h4>AIShield</h4>
-                                    <p>Protection par IA.</p>
+                                    <div className="product-placeholder"><Shield size={40} /></div>
+                                    <h6>AIShield</h6>
+                                    <p>Protection contre les cyberattaques.</p>
                                 </div>
                                 <div className="product-card">
-                                    <div className="product-placeholder"><Lock size={32} /></div>
-                                    <h4>DataVault</h4>
-                                    <p>Stockage sécurisé.</p>
+                                    <div className="product-placeholder"><Lock size={40} /></div>
+                                    <h6>DataVault</h6>
+                                    <p>Stockage ultra-sécurisé.</p>
                                 </div>
                             </div>
                         </div>
                     )}
                     {currentPage === 'à-propos' && (
                         <div>
-                            <h3 className="interface-title">À Propos de TechCorp</h3>
-                            <p>Fondée en 2010, TechCorp innove dans la cybersécurité.</p>
-                            <p>Notre mission : protéger le monde numérique.</p>
+                            <h3 className="interface-title">À propos de TechCorp</h3>
+                            <p>Depuis 2010, TechCorp protège les entreprises avec des solutions innovantes.</p>
+                            <p>Notre mission : un internet sûr pour tous.</p>
                         </div>
                     )}
                     {currentPage === 'connexion' && (
@@ -418,34 +542,35 @@ const CyberWarGame = () => {
                                     placeholder="Email (Newsletter)"
                                 />
                                 <button
-                                    onClick={() => handleAction(selectedTeam, `Tentative XSS : ${formData.comment.substring(0, 20)}...`, formData.comment.includes('<script>') ? 10 : 0)}
+                                    onClick={() => handleAction(selectedTeam, `Tentative XSS avec : ${formData.comment.substring(0, 20)}...`, formData.comment.includes('<script>') ? 10 : 0)}
                                     className="button défenseurs"
                                 >
                                     Envoyer
                                 </button>
                                 <button
-                                    onClick={() => handleAction(selectedTeam, `Tentative sur newsletter : ${formData.newsletter}`, 0)}
+                                    onClick={() => handleAction(selectedTeam, `Test newsletter avec : ${formData.newsletter}`, 0)}
                                     className="button défenseurs"
                                 >
-                                    S’inscrire à la Newsletter
+                                    S’inscrire
                                 </button>
                             </div>
                         </div>
                     )}
                 </div>
                 <div className="actions">
-                    <h3 className="panel-title">{selectedTeam === 'attaquants' ? 'Outils d’Attaque' : 'Outils de Défense'}</h3>
+                    <h3 className="panel-title">{selectedTeam === 'attaquants' ? 'Outils d’attaque' : 'Outils de défense'}</h3>
                     <div className="action-grid">
                         {role.actions.map((action, i) => (
                             <button
                                 key={i}
                                 onClick={() => {
-                                    const isFake = action.includes('Faux') || action.includes('Inutilisé');
-                                    handleAction(selectedTeam, `${action} exécuté${isFake ? ' (aucun résultat)' : ''}`, isFake ? 0 : 10);
+                                    const isFake = action.name.includes('Faux') || action.name.includes('Inutilisé');
+                                    handleAction(selectedTeam, `${action.name} exécuté${isFake ? ' (aucun effet)' : ''}`, isFake ? 0 : 10);
                                 }}
                                 className={`button ${selectedTeam}`}
+                                title={action.desc}
                             >
-                                {action}
+                                {action.name}
                             </button>
                         ))}
                     </div>
@@ -457,8 +582,8 @@ const CyberWarGame = () => {
     const ServerInterface = ({ role }) => {
         const [terminalInput, setTerminalInput] = useState('');
         const [terminalHistory, setTerminalHistory] = useState([
-            'Bienvenue sur le serveur TechCorp (Linux v5.4)',
-            'Tapez "help" pour les commandes.'
+            'Bienvenue sur le serveur TechCorp.',
+            'Tapez "help" pour voir les commandes.'
         ]);
         const terminalEndRef = useRef(null);
 
@@ -469,43 +594,43 @@ const CyberWarGame = () => {
         const executeCommand = (command) => {
             let output = '';
             const cmdParts = command.toLowerCase().split(' ');
-            addLog(`Commande exécutée : ${command}`);
+            addLog(`Commande : ${command}`);
 
             switch (cmdParts[0]) {
                 case 'help':
-                    output = 'Commandes : ls, ps, netstat, cat, to, nmap, ssh, whoami';
+                    output = 'Commandes : ls, ps, netstat, cat, nmap, ssh, whoami';
                     break;
                 case 'ls':
-                    ls => output = 'config.txt  logs/  passwords.bak  run.sh  decoy.txt';
+                    output = 'config.txt  logs/  passwords.bak  run.sh  decoy.txt';
                     break;
                 case 'ps':
-                    output = 'PID\tCOMMAND\n1234\tapache2\n5678\tsshd\n9012\tmysql\n9999\tfake_service';
+                    output = 'PID\tCOMMAND\n1234\tapache2\n5678\tsshd\n4567\tmysql\n9999\tfake_service';
                     break;
                 case 'netstat':
                     output = 'TCP\t0.0.0.0:22\tLISTEN\nTCP\t0.0.0.0:80\tLISTEN\nTCP\t0.0.0.0:8080\tCLOSED';
                     break;
                 case 'cat':
                     if (cmdParts[1] === 'passwords.bak') {
-                        output = 'root:Sup3rS3cr3tP4ss';
+                        output = 'admin:MotDePasseSecret123';
                     } else if (cmdParts[1] === 'decoy.txt') {
-                        output = 'Rien d’utile ici, juste un leurre.';
+                        output = 'Ce fichier est un leurre, rien d’utile ici.';
                     } else {
-                        output = 'Erreur : Fichier non trouvé ou non lisible.';
+                        output = 'Erreur : fichier non trouvé.';
                     }
                     break;
                 case 'nmap':
-                    output = 'Scan Nmap... Ports ouverts : 22 (SSH), 80 (HTTP), 8080 (Inactif)';
+                    output = 'Scan... Ports : 22 (SSH), 80 (HTTP), 8080 (Inactif)';
                     break;
                 case 'ssh':
-                    output = 'Tentative de connexion SSH...';
+                    output = 'Connexion SSH en cours...';
                     break;
                 case 'whoami':
-                    output = 'root';
+                    output = 'admin';
                     break;
                 default:
-                    output = `bash: ${command}: commande introuvable`;
+                    output = `Commande inconnue : ${command}`;
             }
-            setTerminalHistory(prev => [...prev, `root@techcorp:~# ${command}`, output]);
+            setTerminalHistory(prev => [...prev, `> ${command}`, output]);
             setTerminalInput('');
         };
 
@@ -514,54 +639,55 @@ const CyberWarGame = () => {
                 <h2 className="panel-title">Serveur TechCorp</h2>
                 <div className="status-grid">
                     <div className="status-card">
-                        <h3 className="status-title">Services Actifs</h3>
-                        <div className="status-content">SSH, HTTP, FTP, MySQL, FakeDB (Inactif)</div>
+                        <h3 className="status-title">Services</h3>
+                        <div className="status-content">SSH, HTTP, FTP, MySQL, FakeDB (inactif)</div>
                     </div>
                     <div className="status-card">
-                        <h3 className="status-title">Vulnérabilités</h3>
-                        <div className="status-content">SSH (Auth Faible), FTP (Anonyme)</div>
+                        <h3 className="status-title">Failles</h3>
+                        <div className="status-content">SSH (mot de passe faible)</div>
                     </div>
                     <div className="status-card">
-                        <h3 className="status-title">Alertes Récentes</h3>
-                        <div className="status-content">0 nouvelles alertes</div>
+                        <h3 className="status-title">Alertes</h3>
+                        <div className="status-content">Aucune</div>
                     </div>
                 </div>
                 <div
                     className="terminal"
                     onClick={() => terminalInputRef.current.focus()}
                 >
-                    <div className="terminal-output">
+                    <div className="terminal-list">
                         {terminalHistory.map((line, i) => (
                             <div key={i} className="terminal-line">{line}</div>
                         ))}
                         <div ref={terminalEndRef} />
                     </div>
                     <div className="terminal-prompt">
-                        <span>root@techcorp:~# </span>
+                        <span>> </span>
                         <input
                             ref={terminalInputRef}
                             type="text"
                             value={terminalInput}
                             onChange={(e) => setTerminalInput(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && executeCommand(terminalInput)}
-                            className="terminal-input"
+                            className="input terminal-input"
                             autoFocus
                         />
                     </div>
                 </div>
                 <div className="actions">
-                    <h3 className="panel-title">{selectedTeam === 'attaquants' ? 'Actions Serveur' : 'Contre-mesures'}</h3>
+                    <h3 className="panel-title">{selectedTeam === 'attaquants' ? 'Actions d’attaque' : 'Actions de défense'}</h3>
                     <div className="action-grid">
                         {role.actions.map((action, i) => (
                             <button
                                 key={i}
                                 onClick={() => {
-                                    const isFake = action.includes('Faux') || action.includes('Inutilisé');
-                                    handleAction(selectedTeam, `${action} exécuté${isFake ? ' (aucun résultat)' : ''}`, isFake ? 0 : 15);
+                                    const isFake = action.name.includes('Faux') || action.name.includes('Inutilisé');
+                                    handleAction(selectedTeam, `${action.name} exécuté${isFake ? ' (aucun effet)' : ''}`, isFake ? 0 : 15);
                                 }}
-                                className={`button ${selectedTeam}`}
+                                className="button ${selectedTeam}"
+                                title="${action.desc}"
                             >
-                                {action}
+                                {action.name}
                             </button>
                         ))}
                     </div>
@@ -577,7 +703,7 @@ const CyberWarGame = () => {
         return (
             <div className="game-container">
                 <div className="results-panel">
-                    <h1 className="intro-title">Fin de Partie</h1>
+                    <h1 className="title">Fin de Partie</h1>
                     {isTie ? (
                         <h2 className="results-title">Égalité !</h2>
                     ) : (
@@ -586,16 +712,16 @@ const CyberWarGame = () => {
                         </h2>
                     )}
                     <div className="score-grid">
-                        <div className="score-card attackers">
+                        <div className="score-card attaquants">
                             <div className="score-label">Attaquants</div>
                             <div className="score-value">{scores.attaquants}</div>
                         </div>
-                        <div className="score-card defenders">
+                        <div className="score-card défenseurs">
                             <div className="score-label">Défenseurs</div>
                             <div className="score-value">{scores.défenseurs}</div>
                         </div>
                     </div>
-                    <button onClick={handleRestartGame} className="button replay">
+                    <button onClick={handleRestartGame} className="button restart">
                         Rejouer
                     </button>
                 </div>
@@ -605,6 +731,7 @@ const CyberWarGame = () => {
 
     if (gameState === 'intro') return <IntroAnimation />;
     if (gameState === 'jeu') return <GameInterface />;
+    if (gameState === 'résultats') return <ResultsScreen />;
     return <div className="game-container">Chargement...</div>;
 };
 
