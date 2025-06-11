@@ -1,16 +1,34 @@
-/* CyberWarGame.css - Style clair et pédagogique pour CyberWar */
+/* CyberWarGame_Dark.css - Thème Cyberpunk ATK/DEF pour CyberWar */
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@400;500&display=swap');
 
+/* === Variables : Le Cœur du Thème Cyberpunk === */
 :root {
-    --accent-blue: #4a90e2;
-    --accent-red: #e74c3c;
-    --text-primary: #333;
-    --text-secondary: #666;
-    --border-color: #ddd;
-    --background-panel: #fff;
-    --shadow-color: rgba(0, 0, 0, 0.1);
-    --transition: all 0.2s ease;
+    /* Couleurs de base */
+    --background-main: #0a0c1a;
+    --background-panel: rgba(18, 23, 58, 0.85);
+    --background-header: rgba(10, 12, 26, 0.9);
+    --background-input: #1c254f;
+
+    /* Accents et Rôles */
+    --accent-blue: #3e70cf;       /* Défenseurs */
+    --accent-red: #e74c3c;        /* Attaquants */
+    --neon-glow-blue: rgba(62, 112, 207, 0.7);
+    --neon-glow-red: rgba(231, 76, 60, 0.7);
+    --hover-glow: #8ab0ff;
+
+    /* Texte */
+    --text-primary: #e0e6f9;
+    --text-secondary: #a0a8d3;
+    --text-dark: #111;
+
+    /* Bordures et Ombres */
+    --border-color: rgba(97, 127, 153, 0.3);
+    --shadow-color: rgba(0, 0, 0, 0.5);
+
+    /* UI Elements */
+    --border-radius: 8px;
+    --transition: all 0.3s ease;
 }
 
 * {
@@ -22,10 +40,33 @@
 body {
     font-family: 'Inter', sans-serif;
     color: var(--text-primary);
-    background-color: transparent; /* Respecte ton fond existant */
+    background: linear-gradient(145deg, #0f1326 0%, #1a2051 100%);
     width: 100%;
     min-height: 100vh;
-    overflow: auto; /* Active le scroll */
+    overflow-x: hidden;
+    position: relative;
+}
+
+/* Fond animé style "grille numérique" */
+body::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-image:
+            linear-gradient(to right, rgba(97, 127, 153, 0.1) 1px, transparent 1px),
+            linear-gradient(to bottom, rgba(97, 127, 153, 0.1) 1px, transparent 1px);
+    background-size: 40px 40px;
+    animation: scrollBg 30s linear infinite;
+    z-index: -1;
+    pointer-events: none;
+}
+
+@keyframes scrollBg {
+    from { background-position: 0 0; }
+    to { background-position: -120px -120px; }
 }
 
 .game-container {
@@ -33,114 +74,76 @@ body {
     min-height: 100%;
     display: flex;
     flex-direction: column;
-    background-color: transparent; /* Respecte ton fond */
 }
 
-/* Header */
+/* === Header : Centre de Commandement === */
 .header {
-    background-color: var(--background-panel);
+    background-color: var(--background-header);
+    backdrop-filter: blur(10px);
     border-bottom: 1px solid var(--border-color);
-    padding: 1rem;
+    padding: 1rem 2rem;
     width: 100%;
-    box-shadow: 0 2px 4px var(--shadow-color);
+    position: sticky;
+    top: 0;
+    z-index: 100;
 }
 
 .header-content {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    max-width: 1200px;
+    max-width: 1400px;
     margin: 0 auto;
-}
-
-.header-left {
-    display: flex;
-    align-items: center;
-    gap: 1.5rem;
 }
 
 .header-title {
     font-size: 2rem;
     font-weight: 700;
-}
-
-.phase-info {
-    font-size: 1.2rem;
-    color: var(--text-secondary);
+    color: var(--hover-glow);
+    text-shadow: 0 0 10px var(--hover-glow);
 }
 
 .phase-name {
-    color: var(--accent-blue);
+    color: var(--hover-glow);
     font-weight: 600;
-}
-
-.header-right {
-    display: flex;
-    align-items: center;
-    gap: 1.5rem;
-}
-
-.timer, .scores {
-    text-align: center;
-}
-
-.timer-label, .score-label {
-    font-size: 1rem;
-    color: var(--text-secondary);
 }
 
 .timer-value, .score-value {
     font-size: 1.8rem;
     font-family: 'Roboto Mono', monospace;
+    text-shadow: 0 0 5px currentColor;
 }
 
-.score-value .attaquants {
-    color: var(--accent-red);
-}
+.score-value .attaquants { color: var(--accent-red); }
+.score-value .défenseurs { color: var(--accent-blue); }
 
-.score-value .défenseurs {
-    color: var(--accent-blue);
-}
-
-.role-details-btn {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-size: 1.1rem;
-}
-
-/* Main Content */
+/* === Contenu Principal === */
 .main-content {
     display: flex;
     flex: 1;
     width: 100%;
-    max-width: 1200px;
+    max-width: 1400px;
     margin: 0 auto;
     padding: 1.5rem;
     gap: 1.5rem;
 }
 
-.sidebar {
-    width: 320px;
-    display: flex;
-    flex-direction: column;
-    gap: 1.5rem;
-}
+.sidebar { width: 350px; display: flex; flex-direction: column; gap: 1.5rem; }
+.content { flex: 1; display: flex; flex-direction: column; gap: 1.5rem; }
 
-.content {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 1.5rem;
-}
-
-/* Panels */
+/* === Panneaux : Modules de l'Interface === */
 .panel {
     background-color: var(--background-panel);
     border: 1px solid var(--border-color);
-    border-radius: 8px;
+    border-radius: var(--border-radius);
     padding: 1.5rem;
-    box-shadow: 0 2px 6px var(--shadow-color);
+    box-shadow: 0 8px 32px 0 var(--shadow-color);
+    backdrop-filter: blur(8px);
+    transition: var(--transition);
+}
+
+.panel:hover {
+    border-color: rgba(97, 127, 153, 0.6);
 }
 
 .panel-title {
@@ -148,8 +151,10 @@ body {
     font-weight: 600;
     margin-bottom: 1rem;
     color: var(--text-primary);
+    text-shadow: 0 0 4px var(--text-secondary);
 }
 
+/* Panneau de Rôle avec lueur néon */
 .role-panel {
     text-align: center;
     border-width: 2px;
@@ -157,296 +162,40 @@ body {
 
 .role-panel.attaquants {
     border-color: var(--accent-red);
+    box-shadow: inset 0 0 15px var(--neon-glow-red), 0 0 15px var(--neon-glow-red);
 }
 
 .role-panel.défenseurs {
     border-color: var(--accent-blue);
+    box-shadow: inset 0 0 15px var(--neon-glow-blue), 0 0 15px var(--neon-glow-blue);
 }
 
-.role-icon {
-    font-size: 3rem;
-    margin-bottom: 0.5rem;
-}
+.role-name { font-size: 1.6rem; font-weight: 600; text-shadow: 0 0 8px currentColor; }
+.role-icon { font-size: 3rem; margin-bottom: 0.5rem; }
+.role-panel.attaquants .role-name, .role-panel.attaquants .role-icon { color: var(--accent-red); }
+.role-panel.défenseurs .role-name, .role-panel.défenseurs .role-icon { color: var(--accent-blue); }
 
-.role-name {
-    font-size: 1.6rem;
-    font-weight: 600;
-}
 
-.speciality {
-    font-size: 1rem;
-    color: var(--text-secondary);
-}
-
-.objective-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0.8rem;
-    font-size: 1rem;
-}
-
-.objective-list .icon {
-    margin-right: 0.5rem;
-}
-
-.activity-log {
-    background-color: #fafafa;
+/* === Log d'Activité et Terminal === */
+.activity-log, .terminal {
+    background-color: rgba(10, 12, 26, 0.9);
     border-radius: 4px;
     padding: 1rem;
-    max-height: 350px;
-    overflow-y: auto;
     font-family: 'Roboto Mono', monospace;
     font-size: 0.9rem;
-}
-
-.log-entry {
-    margin-bottom: 0.5rem;
-}
-
-/* Tabs */
-.tabs {
-    display: flex;
-    gap: 1rem;
-}
-
-.tab {
-    padding: 0.8rem 1.5rem;
     border: 1px solid var(--border-color);
-    border-radius: 6px;
-    background-color: var(--background-panel);
-    color: var(--text-primary);
-    font-size: 1rem;
-    cursor: pointer;
-    transition: var(--transition);
 }
 
-.tab:hover {
-    background-color: #f0f0f0;
-}
+.activity-log { max-height: 350px; overflow-y: auto; }
+.terminal { max-height: 300px; display: flex; flex-direction: column; }
+.terminal-list { flex: 1; overflow-y: auto; }
 
-.tab.active.attaquants {
-    border-color: var(--accent-red);
-    background-color: var(--accent-red);
-    color: #fff;
-}
-
-.tab.active.défenseurs {
-    border-color: var(--accent-blue);
-    background-color: var(--accent-blue);
-    color: #fff;
-}
-
-/* Interface */
-.interface {
-    flex: 1;
-}
-
-.sub-tabs {
-    display: flex;
-    gap: 0.5rem;
-    margin-bottom: 1rem;
-    border-bottom: 1px solid var(--border-color);
-    padding-bottom: 0.5rem;
-}
-
-.sub-tab {
-    padding: 0.5rem 1rem;
-    border-radius: 4px;
+.log-entry::before {
+    content: '> ';
     color: var(--text-secondary);
-    cursor: pointer;
-    transition: var(--transition);
 }
 
-.sub-tab:hover {
-    color: var(--text-primary);
-}
-
-.sub-tab.active {
-    color: var(--accent-blue);
-    font-weight: 500;
-}
-
-.interface-content {
-    background-color: var(--background-panel);
-    border-radius: 6px;
-    padding: 1.5rem;
-}
-
-.interface-title {
-    font-size: 1.6rem;
-    font-weight: 600;
-    margin-bottom: 1rem;
-}
-
-.lead {
-    font-size: 1rem;
-    color: var(--text-secondary);
-    margin-bottom: 1rem;
-}
-
-.hero-placeholder {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background-color: #f5f5f5;
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
-    padding: 1.5rem;
-    margin-bottom: 1rem;
-    font-size: 1.2rem;
-    gap: 1rem;
-}
-
-.product-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 1rem;
-}
-
-.product-card {
-    background-color: #f5f5f5;
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
-    padding: 1rem;
-    text-align: center;
-}
-
-.product-placeholder {
-    background-color: #fff;
-    border-radius: 4px;
-    padding: 1rem;
-    height: 100px;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    margin-bottom: 0.5rem;
-}
-
-.product-card h4 {
-    font-size: 1rem;
-    font-weight: 600;
-    margin-bottom: 0.5rem;
-}
-
-.form {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-}
-
-.input {
-    padding: 0.8rem;
-    border: 1px solid var(--border-color);
-    border-radius: 4px;
-    background-color: #fff;
-    color: var(--text-primary);
-    font-size: 1rem;
-}
-
-.input:focus {
-    outline: none;
-    border-color: var(--accent-blue);
-}
-
-.textarea {
-    resize: vertical;
-    min-height: 100px;
-}
-
-.actions {
-    margin-top: 1.5rem;
-}
-
-.action-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    gap: 1rem;
-}
-
-/* Buttons */
-.button {
-    padding: 0.8rem;
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
-    background-color: #fff;
-    color: var(--text-primary);
-    font-size: 1rem;
-    cursor: pointer;
-    transition: var(--transition);
-}
-
-.button:hover {
-    background-color: #f0f0f0;
-}
-
-.button.attaquants {
-    border-color: var(--accent-red);
-}
-
-.button.attaquants:hover {
-    background-color: var(--accent-red);
-    color: #fff;
-}
-
-.button.défenseurs {
-    border-color: var(--accent-blue);
-}
-
-.button.défenseurs:hover {
-    background-color: var(--accent-blue);
-    color: #fff;
-}
-
-.button.restart {
-    border-color: var(--accent-blue);
-    background-color: var(--accent-blue);
-    color: #fff;
-    font-weight: 500;
-}
-
-/* .button.restart:hover {
-  background-color: darken(var(--accent-blue), 10%);
-} Note: darken non-standard, utiliser une couleur fixe si nécessaire */
-
-.button.close-btn {
-    position: absolute;
-    top: 0.5rem;
-    right: 0.5rem;
-    padding: 0.5rem;
-}
-
-/* Terminal */
-.terminal {
-    background-color: #fff;
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
-    padding: 1rem;
-    font-family: 'Roboto Mono', monospace;
-    font-size: 1rem;
-    max-height: 300px;
-    display: flex;
-    flex-direction: column;
-}
-
-.terminal-list {
-    flex: 1;
-    overflow-y: auto;
-}
-
-.terminal-line {
-    margin-bottom: 0.5rem;
-}
-
-.terminal-prompt {
-    display: flex;
-    align-items: center;
-}
-
-.terminal-prompt span {
-    color: var(--accent-blue);
-    margin-right: 0.5rem;
-}
-
+.terminal-prompt span { color: var(--hover-glow); margin-right: 0.5rem; }
 .terminal-input {
     flex: 1;
     background: none;
@@ -455,118 +204,189 @@ body {
     font-family: 'Roboto Mono', monospace;
     font-size: 1rem;
 }
+.terminal-input:focus { outline: none; }
 
-.terminal-input:focus {
-    outline: none;
-}
 
-/* Status Cards */
-.status-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 1rem;
-    margin-bottom: 1.5rem;
-}
+/* === Onglets (Tabs) et Boutons === */
+.tabs { display: flex; gap: 1rem; margin-bottom: 1rem; }
 
-.status-card {
-    background-color: #f5f5f5;
+.tab {
+    padding: 0.8rem 1.5rem;
     border: 1px solid var(--border-color);
     border-radius: 6px;
-    padding: 1rem;
-}
-
-.status-title {
-    font-size: 1.2rem;
-    font-weight: 600;
-    margin-bottom: 0.5rem;
-}
-
-.status-content {
+    background-color: transparent;
+    color: var(--text-secondary);
     font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: var(--transition);
 }
 
-/* Intro Animation */
-.intro-container {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    width: 100%;
-    min-height: 100vh;
-    padding: 2rem;
+.tab:hover {
+    color: var(--text-primary);
+    border-color: var(--hover-glow);
 }
 
-.intro-title {
-    font-size: 3rem;
+.tab.active.attaquants {
+    background: var(--accent-red);
+    color: var(--text-dark);
     font-weight: 700;
+    border-color: var(--accent-red);
+    box-shadow: 0 0 15px var(--neon-glow-red);
 }
 
-.hacker-text {
-    font-family: 'Roboto Mono', monospace;
-    font-size: 2rem;
-    color: var(--accent-blue);
+.tab.active.défenseurs {
+    background: var(--accent-blue);
+    color: #fff;
+    font-weight: 700;
+    border-color: var(--accent-blue);
+    box-shadow: 0 0 15px var(--neon-glow-blue);
+}
+
+/* Boutons avec effet "cyber" */
+.button {
+    padding: 0.8rem 1.2rem;
+    border-radius: 6px;
+    color: var(--text-primary);
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+    position: relative;
+    overflow: hidden;
+    background: transparent;
+    border: 1px solid var(--border-color);
+}
+
+.button:hover {
+    transform: translateY(-2px);
+}
+
+/* Effet de balayage lumineux au survol */
+.button::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    transition: left 0.5s;
+}
+
+.button:hover::before { left: 100%; }
+
+.button.attaquants {
+    border-color: var(--accent-red);
+    box-shadow: 0 0 8px var(--neon-glow-red);
+}
+.button.attaquants:hover {
+    background-color: var(--accent-red);
+    color: var(--text-dark);
+    box-shadow: 0 0 20px var(--neon-glow-red);
+}
+
+.button.défenseurs {
+    border-color: var(--accent-blue);
+    box-shadow: 0 0 8px var(--neon-glow-blue);
+}
+.button.défenseurs:hover {
+    background-color: var(--accent-blue);
+    color: #fff;
+    box-shadow: 0 0 20px var(--neon-glow-blue);
+}
+
+
+/* === Interface et Formulaires === */
+.interface-content {
+    background-color: rgba(10, 12, 26, 0.7);
+    border-radius: 6px;
+    padding: 1.5rem;
+    border: 1px solid var(--border-color);
+}
+
+.input, .textarea {
+    padding: 0.8rem;
+    border-radius: 4px;
+    background-color: var(--background-input);
+    color: var(--text-primary);
+    font-size: 1rem;
+    border: 1px solid var(--border-color);
+}
+
+.input:focus, .textarea:focus {
+    outline: none;
+    border-color: var(--hover-glow);
+    box-shadow: 0 0 10px var(--neon-glow-blue);
+}
+
+/* === Feedback Visuel === */
+.feedback {
+    padding: 0.8rem;
+    margin-bottom: 1rem;
+    border-radius: 4px;
+    font-size: 1rem;
     text-align: center;
-    animation: flicker 0.5s infinite;
+    border: 1px solid;
 }
 
-@keyframes flicker {
-    0% { opacity: 1; }
-    100% { opacity: 0.8; }
+/* Utilisation de sélecteurs d'attributs pour la coloration, plus robuste */
+.feedback[data-status="success"] {
+    background-color: rgba(46, 213, 115, 0.1);
+    color: #2ed573;
+    border-color: #2ed573;
+    text-shadow: 0 0 5px #2ed573;
 }
 
-/* Role Details */
-.role-details {
-    background-color: var(--background-panel);
-    border: 2px solid var(--border-color);
-    border-radius: 8px;
+.feedback[data-status="failure"] {
+    background-color: rgba(255, 71, 87, 0.1);
+    color: #ff4757;
+    border-color: #ff4757;
+    text-shadow: 0 0 5px #ff4757;
+}
+
+/* === Écran des Résultats === */
+.results-panel {
+    background: var(--background-panel);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
     padding: 2rem;
     max-width: 600px;
-    margin: 0 auto;
-    animation: slide-in 0.5s ease-out;
+    margin: 2rem auto;
+    text-align: center;
+    box-shadow: 0 8px 32px 0 var(--shadow-color);
+    backdrop-filter: blur(8px);
 }
 
-.role-details.attaquants {
-    border-color: var(--accent-red);
+.results-title.attaquants {
+    color: var(--accent-red);
+    text-shadow: 0 0 10px var(--neon-glow-red);
 }
 
-.role-details.défenseurs {
-    border-color: var(--accent-blue);
+.results-title.défenseurs {
+    color: var(--accent-blue);
+    text-shadow: 0 0 10px var(--neon-glow-blue);
 }
 
-.role-details-title {
-    font-size: 2rem;
-    font-weight: 600;
-    margin-bottom: 1rem;
+.score-card {
+    padding: 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    background-color: rgba(10, 12, 26, 0.5);
 }
 
-.role-details p {
-    font-size: 1.1rem;
-    margin-bottom: 1rem;
-}
+.score-card.attaquants { border-color: var(--accent-red); }
+.score-card.défenseurs { border-color: var(--accent-blue); }
 
-.role-details ul {
-    list-style-type: disc;
-    margin-left: 1.5rem;
-    margin-bottom: 1rem;
-}
-
-.role-details li {
-    font-size: 1rem;
-    margin-bottom: 0.5rem;
-}
-
-@keyframes slide-in {
-    from { opacity: 0; transform: translateY(25px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-
+/* === Pop-up / Overlay === */
 .role-details-overlay {
     position: fixed;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(0, 0, 0, 0.5);
+    background-color: rgba(10, 12, 26, 0.7);
+    backdrop-filter: blur(5px);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -579,85 +399,52 @@ body {
     width: 90%;
 }
 
-/* Results Screen */
-.results-panel {
-    background-color: #fff;
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
+.role-details {
+    background-color: var(--background-panel);
+    border: 2px solid;
+    border-radius: var(--border-radius);
     padding: 2rem;
-    max-width: 600px;
-    margin: 2rem auto;
-    text-align: center;
+    box-shadow: 0 0 30px var(--shadow-color);
+    animation: slide-in 0.5s ease-out;
 }
 
-.results-title {
-    font-size: 2rem;
-    font-weight: 600;
-    margin-bottom: 1rem;
-}
-
-.results-title.attaquants {
-    color: var(--accent-red);
-}
-
-.results-title.défenseurs {
-    color: var(--accent-blue);
-}
-
-.score-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1rem;
-    margin-bottom: 2rem;
-}
-
-.score-card {
-    padding: 1rem;
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-}
-
-.score-card.attaquants {
+.role-details.attaquants {
     border-color: var(--accent-red);
+    box-shadow: 0 0 30px var(--neon-glow-red);
 }
 
-.score-card.défenseurs {
+.role-details.défenseurs {
     border-color: var(--accent-blue);
+    box-shadow: 0 0 30px var(--neon-glow-blue);
 }
 
-.score-label {
-    font-size: 1rem;
-    color: var(--text-secondary);
+@keyframes slide-in {
+    from { opacity: 0; transform: translateY(25px) scale(0.98); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
-.score-value {
-    font-size: 2rem;
-    font-family: 'Roboto Mono', monospace;
+/* === Responsive Design === */
+@media screen and (max-width: 992px) {
+    .main-content {
+        flex-direction: column;
+    }
+    .sidebar {
+        width: 100%;
+        flex-direction: row;
+        gap: 1.5rem;
+    }
+    .sidebar .panel {
+        flex: 1;
+    }
+    .product-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
 }
 
-/* Feedback */
-.feedback {
-    padding: 0.8rem;
-    margin-bottom: 1rem;
-    border-radius: 4px;
-    font-size: 1rem;
-    text-align: center;
-}
-
-.feedback:contains("Succès") {
-    background-color: #e0f7e0;
-    color: #2e7d32;
-}
-
-.feedback:contains("Échec") {
-    background-color: #ffebee;
-    color: #c62828;
-}
-
-/* Hints */
-.hint {
-    font-size: 1rem;
-    color: var(--text-secondary);
-    margin-bottom: 1rem;
-    font-style: italic;
+@media screen and (max-width: 768px) {
+    .header-content { flex-direction: column; gap: 1rem; }
+    .header-left, .header-right { flex-wrap: wrap; justify-content: center; }
+    .sidebar { flex-direction: column; }
+    .status-grid { grid-template-columns: 1fr; }
+    .product-grid { grid-template-columns: 1fr; }
 }

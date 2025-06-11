@@ -1,31 +1,48 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { Shield, Sword, Timer, Target, Server, Globe, Terminal, Lock, AlertTriangle, CheckCircle, Info } from 'lucide-react';
 import './CyberWarGame.css';
 
-const TimerComponent = ({ gameState, timeLeft, setTimeLeft, currentPhase, setCurrentPhase, setGameState, addLog }) => {
-    useEffect(() => {
-        let timer;
-        if (gameState === 'jeu' && timeLeft > 0) {
-            timer = setInterval(() => setTimeLeft(prev => prev - 1), 1000);
-        } else if (timeLeft === 0) {
-            if (currentPhase === 'site') {
-                setCurrentPhase('serveur');
-                setTimeLeft(600);
-                addLog('Phase site terminée. Passage au serveur.');
-            } else {
-                setGameState('résultats');
-            }
-        }
-        return () => clearInterval(timer);
-    }, [gameState, timeLeft, currentPhase, setTimeLeft, setCurrentPhase, setGameState, addLog]);
+// Timer isolé avec état local
+const TimerDisplay = memo(({ gameState, initialTime, onPhaseChange, onGameEnd, addLog }) => {
+    const [timeLeft, setTimeLeft] = useState(initialTime);
+    const [currentPhase, setCurrentPhase] = useState('site');
 
-    return null;
-};
+    useEffect(() => {
+        if (gameState !== 'jeu' || timeLeft <= 0) return;
+
+        const timer = setInterval(() => {
+            setTimeLeft(prev => {
+                if (prev <= 1) {
+                    if (currentPhase === 'site') {
+                        setCurrentPhase('serveur');
+                        addLog('Phase site terminée. Passage au serveur.');
+                        onPhaseChange('serveur');
+                        return initialTime; // Reset pour la phase serveur
+                    } else {
+                        onGameEnd();
+                        return 0;
+                    }
+                }
+                return prev - 1;
+            });
+        }, 1000);
+
+        return () => clearInterval(timer);
+    }, [gameState, timeLeft, currentPhase, initialTime, addLog, onPhaseChange, onGameEnd]);
+
+    const formatTime = (s) => `${Math.floor(s / 60).toString().padStart(2, '0')}:${(s % 60).toString().padStart(2, '0')}`;
+
+    return (
+        <div className="timer">
+            <span className="timer-label">Temps</span>
+            <span className="timer-value">{formatTime(timeLeft)}</span>
+        </div>
+    );
+});
 
 const CyberWarGame = () => {
     const [gameState, setGameState] = useState('intro');
     const [currentPhase, setCurrentPhase] = useState('site');
-    const [timeLeft, setTimeLeft] = useState(600);
     const [selectedTeam, setSelectedTeam] = useState(null);
     const [selectedRole, setSelectedRole] = useState(null);
     const [scores, setScores] = useState({ attaquants: 0, défenseurs: 0 });
@@ -70,23 +87,23 @@ const CyberWarGame = () => {
                 name: 'Hacker de Site Web',
                 icon: '🕷️',
                 spécialité: 'Trouver des failles dans les sites',
-                description: 'Tu explores les sites web pour trouver des failles, comme des formulaires non sécurisés. Teste les champs avec du code ou des mots de passe simples !',
+                description: 'Explore les pages web pour repérer des failles. Teste les formulaires avec du code ou des mots de passe simples !',
                 hints: [
-                    'Essaie d’entrer <script>alert("test")</script> dans les champs de texte pour tester XSS.',
-                    'Utilise " OR 1=1 --" dans les formulaires de connexion pour tenter une injection SQL.',
-                    'Teste des mots de passe simples comme "admin123" sur la page de connexion.'
+                    'Entre <script>alert("test")</script> dans le champ de commentaire pour tester XSS.',
+                    'Utilise " OR 1=1 --" dans la connexion pour une injection SQL.',
+                    'Essaie admin:admin123 sur la page de connexion.'
                 ]
             },
             {
                 id: 'explorateur-réseau',
                 name: 'Explorateur Réseau',
                 icon: '📡',
-                spécialité: 'Cartographier les serveurs',
-                description: 'Tu examines les serveurs pour trouver des services vulnérables. Utilise le terminal pour scanner les ports et tester les connexions !',
+                spécialité: 'Examiner les serveurs',
+                description: 'Utilise le terminal pour trouver des failles dans le serveur. Scan les ports et cherche des mots de passe !',
                 hints: [
-                    'Tape "nmap" dans le terminal pour voir les ports ouverts.',
-                    'Essaie "ssh admin@server" avec un mot de passe faible comme "weakpass".',
-                    'Vérifie les fichiers comme "/var/www/decoy.txt" pour des indices (attention aux leurres !).'
+                    'Tape "nmap" pour voir les ports ouverts.',
+                    'Essaie "cat passwords.bak" pour trouver un mot de passe.',
+                    'Utilise "ssh admin@server weakpass" pour te connecter.'
                 ]
             }
         ],
@@ -96,11 +113,11 @@ const CyberWarGame = () => {
                 name: 'Protecteur Sécurité',
                 icon: '🛡️',
                 spécialité: 'Surveiller les systèmes',
-                description: 'Tu surveilles le site et le serveur pour repérer les attaques. Vérifie les journaux et bloque les failles !',
+                description: 'Surveille le journal pour repérer les attaques et corrige les failles sur le site !',
                 hints: [
-                    'Regarde le journal d’activité pour repérer des tentatives suspectes (XSS, SQLi).',
-                    'Bloque les champs vulnérables en "patchant" XSS ou SQLi via les outils de défense.',
-                    'Change les mots de passe faibles comme "admin123" pour sécuriser.'
+                    'Vérifie le journal pour des tentatives XSS ou SQLi.',
+                    'Corrige les failles XSS ou SQLi via les boutons de défense.',
+                    'Renforce les mots de passe faibles comme admin123.'
                 ]
             },
             {
@@ -108,11 +125,11 @@ const CyberWarGame = () => {
                 name: 'Renforceur Système',
                 icon: '🔒',
                 spécialité: 'Sécuriser les serveurs',
-                description: 'Tu renforces les serveurs en fermant les ports ou services vulnérables. Utilise le terminal pour appliquer des correctifs !',
+                description: 'Ferme les ports et services vulnérables dans le terminal pour protéger le serveur !',
                 hints: [
-                    'Tape "netstat" pour voir les ports ouverts et ferme ceux inutiles (e.g., port 21).',
-                    'Désactive le service SSH s’il semble compromis.',
-                    'Ignore les services comme "fake_db", c’est une fausse piste.'
+                    'Tape "netstat" pour voir les ports ouverts.',
+                    'Utilise "stop-service ssh" pour sécuriser SSH.',
+                    'Ignore "fake_db", c’est un piège.'
                 ]
             }
         ]
@@ -143,11 +160,19 @@ const CyberWarGame = () => {
         }));
     }, [addLog]);
 
-    const handleRestartGame = () => {
+    const handlePhaseChange = useCallback((newPhase) => {
+        setCurrentPhase(newPhase);
+        setActiveTab(newPhase);
+    }, []);
+
+    const handleGameEnd = useCallback(() => {
+        setGameState('résultats');
+    }, []);
+
+    const handleRestartGame = useCallback(() => {
         setGameState('intro');
         setCurrentPhase('site');
         setActiveTab('site');
-        setTimeLeft(600);
         setSelectedTeam(null);
         setSelectedRole(null);
         setScores({ attaquants: 0, défenseurs: 0 });
@@ -156,7 +181,7 @@ const CyberWarGame = () => {
         setServerState(initialServerState);
         setRoleAssigned(false);
         setShowRoleDetails(false);
-    };
+    }, []);
 
     const IntroAnimation = () => {
         const [animationStep, setAnimationStep] = useState(0);
@@ -213,7 +238,7 @@ const CyberWarGame = () => {
                 <h2 className="role-details-title">{role.name}</h2>
                 <p><strong>Rôle :</strong> {role.description}</p>
                 <p><strong>Spécialité :</strong> {role.spécialité}</p>
-                <p><strong>Conseils pour réussir :</strong></p>
+                <p><strong>Conseils :</strong></p>
                 <ul>
                     {role.hints.map((hint, i) => (
                         <li key={i}>{hint}</li>
@@ -224,25 +249,24 @@ const CyberWarGame = () => {
                     {team === 'attaquants' ? (
                         <>
                             <li>Explore le site ou le serveur pour trouver des failles.</li>
-                            <li>Teste des entrées (code, mots de passe) pour exploiter ces failles.</li>
-                            <li>Marque des points en accédant à des données protégées.</li>
+                            <li>Teste des codes ou mots de passe pour les exploiter.</li>
+                            <li>Gagne des points en accédant à des données protégées.</li>
                         </>
                     ) : (
                         <>
-                            <li>Surveille les attaques dans le journal d’activité.</li>
-                            <li>Répare les failles en utilisant les outils de défense.</li>
-                            <li>Bloque les attaquants pour gagner des points.</li>
+                            <li>Surveille le journal pour repérer les attaques.</li>
+                            <li>Corrige les failles avec les outils de défense.</li>
+                            <li>Bloque les attaquants pour marquer des points.</li>
                         </>
                     )}
                 </ul>
-                <p><strong>Attention :</strong> Certaines actions sont des pièges ! Lis bien les indices.</p>
+                <p><strong>Attention :</strong> Certains éléments sont des pièges ! Lis les indices.</p>
             </div>
         );
     };
 
     const GameInterface = () => {
         const role = roles[selectedTeam]?.find(r => r.id === selectedRole);
-        const formatTime = (s) => `${Math.floor(s / 60).toString().padStart(2, '0')}:${(s % 60).toString().padStart(2, '0')}`;
 
         return (
             <div className="game-container">
@@ -255,10 +279,13 @@ const CyberWarGame = () => {
                             </div>
                         </div>
                         <div className="header-right">
-                            <div className="timer">
-                                <span className="timer-label">Temps</span>
-                                <span className="timer-value">{formatTime(timeLeft)}</span>
-                            </div>
+                            <TimerDisplay
+                                gameState={gameState}
+                                initialTime={600}
+                                onPhaseChange={handlePhaseChange}
+                                onGameEnd={handleGameEnd}
+                                addLog={addLog}
+                            />
                             <div className="scores">
                                 <span className="score-label">Score</span>
                                 <span className="score-value">
@@ -295,7 +322,7 @@ const CyberWarGame = () => {
                                 ) : (
                                     <>
                                         <div><Shield className="icon" size={18} /> Détecter les attaques</div>
-                                        <div><Lock className="icon" size={18} /> Réparer les failles</div>
+                                        <div><Lock className="icon" size={18} /> Corriger les failles</div>
                                         <div><Zap className="icon" size={18} /> Bloquer les hackers</div>
                                     </>
                                 )}
@@ -310,19 +337,19 @@ const CyberWarGame = () => {
                             </div>
                         </div>
                     </aside>
-                    <div className="content">
+                    <div className="content-wrapper">
                         <div className="tabs">
                             <button
                                 onClick={() => setActiveTab('site')}
-                                className={`tab ${activeTab === 'site' ? 'active attaquants' : ''}`}
+                                className={`tab ${activeTab === 'site' ? 'active' : ''}`}
                             >
                                 🌐 Site Web
                             </button>
                             <button
                                 onClick={() => setActiveTab('serveur')}
-                                className={`tab ${activeTab === 'serveur' ? 'active défenseurs' : ''}`}
+                                className={`tab ${activeTab === 'serveur' ? 'active' : ''}`}
                             >
-                                🖥️ Serveur
+                                🖥️ Network
                             </button>
                         </div>
                         <div className="interface">
@@ -343,15 +370,6 @@ const CyberWarGame = () => {
                         </div>
                     )}
                 </main>
-                <TimerComponent
-                    gameState={gameState}
-                    timeLeft={timeLeft}
-                    setTimeLeft={setTimeLeft}
-                    currentPhase={currentPhase}
-                    setCurrentPhase={setCurrentPhase}
-                    setGameState={setGameState}
-                    addLog={addLog}
-                />
             </div>
         );
     };
@@ -369,21 +387,21 @@ const CyberWarGame = () => {
             { id: 'contact', name: 'Contact' }
         ];
 
-        const testXSS = (input) => {
+        const testXSS = useCallback((input) => {
             if (input.includes('<script>') || input.toLowerCase().includes('alert(')) {
                 if (!websiteState.vulnerabilities.xss.exploited && selectedTeam === 'attaquants') {
                     setWebsiteState(prev => ({
                         ...prev,
                         vulnerabilities: { ...prev.vulnerabilities, xss: { ...prev.vulnerabilities.xss, exploited: true } }
                     }));
-                    handleAction('attaquants', 'XSS réussi ! Tu as inséré un script malveillant.', 20);
+                    handleAction('attaquants', 'XSS réussi ! Script malveillant inséré.', 20);
                 }
                 return true;
             }
             return false;
-        };
+        }, [websiteState.vulnerabilities.xss.exploited, selectedTeam, handleAction]);
 
-        const testSQLi = (input) => {
+        const testSQLi = useCallback((input) => {
             if (input.includes('" OR 1=1 --') || input.includes('\' OR 1=1 --')) {
                 if (!websiteState.vulnerabilities.sqli.exploited && selectedTeam === 'attaquants') {
                     setWebsiteState(prev => ({
@@ -395,9 +413,9 @@ const CyberWarGame = () => {
                 return true;
             }
             return false;
-        };
+        }, [websiteState.vulnerabilities.sqli.exploited, selectedTeam, handleAction]);
 
-        const testWeakPassword = (username, password) => {
+        const testWeakPassword = useCallback((username, password) => {
             const account = websiteState.userAccounts.find(acc => acc === `${username}:${password}`);
             if (account && !websiteState.vulnerabilities.weak_password.exploited && selectedTeam === 'attaquants') {
                 setWebsiteState(prev => ({
@@ -408,9 +426,9 @@ const CyberWarGame = () => {
                 return true;
             }
             return false;
-        };
+        }, [websiteState.userAccounts, websiteState.vulnerabilities.weak_password.exploited, selectedTeam, handleAction]);
 
-        const patchVulnerability = (vuln) => {
+        const patchVulnerability = useCallback((vuln) => {
             if (!websiteState.vulnerabilities[vuln].patched && selectedTeam === 'défenseurs') {
                 setWebsiteState(prev => ({
                     ...prev,
@@ -418,7 +436,7 @@ const CyberWarGame = () => {
                 }));
                 handleAction('défenseurs', `Faille ${vuln.toUpperCase()} corrigée !`, 15);
             }
-        };
+        }, [websiteState.vulnerabilities, selectedTeam, handleAction]);
 
         return (
             <div className="panel">
@@ -481,7 +499,7 @@ const CyberWarGame = () => {
                     {currentPage === 'connexion' && (
                         <div>
                             <h3 className="interface-title">Connexion</h3>
-                            <p className="hint">Indice : Essaie un mot de passe simple ou une injection SQL comme " OR 1=1 --</p>
+                            <p className="hint">Indice : Essaie admin:admin123 ou une injection comme " OR 1=1 --</p>
                             <div className="form">
                                 <input
                                     type="text"
@@ -502,9 +520,9 @@ const CyberWarGame = () => {
                                         if (testSQLi(formData.username) || testSQLi(formData.password)) {
                                             setFeedback('Succès : Injection SQL détectée !');
                                         } else if (testWeakPassword(formData.username, formData.password)) {
-                                            setFeedback('Succès : Connexion avec un mot de passe faible !');
+                                            setFeedback('Succès : Connexion avec mot de passe faible !');
                                         } else {
-                                            setFeedback('Échec : Identifiants incorrects ou attaque non détectée.');
+                                            setFeedback('Échec : Identifiants incorrects.');
                                         }
                                     }}
                                     className="button attaquants"
@@ -533,7 +551,7 @@ const CyberWarGame = () => {
                     {currentPage === 'contact' && (
                         <div>
                             <h3 className="interface-title">Contactez-nous</h3>
-                            <p className="hint">Indice : Teste un script comme <script>alert("test")</script> dans le message.</p>
+                            <p className="hint">Indice : Teste <script>alert("test")</script> dans le message.</p>
                             <div className="form">
                 <textarea
                     value={formData.comment}
@@ -570,7 +588,7 @@ const CyberWarGame = () => {
                                 )}
                                 <button
                                     onClick={() => {
-                                        setFeedback('Rien à trouver ici, c’est un leurre !');
+                                        setFeedback('Rien ici, c’est un piège !');
                                         handleAction(selectedTeam, 'Tentative sur newsletter (leurre)', 0);
                                     }}
                                     className="button défenseurs"
@@ -597,7 +615,7 @@ const CyberWarGame = () => {
             terminalEndRef.current?.scrollIntoView({ behavior: 'smooth' });
         }, [terminalHistory]);
 
-        const executeCommand = (command) => {
+        const executeCommand = useCallback((command) => {
             let output = '';
             const cmdParts = command.toLowerCase().split(' ');
             addLog(`Commande : ${command}`);
@@ -674,12 +692,12 @@ const CyberWarGame = () => {
             }
             setTerminalHistory(prev => [...prev, `> ${command}`, output]);
             setTerminalInput('');
-        };
+        }, [addLog, handleAction, selectedTeam, serverState.services.ssh.patched, serverState.services.ftp.patched]);
 
         return (
             <div className="panel">
                 <h2 className="panel-title">Serveur TechCorp</h2>
-                <p className="hint">Indice : Utilise "nmap" pour voir les ports, ou "cat passwords.bak" pour trouver des indices.</p>
+                <p className="hint">Indice : Utilise "nmap" pour voir les ports, ou "cat passwords.bak" pour un mot de passe.</p>
                 <div className="status-grid">
                     <div className="status-card">
                         <h3 className="status-title">Services</h3>
