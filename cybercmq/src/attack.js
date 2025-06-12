@@ -17,7 +17,7 @@ const TimerDisplay = memo(({ gameState, initialTime, onPhaseChange, onGameEnd, a
                         setCurrentPhase('serveur');
                         addLog('Phase site terminée. Passage au serveur.');
                         onPhaseChange('serveur');
-                        return initialTime; // Reset pour la phase serveur
+                        return initialTime;
                     } else {
                         onGameEnd();
                         return 0;
@@ -50,6 +50,8 @@ const CyberWarGame = () => {
     const [roleAssigned, setRoleAssigned] = useState(false);
     const [showRoleDetails, setShowRoleDetails] = useState(false);
     const [activeTab, setActiveTab] = useState('site');
+    const [threatLevel, setThreatLevel] = useState('low');
+    const [teamActions, setTeamActions] = useState([]);
 
     const initialWebsiteState = {
         currentPage: 'accueil',
@@ -57,10 +59,11 @@ const CyberWarGame = () => {
             xss: { discovered: false, exploited: false, patched: false },
             sqli: { discovered: false, exploited: false, patched: false },
             weak_password: { discovered: false, exploited: false, patched: false },
-            fake_form: { discovered: false, exploited: false, patched: false }
+            csrf: { discovered: false, exploited: false, patched: false },
+            file_inclusion: { discovered: false, exploited: false, patched: false }
         },
         userAccounts: ['admin:admin123', 'utilisateur1:pass123', 'invité:guest'],
-        database: ['utilisateurs', 'commandes', 'produits']
+        database: ['utilisateurs', 'commandes', 'produits', 'secrets']
     };
 
     const initialServerState = {
@@ -68,64 +71,66 @@ const CyberWarGame = () => {
             ssh: { running: true, vulnerable: true, patched: false, credentials: 'admin:weakpass' },
             ftp: { running: true, vulnerable: true, patched: false },
             web: { running: true, vulnerable: false, patched: false },
-            fake_db: { running: true, vulnerable: false, patched: true }
+            fake_db: { running: true, vulnerable: false, patched: true },
+            rdp: { running: true, vulnerable: true, patched: false }
         },
-        files: ['/etc/passwd', '/var/log/auth.log', '/home/user/.ssh/id_rsa', '/var/www/decoy.txt'],
-        processes: ['apache2', 'sshd', 'mysql', 'fake_service'],
-        ports: [22, 80, 443, 21, 3306, 8080]
+        files: ['/etc/passwd', '/var/log/auth.log', '/home/user/.ssh/id_rsa', '/var/www/decoy.txt', '/root/secret.key'],
+        processes: ['apache2', 'sshd', 'mysql', 'fake_service', 'rdp'],
+        ports: [22, 80, 443, 21, 3306, 8080, 3389]
     };
 
     const [websiteState, setWebsiteState] = useState(initialWebsiteState);
     const [serverState, setServerState] = useState(initialServerState);
-
     const terminalInputRef = useRef(null);
 
     const roles = {
         attaquants: [
             {
                 id: 'hacker-site',
-                name: 'Hacker de Site Web',
+                name: 'Web Infiltrator',
                 icon: '🕷️',
-                spécialité: 'Trouver des failles dans les sites',
-                description: 'Explore les pages web pour repérer des failles. Teste les formulaires avec du code ou des mots de passe simples !',
+                spécialité: 'Exploiter les failles web',
+                description: 'Scanne les pages pour des vulnérabilités comme XSS, SQLi ou CSRF.',
                 hints: [
-                    'Entre <script>alert("test")</script> dans le champ de commentaire pour tester XSS.',
-                    'Utilise " OR 1=1 --" dans la connexion pour une injection SQL.',
-                    'Essaie admin:admin123 sur la page de connexion.'
+                    'Teste <script>alert("test")</script> dans les commentaires pour XSS.',
+                    'Utilise " OR 1=1 --" dans la connexion pour SQLi.',
+                    'Essaie admin:admin123 pour les mots de passe faibles.',
+                    'Teste un jeton CSRF invalide sur le formulaire de contact.'
                 ]
             },
             {
                 id: 'explorateur-réseau',
-                name: 'Explorateur Réseau',
+                name: 'Network Phantom',
                 icon: '📡',
-                spécialité: 'Examiner les serveurs',
-                description: 'Utilise le terminal pour trouver des failles dans le serveur. Scan les ports et cherche des mots de passe !',
+                spécialité: 'Piratage serveur',
+                description: 'Utilise le terminal pour scanner les ports et exploiter les services.',
                 hints: [
                     'Tape "nmap" pour voir les ports ouverts.',
                     'Essaie "cat passwords.bak" pour trouver un mot de passe.',
-                    'Utilise "ssh admin@server weakpass" pour te connecter.'
+                    'Utilise "ssh admin@server weakpass" pour te connecter.',
+                    'Teste "crack secret.key" pour un accès critique.'
                 ]
             }
         ],
         défenseurs: [
             {
                 id: 'protecteur-sécurité',
-                name: 'Protecteur Sécurité',
+                name: 'Cyber Guardian',
                 icon: '🛡️',
-                spécialité: 'Surveiller les systèmes',
-                description: 'Surveille le journal pour repérer les attaques et corrige les failles sur le site !',
+                spécialité: 'Surveillance active',
+                description: 'Surveille les journaux et corrige les failles web.',
                 hints: [
                     'Vérifie le journal pour des tentatives XSS ou SQLi.',
-                    'Corrige les failles XSS ou SQLi via les boutons de défense.',
+                    'Corrige XSS, SQLi ou CSRF via les boutons de défense.',
                     'Renforce les mots de passe faibles comme admin123.'
                 ]
             },
             {
                 id: 'renforceur-système',
-                name: 'Renforceur Système',
+                name: 'System Locksmith',
                 icon: '🔒',
-                spécialité: 'Sécuriser les serveurs',
-                description: 'Ferme les ports et services vulnérables dans le terminal pour protéger le serveur !',
+                spécialité: 'Sécurisation serveur',
+                description: 'Ferme les ports et services vulnérables pour protéger le système.',
                 hints: [
                     'Tape "netstat" pour voir les ports ouverts.',
                     'Utilise "stop-service ssh" pour sécuriser SSH.',
@@ -135,9 +140,9 @@ const CyberWarGame = () => {
         ]
     };
 
-    // Attribution du rôle
+    // Attribution du rôle avec correction du bug de refresh
     useEffect(() => {
-        if (!roleAssigned && gameState === 'intro') {
+        if (gameState === 'intro' && !roleAssigned) {
             const teams = ['attaquants', 'défenseurs'];
             const randomTeam = teams[Math.floor(Math.random() * teams.length)];
             const randomRole = roles[randomTeam][Math.floor(Math.random() * roles[randomTeam].length)];
@@ -146,10 +151,27 @@ const CyberWarGame = () => {
             setGameLog([`[${new Date().toLocaleTimeString('fr-FR')}] Rôle assigné : ${randomRole.name} (${randomTeam === 'attaquants' ? '⚔️ Attaquants' : '🛡️ Défenseurs'})`]);
             setRoleAssigned(true);
         }
-    }, [roleAssigned, gameState]);
+    }, [gameState, roleAssigned]);
+
+    // Événements aléatoires pour l’engagement
+    useEffect(() => {
+        if (gameState !== 'jeu') return;
+        const events = [
+            { type: 'ddos', message: 'Alerte : Attaque DDoS détectée !', team: 'défenseurs', points: 10 },
+            { type: 'breach', message: 'Tentative de violation du pare-feu !', team: 'attaquants', points: 5 },
+            { type: 'patch', message: 'Mise à jour de sécurité disponible.', team: 'défenseurs', points: 5 }
+        ];
+        const interval = setInterval(() => {
+            const event = events[Math.floor(Math.random() * events.length)];
+            addLog(event.message);
+            handleAction(event.team, event.message, event.points);
+            setThreatLevel(event.type === 'ddos' ? 'high' : event.type === 'breach' ? 'medium' : 'low');
+        }, 30000);
+        return () => clearInterval(interval);
+    }, [gameState]);
 
     const addLog = useCallback((message) => {
-        setGameLog(prev => [...prev.slice(-15), `[${new Date().toLocaleTimeString('fr-FR')}] ${selectedTeam === 'attaquants' ? '⚔️' : '🛡️'} ${message}`]);
+        setGameLog(prev => [...prev.slice(-20), `[${new Date().toLocaleTimeString('fr-FR')}] ${selectedTeam === 'attaquants' ? '⚔️' : '🛡️'} ${message}`]);
     }, [selectedTeam]);
 
     const handleAction = useCallback((team, message, points) => {
@@ -158,6 +180,8 @@ const CyberWarGame = () => {
             ...prev,
             [team]: prev[team] + points
         }));
+        setTeamActions(prev => [...prev.slice(-10), `${team}: ${message}`]);
+        setThreatLevel(points > 15 ? 'high' : points > 5 ? 'medium' : 'low');
     }, [addLog]);
 
     const handlePhaseChange = useCallback((newPhase) => {
@@ -181,6 +205,8 @@ const CyberWarGame = () => {
         setServerState(initialServerState);
         setRoleAssigned(false);
         setShowRoleDetails(false);
+        setThreatLevel('low');
+        setTeamActions([]);
     }, []);
 
     const IntroAnimation = () => {
@@ -189,15 +215,15 @@ const CyberWarGame = () => {
 
         useEffect(() => {
             if (animationStep === 0) {
-                let text = 'DÉMARRAGE...';
+                let text = 'INITIALISATION SYSTÈME...';
                 let i = 0;
                 const typeText = () => {
                     if (i <= text.length) {
                         setDisplayText(text.slice(0, i));
                         i++;
-                        setTimeout(typeText, 100);
+                        setTimeout(typeText, 80);
                     } else {
-                        setTimeout(() => setAnimationStep(1), 800);
+                        setTimeout(() => setAnimationStep(1), 1000);
                     }
                 };
                 typeText();
@@ -212,7 +238,7 @@ const CyberWarGame = () => {
                         setTimeout(typeText, 60);
                     } else {
                         setShowRoleDetails(true);
-                        setTimeout(() => setAnimationStep(2), 2000);
+                        setTimeout(() => setAnimationStep(2), 2500);
                     }
                 };
                 typeText();
@@ -223,8 +249,8 @@ const CyberWarGame = () => {
 
         return (
             <div className="game-container intro-container">
-                <h1 className="intro-title">CyberWar</h1>
-                <div className="hacker-text">{displayText}</div>
+                <h1 className="header-title">CyberWar</h1>
+                <div className="hacker-text text-3xl font-mono">{displayText}</div>
                 {showRoleDetails && selectedRole && (
                     <RoleDetails role={roles[selectedTeam].find(r => r.id === selectedRole)} team={selectedTeam} />
                 )}
@@ -235,32 +261,59 @@ const CyberWarGame = () => {
     const RoleDetails = ({ role, team }) => {
         return (
             <div className={`role-details ${team}`}>
-                <h2 className="role-details-title">{role.name}</h2>
+                <h2 className="role-details-title text-2xl font-bold">{role.name}</h2>
                 <p><strong>Rôle :</strong> {role.description}</p>
                 <p><strong>Spécialité :</strong> {role.spécialité}</p>
                 <p><strong>Conseils :</strong></p>
-                <ul>
+                <ul className="list-disc pl-5">
                     {role.hints.map((hint, i) => (
                         <li key={i}>{hint}</li>
                     ))}
                 </ul>
                 <p><strong>Objectifs :</strong></p>
-                <ul>
+                <ul className="list-disc pl-5">
                     {team === 'attaquants' ? (
                         <>
-                            <li>Explore le site ou le serveur pour trouver des failles.</li>
-                            <li>Teste des codes ou mots de passe pour les exploiter.</li>
-                            <li>Gagne des points en accédant à des données protégées.</li>
+                            <li>Exploiter les failles pour marquer des points.</li>
+                            <li>Collaborer avec ton équipe pour maximiser l’impact.</li>
+                            <li>Évite les pièges tendus par les défenseurs.</li>
                         </>
                     ) : (
                         <>
-                            <li>Surveille le journal pour repérer les attaques.</li>
-                            <li>Corrige les failles avec les outils de défense.</li>
-                            <li>Bloque les attaquants pour marquer des points.</li>
+                            <li>Protéger le système en corrigeant les failles.</li>
+                            <li>Surveiller les actions des attaquants.</li>
+                            <li>Réagir rapidement aux alertes.</li>
                         </>
                     )}
                 </ul>
-                <p><strong>Attention :</strong> Certains éléments sont des pièges ! Lis les indices.</p>
+                <p><strong>Attention :</strong> Les pièges sont partout !</p>
+            </div>
+        );
+    };
+
+    const ChallengeBoard = () => {
+        const challenges = [
+            { id: 1, task: 'Exploiter une faille XSS en moins de 2 min', points: 20, team: 'attaquants' },
+            { id: 2, task: 'Corriger une faille SQLi avant une attaque', points: 15, team: 'défenseurs' },
+            { id: 3, task: 'Trouver un mot de passe faible', points: 10, team: 'attaquants' },
+            { id: 4, task: 'Fermer un port vulnérable', points: 15, team: 'défenseurs' }
+        ];
+
+        return (
+            <div className="challenge-board">
+                <h3 className="panel-title">Tableau des Défis</h3>
+                {challenges.map(challenge => (
+                    <div key={challenge.id} className="challenge-item">
+                        <p>{challenge.task}</p>
+                        <p><strong>{challenge.points} points</strong> ({challenge.team})</p>
+                        <button
+                            className={`button ${selectedTeam}`}
+                            onClick={() => handleAction(selectedTeam, `Défi complété : ${challenge.task}`, challenge.points)}
+                        >
+                            Compléter
+                        </button>
+                    </div>
+                ))}
             </div>
         );
     };
@@ -271,14 +324,14 @@ const CyberWarGame = () => {
         return (
             <div className="game-container">
                 <header className="header">
-                    <div className="header-content">
+                    <div className="header-content flex justify-between items-center">
                         <div className="header-left">
                             <h1 className="header-title">CyberWar</h1>
                             <div className="phase-info">
                                 Phase : <span className="phase-name">{currentPhase === 'site' ? 'Site Web' : 'Serveur'}</span>
                             </div>
                         </div>
-                        <div className="header-right">
+                        <div className="header-right flex gap-4">
                             <TimerDisplay
                                 gameState={gameState}
                                 initialTime={600}
@@ -289,19 +342,19 @@ const CyberWarGame = () => {
                             <div className="scores">
                                 <span className="score-label">Score</span>
                                 <span className="score-value">
-                  <span className="attaquants">{scores.attaquants}</span> - <span className="défenseurs">{scores.défenseurs}</span>
-                </span>
+                                    <span className="attaquants">{scores.attaquants}</span> - <span className="défenseurs">{scores.défenseurs}</span>
+                                </span>
                             </div>
                             <button
                                 onClick={() => setShowRoleDetails(true)}
-                                className="button role-details-btn"
+                                className="button role-details-btn flex items-center gap-2"
                             >
                                 <Info size={18} /> Voir mon rôle
                             </button>
                         </div>
                     </div>
                 </header>
-                <main className="main-content">
+                <main className="main-content flex gap-6">
                     <aside className="sidebar">
                         {role && (
                             <div className={`panel role-panel ${selectedTeam}`}>
@@ -310,46 +363,43 @@ const CyberWarGame = () => {
                                 <div className="speciality">{role.spécialité}</div>
                             </div>
                         )}
-                        <div className="panel objectives">
-                            <h3 className="panel-title">Objectifs</h3>
-                            <div className="objective-list">
-                                {selectedTeam === 'attaquants' ? (
-                                    <>
-                                        <div><CheckCircle className="icon" size={18} /> Trouver des failles</div>
-                                        <div><AlertTriangle className="icon" size={18} /> Tester des exploits</div>
-                                        <div><Target className="icon" size={18} /> Accéder aux données</div>
-                                    </>
-                                ) : (
-                                    <>
-                                        <div><Shield className="icon" size={18} /> Détecter les attaques</div>
-                                        <div><Lock className="icon" size={18} /> Corriger les failles</div>
-                                        <div><Zap className="icon" size={18} /> Bloquer les hackers</div>
-                                    </>
-                                )}
+                        <div className="panel">
+                            <h3 className="panel-title">Niveau de Menace</h3>
+                            <div className={`threat-level ${threatLevel}`}>
+                                Menace : {threatLevel.toUpperCase()}
                             </div>
                         </div>
+                        <ChallengeBoard />
                         <div className="panel activity">
-                            <h3 className="panel-title">Journal d’activité</h3>
+                            <h3 className="panel-title">Journal d’Activité</h3>
                             <div className="activity-log">
                                 {gameLog.map((log, i) => (
                                     <div key={i} className="log-entry">{log}</div>
                                 ))}
                             </div>
                         </div>
+                        <div className="panel">
+                            <h3 className="panel-title">Actions d’Équipe</h3>
+                            <div className="activity-log">
+                                {teamActions.map((action, i) => (
+                                    <div key={i} className="log-entry">{action}</div>
+                                ))}
+                            </div>
+                        </div>
                     </aside>
-                    <div className="content-wrapper">
-                        <div className="tabs">
+                    <div className="content-wrapper flex-1">
+                        <div className="tabs flex gap-4 mb-4">
                             <button
                                 onClick={() => setActiveTab('site')}
-                                className={`tab ${activeTab === 'site' ? 'active' : ''}`}
+                                className={`tab ${activeTab === 'site' ? 'active' : ''} ${selectedTeam}`}
                             >
                                 🌐 Site Web
                             </button>
                             <button
                                 onClick={() => setActiveTab('serveur')}
-                                className={`tab ${activeTab === 'serveur' ? 'active' : ''}`}
+                                className={`tab ${activeTab === 'serveur' ? 'active' : ''} ${selectedTeam}`}
                             >
-                                🖥️ Network
+                                🖥️ Serveur
                             </button>
                         </div>
                         <div className="interface">
@@ -376,7 +426,7 @@ const CyberWarGame = () => {
 
     const WebsiteInterface = ({ role }) => {
         const [currentPage, setCurrentPage] = useState('accueil');
-        const [formData, setFormData] = useState({ username: '', password: '', comment: '', newsletter: '' });
+        const [formData, setFormData] = useState({ username: '', password: '', comment: '', newsletter: '', csrfToken: '' });
         const [feedback, setFeedback] = useState('');
 
         const pages = [
@@ -428,6 +478,30 @@ const CyberWarGame = () => {
             return false;
         }, [websiteState.userAccounts, websiteState.vulnerabilities.weak_password.exploited, selectedTeam, handleAction]);
 
+        const testCSRF = useCallback((token) => {
+            if (token !== 'valid_token' && !websiteState.vulnerabilities.csrf.exploited && selectedTeam === 'attaquants') {
+                setWebsiteState(prev => ({
+                    ...prev,
+                    vulnerabilities: { ...prev.vulnerabilities, csrf: { ...prev.vulnerabilities.csrf, exploited: true } }
+                }));
+                handleAction('attaquants', 'Attaque CSRF réussie !', 20);
+                return true;
+            }
+            return false;
+        }, [websiteState.vulnerabilities.csrf.exploited, selectedTeam, handleAction]);
+
+        const testFileInclusion = useCallback((input) => {
+            if (input.includes('/etc/passwd') && !websiteState.vulnerabilities.file_inclusion.exploited && selectedTeam === 'attaquants') {
+                setWebsiteState(prev => ({
+                    ...prev,
+                    vulnerabilities: { ...prev.vulnerabilities, file_inclusion: { ...prev.vulnerabilities.file_inclusion, exploited: true } }
+                }));
+                handleAction('attaquants', 'Inclusion de fichier réussie ! Accès à /etc/passwd.', 25);
+                return true;
+            }
+            return false;
+        }, [websiteState.vulnerabilities.file_inclusion.exploited, selectedTeam, handleAction]);
+
         const patchVulnerability = useCallback((vuln) => {
             if (!websiteState.vulnerabilities[vuln].patched && selectedTeam === 'défenseurs') {
                 setWebsiteState(prev => ({
@@ -441,48 +515,45 @@ const CyberWarGame = () => {
         return (
             <div className="panel">
                 <h2 className="panel-title">Site Web TechCorp</h2>
-                <div className="sub-tabs">
+                <div className="sub-tabs flex gap-2 mb-4">
                     {pages.map(p => (
                         <button
                             key={p.id}
                             onClick={() => setCurrentPage(p.id)}
-                            className={`sub-tab ${currentPage === p.id ? 'active' : ''}`}
+                            className={`sub-tab ${currentPage === p.id ? 'active' : ''} ${selectedTeam}`}
                         >
                             {p.name}
                         </button>
                     ))}
                 </div>
                 <div className="interface-content">
-                    {feedback && <div className="feedback">{feedback}</div>}
+                    {feedback && <div className={`feedback ${feedback.includes('Succès') ? 'data-status-success' : 'data-status-failure'}`}>{feedback}</div>}
                     {currentPage === 'accueil' && (
                         <div>
-                            <h3 className="interface-title">Bienvenue chez TechCorp</h3>
-                            <p className="lead">TechCorp crée des solutions sécurisées.</p>
-                            <div className="hero">
-                                <div className="hero-placeholder">
-                                    <Globe size={50} />
-                                    <span>Solutions sécurisées</span>
-                                </div>
-                                <p>Explorez le site pour trouver des failles ou sécuriser les pages.</p>
+                            <h3 className="interface-title text-xl font-bold">Bienvenue chez TechCorp</h3>
+                            <p className="lead">TechCorp : Solutions sécurisées du futur.</p>
+                            <div className="hero flex flex-col items-center">
+                                <Globe size={60} className="text-blue-400" />
+                                <p>Explorez le site pour attaquer ou défendre !</p>
                             </div>
                         </div>
                     )}
                     {currentPage === 'produits' && (
                         <div>
-                            <h3 className="interface-title">Nos produits</h3>
-                            <div className="product-grid">
-                                <div className="product-card">
-                                    <div className="product-placeholder"><Server size={40} /></div>
+                            <h3 className="interface-title text-xl font-bold">Nos produits</h3>
+                            <div className="product-grid grid grid-cols-3 gap-4">
+                                <div className="product-card p-4 border border-gray-700 rounded-lg">
+                                    <Server size={40} className="text-blue-400" />
                                     <h4>CloudSync</h4>
                                     <p>Partage sécurisé.</p>
                                 </div>
-                                <div className="product-card">
-                                    <div className="product-placeholder"><Shield size={40} /></div>
+                                <div className="product-card p-4 border border-gray-700 rounded-lg">
+                                    <Shield size={40} className="text-blue-400" />
                                     <h4>AIShield</h4>
                                     <p>Protection IA.</p>
                                 </div>
-                                <div className="product-card">
-                                    <div className="product-placeholder"><Lock size={40} /></div>
+                                <div className="product-card p-4 border border-gray-700 rounded-lg">
+                                    <Lock size={40} className="text-blue-400" />
                                     <h4>DataVault</h4>
                                     <p>Stockage sécurisé.</p>
                                 </div>
@@ -491,16 +562,16 @@ const CyberWarGame = () => {
                     )}
                     {currentPage === 'à-propos' && (
                         <div>
-                            <h3 className="interface-title">À propos de TechCorp</h3>
+                            <h3 className="interface-title text-xl font-bold">À propos de TechCorp</h3>
                             <p>Depuis 2010, TechCorp protège vos données.</p>
                             <p>Mission : un internet sûr pour tous.</p>
                         </div>
                     )}
                     {currentPage === 'connexion' && (
                         <div>
-                            <h3 className="interface-title">Connexion</h3>
+                            <h3 className="interface-title text-xl font-bold">Connexion</h3>
                             <p className="hint">Indice : Essaie admin:admin123 ou une injection comme " OR 1=1 --</p>
-                            <div className="form">
+                            <div className="form flex flex-col gap-4">
                                 <input
                                     type="text"
                                     value={formData.username}
@@ -550,28 +621,30 @@ const CyberWarGame = () => {
                     )}
                     {currentPage === 'contact' && (
                         <div>
-                            <h3 className="interface-title">Contactez-nous</h3>
-                            <p className="hint">Indice : Teste <script>alert("test")</script> dans le message.</p>
-                            <div className="form">
-                <textarea
-                    value={formData.comment}
-                    onChange={(e) => setFormData({ ...formData, comment: e.target.value })}
-                    className="input textarea"
-                    placeholder="Votre message..."
-                />
+                            <h3 className="interface-title text-xl font-bold">Contactez-nous</h3>
+                            <p className="hint">Indice : Teste <script>alert("test")</script> ou un jeton CSRF invalide.</p>
+                            <div className="form flex flex-col gap-4">
+                                <textarea
+                                    value={formData.comment}
+                                    onChange={(e) => setFormData({ ...formData, comment: e.target.value })}
+                                    className="input textarea"
+                                    placeholder="Votre message..."
+                                />
                                 <input
-                                    type="email"
-                                    value={formData.newsletter}
-                                    onChange={(e) => setFormData({ ...formData, newsletter: e.target.value })}
+                                    type="text"
+                                    value={formData.csrfToken}
+                                    onChange={(e) => setFormData({ ...formData, csrfToken: e.target.value })}
                                     className="input"
-                                    placeholder="Email (Newsletter)"
+                                    placeholder="Jeton CSRF"
                                 />
                                 <button
                                     onClick={() => {
                                         if (testXSS(formData.comment)) {
                                             setFeedback('Succès : Script XSS exécuté !');
+                                        } else if (testCSRF(formData.csrfToken)) {
+                                            setFeedback('Succès : Attaque CSRF détectée !');
                                         } else {
-                                            setFeedback('Échec : Aucun script détecté.');
+                                            setFeedback('Échec : Aucun script ou CSRF détecté.');
                                         }
                                     }}
                                     className="button attaquants"
@@ -579,22 +652,21 @@ const CyberWarGame = () => {
                                     Tester
                                 </button>
                                 {selectedTeam === 'défenseurs' && (
-                                    <button
-                                        onClick={() => patchVulnerability('xss')}
-                                        className="button défenseurs"
-                                    >
-                                        Corriger XSS
-                                    </button>
+                                    <>
+                                        <button
+                                            onClick={() => patchVulnerability('xss')}
+                                            className="button défenseurs"
+                                        >
+                                            Corriger XSS
+                                        </button>
+                                        <button
+                                            onClick={() => patchVulnerability('csrf')}
+                                            className="button défenseurs"
+                                        >
+                                            Corriger CSRF
+                                        </button>
+                                    </>
                                 )}
-                                <button
-                                    onClick={() => {
-                                        setFeedback('Rien ici, c’est un piège !');
-                                        handleAction(selectedTeam, 'Tentative sur newsletter (leurre)', 0);
-                                    }}
-                                    className="button défenseurs"
-                                >
-                                    Tester Newsletter
-                                </button>
                             </div>
                         </div>
                     )}
@@ -622,16 +694,16 @@ const CyberWarGame = () => {
 
             switch (cmdParts[0]) {
                 case 'help':
-                    output = 'Commandes : ls, ps, netstat, cat, nmap, ssh, whoami, stop-service, close-port';
+                    output = 'Commandes : ls, ps, netstat, cat, nmap, ssh, whoami, stop-service, close-port, crack';
                     break;
                 case 'ls':
-                    output = 'config.txt  logs/  passwords.bak  run.sh  decoy.txt';
+                    output = 'config.txt  logs/  passwords.bak  run.sh  decoy.txt  secret.key';
                     break;
                 case 'ps':
-                    output = 'PID\tCOMMAND\n1234\tapache2\n5678\tsshd\n4567\tmysql\n9999\tfake_service';
+                    output = 'PID\tCOMMAND\n1234\tapache2\n5678\tsshd\n4567\tmysql\n9999\tfake_service\n1111\trdp';
                     break;
                 case 'netstat':
-                    output = 'TCP\t0.0.0.0:22\tLISTEN\nTCP\t0.0.0.0:80\tLISTEN\nTCP\t0.0.0.0:21\tLISTEN\nTCP\t0.0.0.0:8080\tCLOSED';
+                    output = 'TCP\t0.0.0.0:22\tLISTEN\nTCP\t0.0.0.0:80\tLISTEN\nTCP\t0.0.0.0:21\tLISTEN\nTCP\t0.0.0.0:3389\tLISTEN';
                     break;
                 case 'cat':
                     if (cmdParts[1] === 'passwords.bak') {
@@ -647,7 +719,7 @@ const CyberWarGame = () => {
                     }
                     break;
                 case 'nmap':
-                    output = 'Scan... Ports : 22 (SSH), 80 (HTTP), 21 (FTP), 8080 (Inactif)';
+                    output = 'Scan... Ports : 22 (SSH), 80 (HTTP), 21 (FTP), 3389 (RDP), 8080 (Inactif)';
                     if (selectedTeam === 'attaquants') {
                         handleAction('attaquants', 'Scan nmap effectué.', 5);
                     }
@@ -658,6 +730,14 @@ const CyberWarGame = () => {
                         handleAction('attaquants', 'Accès SSH obtenu avec weakpass.', 25);
                     } else {
                         output = 'Connexion SSH échouée.';
+                    }
+                    break;
+                case 'crack':
+                    if (cmdParts[1] === 'secret.key' && !serverState.services.rdp.patched && selectedTeam === 'attaquants') {
+                        output = 'Clé secrète décryptée ! Accès critique obtenu.';
+                        handleAction('attaquants', 'Clé secrète décryptée.', 30);
+                    } else {
+                        output = 'Erreur : fichier non décryptable.';
                     }
                     break;
                 case 'whoami':
@@ -671,6 +751,13 @@ const CyberWarGame = () => {
                         }));
                         output = 'Service SSH arrêté.';
                         handleAction('défenseurs', 'Service SSH sécurisé.', 15);
+                    } else if (cmdParts[1] === 'rdp' && selectedTeam === 'défenseurs' && !serverState.services.rdp.patched) {
+                        setServerState(prev => ({
+                            ...prev,
+                            services: { ...prev.services, rdp: { ...prev.services.rdp, patched: true } }
+                        }));
+                        output = 'Service RDP arrêté.';
+                        handleAction('défenseurs', 'Service RDP sécurisé.', 15);
                     } else {
                         output = 'Erreur : service non trouvé ou déjà sécurisé.';
                     }
@@ -692,28 +779,28 @@ const CyberWarGame = () => {
             }
             setTerminalHistory(prev => [...prev, `> ${command}`, output]);
             setTerminalInput('');
-        }, [addLog, handleAction, selectedTeam, serverState.services.ssh.patched, serverState.services.ftp.patched]);
+        }, [addLog, handleAction, selectedTeam, serverState.services.ssh.patched, serverState.services.ftp.patched, serverState.services.rdp.patched]);
 
         return (
             <div className="panel">
                 <h2 className="panel-title">Serveur TechCorp</h2>
                 <p className="hint">Indice : Utilise "nmap" pour voir les ports, ou "cat passwords.bak" pour un mot de passe.</p>
-                <div className="status-grid">
-                    <div className="status-card">
-                        <h3 className="status-title">Services</h3>
-                        <div className="status-content">SSH, HTTP, FTP, MySQL, FakeDB (inactif)</div>
+                <div className="status-grid grid grid-cols-3 gap-4">
+                    <div className="status-card p-4 border border-gray-700 rounded-lg">
+                        <h3 className="status-title text-lg font-bold">Services</h3>
+                        <div className="status-content">SSH, HTTP, FTP, MySQL, RDP, FakeDB (inactif)</div>
                     </div>
-                    <div className="status-card">
-                        <h3 className="status-title">Failles</h3>
-                        <div className="status-content">{serverState.services.ssh.patched ? 'Aucune' : 'SSH (mot de passe faible)'}</div>
+                    <div className="status-card p-4 border border-gray-700 rounded-lg">
+                        <h3 className="status-title text-lg font-bold">Failles</h3>
+                        <div className="status-content">{serverState.services.ssh.patched ? 'Aucune' : 'SSH (mot de passe faible), RDP'}</div>
                     </div>
-                    <div className="status-card">
-                        <h3 className="status-title">Alertes</h3>
+                    <div className="status-card p-4 border border-gray-700 rounded-lg">
+                        <h3 className="status-title text-lg font-bold">Alertes</h3>
                         <div className="status-content">{gameLog.length > 0 ? 'Activité détectée' : 'Aucune'}</div>
                     </div>
                 </div>
                 <div
-                    className="terminal"
+                    className="terminal mt-4"
                     onClick={() => terminalInputRef.current.focus()}
                 >
                     <div className="terminal-list">
@@ -722,7 +809,7 @@ const CyberWarGame = () => {
                         ))}
                         <div ref={terminalEndRef} />
                     </div>
-                    <div className="terminal-prompt">
+                    <div className="terminal-prompt flex items-center">
                         <span>> </span>
                         <input
                             ref={terminalInputRef}
@@ -746,7 +833,7 @@ const CyberWarGame = () => {
         return (
             <div className="game-container">
                 <div className="results-panel">
-                    <h1 className="intro-title">Fin de Partie</h1>
+                    <h1 className="header-title">Fin de Partie</h1>
                     {isTie ? (
                         <h2 className="results-title">Égalité !</h2>
                     ) : (
@@ -754,7 +841,7 @@ const CyberWarGame = () => {
                             Les {winner} gagnent !
                         </h2>
                     )}
-                    <div className="score-grid">
+                    <div className="score-grid grid grid-cols-2 gap-4">
                         <div className="score-card attaquants">
                             <div className="score-label">Attaquants</div>
                             <div className="score-value">{scores.attaquants}</div>
@@ -764,7 +851,7 @@ const CyberWarGame = () => {
                             <div className="score-value">{scores.défenseurs}</div>
                         </div>
                     </div>
-                    <button onClick={handleRestartGame} className="button restart">
+                    <button onClick={handleRestartGame} className="button restart mt-4">
                         Rejouer
                     </button>
                 </div>
