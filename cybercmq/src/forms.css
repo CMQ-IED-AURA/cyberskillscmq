@@ -1,0 +1,98 @@
+.login-register-page {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    background: linear-gradient(135deg, #1e3a8a, #3b82f6);
+}
+
+.login-register-form {
+    background: rgba(255, 255, 255, 0.95);
+    padding: 2rem;
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+    width: 100%;
+    max-width: 400px;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.login-register-form h2 {
+    text-align: center;
+    color: #1e3a8a;
+    font-size: 1.8rem;
+    margin-bottom: 1rem;
+    font-weight: 600;
+}
+
+.login-register-input-container {
+    position: relative;
+    width: 100%;
+}
+
+.login-register-input {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border: 2px solid #e5e7eb;
+    border-radius: 8px;
+    font-size: 1rem;
+    color: #1f2937;
+    background: #f9fafb;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.login-register-input:focus {
+    outline: none;
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.login-register-input::placeholder {
+    color: #9ca3af;
+}
+
+.login-register-toggle-password {
+    position: absolute;
+    right: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    display: flex;
+    align-items: center;
+}
+
+.login-register-toggle-password svg {
+    width: 20px;
+    height: 20px;
+    fill: #6b7280;
+    transition: fill 0.3s ease;
+}
+
+.login-register-toggle-password:hover svg {
+    fill: #3b82f6;
+}
+
+.login-register-btn {
+    padding: 0.75rem 1rem;
+    background: #3b82f6;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.3s ease, transform 0.2s ease;
+}
+
+.login-register-btn:hover {
+    background: #1e40af;
+    transform: translateY(-2px);
+}
+
+.login-register-btn:active {
+    transform: translateY(0);
+}
