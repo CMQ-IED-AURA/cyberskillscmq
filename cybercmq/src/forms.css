@@ -1,29 +1,110 @@
+/* Styles modernes pour les formulaires de connexion/inscription */
 .login-register-page {
     display: flex;
     justify-content: center;
     align-items: center;
     min-height: 100vh;
-    background: linear-gradient(135deg, #1e3a8a, #3b82f6);
+    background: linear-gradient(135deg, #151857 0%, #2563eb 50%, #3b82f6 100%);
+    padding: 1rem;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    position: relative;
+}
+
+.login-register-page::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.1) 0%, transparent 50%),
+    radial-gradient(circle at 70% 80%, rgba(255, 255, 255, 0.08) 0%, transparent 50%);
+    pointer-events: none;
+}
+
+.back-button {
+    position: absolute;
+    top: 2rem;
+    left: 2rem;
+    background: rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: white;
+    padding: 0.75rem 1rem;
+    border-radius: 12px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(10px);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    text-decoration: none;
+    z-index: 10;
+}
+
+.back-button:hover {
+    background: rgba(255, 255, 255, 0.25);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+.back-button svg {
+    width: 18px;
+    height: 18px;
+    fill: currentColor;
 }
 
 .login-register-form {
     background: rgba(255, 255, 255, 0.95);
-    padding: 2rem;
-    border-radius: 12px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+    backdrop-filter: blur(20px);
+    padding: 2.5rem;
+    border-radius: 20px;
+    box-shadow:
+            0 20px 40px rgba(21, 24, 87, 0.15),
+            0 8px 16px rgba(0, 0, 0, 0.1),
+            inset 0 1px 0 rgba(255, 255, 255, 0.8);
     width: 100%;
-    max-width: 400px;
+    max-width: 420px;
     display: flex;
     flex-direction: column;
     gap: 1.5rem;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    position: relative;
+    z-index: 5;
+}
+
+.login-register-form::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, #151857, #3b82f6, #151857);
+    border-radius: 20px 20px 0 0;
 }
 
 .login-register-form h2 {
     text-align: center;
-    color: #1e3a8a;
-    font-size: 1.8rem;
-    margin-bottom: 1rem;
-    font-weight: 600;
+    color: #151857;
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    position: relative;
+}
+
+.login-register-form h2::after {
+    content: '';
+    position: absolute;
+    bottom: -8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 40px;
+    height: 3px;
+    background: linear-gradient(90deg, #151857, #3b82f6);
+    border-radius: 2px;
 }
 
 .login-register-input-container {
@@ -33,23 +114,30 @@
 
 .login-register-input {
     width: 100%;
-    padding: 0.75rem 1rem;
+    padding: 1rem 1.25rem;
     border: 2px solid #e5e7eb;
-    border-radius: 8px;
+    border-radius: 12px;
     font-size: 1rem;
     color: #1f2937;
-    background: #f9fafb;
-    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+    background: #fafbfc;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    font-weight: 500;
+    box-sizing: border-box;
 }
 
 .login-register-input:focus {
     outline: none;
-    border-color: #3b82f6;
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    border-color: #151857;
+    background: white;
+    box-shadow:
+            0 0 0 4px rgba(21, 24, 87, 0.1),
+            0 4px 12px rgba(21, 24, 87, 0.15);
+    transform: translateY(-1px);
 }
 
 .login-register-input::placeholder {
     color: #9ca3af;
+    font-weight: 400;
 }
 
 .login-register-toggle-password {
@@ -60,9 +148,15 @@
     background: none;
     border: none;
     cursor: pointer;
-    padding: 0;
+    padding: 0.5rem;
     display: flex;
     align-items: center;
+    border-radius: 8px;
+    transition: background 0.3s ease;
+}
+
+.login-register-toggle-password:hover {
+    background: rgba(21, 24, 87, 0.1);
 }
 
 .login-register-toggle-password svg {
@@ -73,26 +167,264 @@
 }
 
 .login-register-toggle-password:hover svg {
-    fill: #3b82f6;
+    fill: #151857;
 }
 
 .login-register-btn {
-    padding: 0.75rem 1rem;
-    background: #3b82f6;
+    padding: 1rem 1.5rem;
+    background: linear-gradient(135deg, #151857 0%, #2563eb 100%);
     color: white;
     border: none;
-    border-radius: 8px;
+    border-radius: 12px;
     font-size: 1rem;
-    font-weight: 500;
+    font-weight: 600;
     cursor: pointer;
-    transition: background 0.3s ease, transform 0.2s ease;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-top: 0.5rem;
+}
+
+.login-register-btn::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    transition: left 0.5s ease;
 }
 
 .login-register-btn:hover {
-    background: #1e40af;
     transform: translateY(-2px);
+    box-shadow: 0 10px 25px rgba(21, 24, 87, 0.3);
+}
+
+.login-register-btn:hover::before {
+    left: 100%;
 }
 
 .login-register-btn:active {
     transform: translateY(0);
+}
+
+/* Styles pour les anciennes classes (compatibilité) */
+.page {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    background: linear-gradient(135deg, #151857 0%, #2563eb 50%, #3b82f6 100%);
+    padding: 1rem;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    position: relative;
+}
+
+.page::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.1) 0%, transparent 50%),
+    radial-gradient(circle at 70% 80%, rgba(255, 255, 255, 0.08) 0%, transparent 50%);
+    pointer-events: none;
+}
+
+.page form {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(20px);
+    padding: 2.5rem;
+    border-radius: 20px;
+    box-shadow:
+            0 20px 40px rgba(21, 24, 87, 0.15),
+            0 8px 16px rgba(0, 0, 0, 0.1),
+            inset 0 1px 0 rgba(255, 255, 255, 0.8);
+    width: 100%;
+    max-width: 420px;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    position: relative;
+    z-index: 5;
+}
+
+.page form::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, #151857, #3b82f6, #151857);
+    border-radius: 20px 20px 0 0;
+}
+
+.page h2 {
+    text-align: center;
+    color: #151857;
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    position: relative;
+}
+
+.page h2::after {
+    content: '';
+    position: absolute;
+    bottom: -8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 40px;
+    height: 3px;
+    background: linear-gradient(90deg, #151857, #3b82f6);
+    border-radius: 2px;
+}
+
+.input-container {
+    position: relative;
+    width: 100%;
+}
+
+.page input {
+    width: 100%;
+    padding: 1rem 1.25rem;
+    border: 2px solid #e5e7eb;
+    border-radius: 12px;
+    font-size: 1rem;
+    color: #1f2937;
+    background: #fafbfc;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    font-weight: 500;
+    box-sizing: border-box;
+}
+
+.page input:focus {
+    outline: none;
+    border-color: #151857;
+    background: white;
+    box-shadow:
+            0 0 0 4px rgba(21, 24, 87, 0.1),
+            0 4px 12px rgba(21, 24, 87, 0.15);
+    transform: translateY(-1px);
+}
+
+.page input::placeholder {
+    color: #9ca3af;
+    font-weight: 400;
+}
+
+.toggle-password {
+    position: absolute;
+    right: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0.5rem;
+    display: flex;
+    align-items: center;
+    border-radius: 8px;
+    transition: background 0.3s ease;
+}
+
+.toggle-password:hover {
+    background: rgba(21, 24, 87, 0.1);
+}
+
+.toggle-password svg {
+    width: 20px;
+    height: 20px;
+    fill: #6b7280;
+    transition: fill 0.3s ease;
+}
+
+.toggle-password:hover svg {
+    fill: #151857;
+}
+
+.btn-modern {
+    padding: 1rem 1.5rem;
+    background: linear-gradient(135deg, #151857 0%, #2563eb 100%);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-top: 0.5rem;
+}
+
+.btn-modern::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    transition: left 0.5s ease;
+}
+
+.btn-modern:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px rgba(21, 24, 87, 0.3);
+}
+
+.btn-modern:hover::before {
+    left: 100%;
+}
+
+.btn-modern:active {
+    transform: translateY(0);
+}
+
+/* Animation d'entrée */
+@keyframes slideInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.login-register-form,
+.page form {
+    animation: slideInUp 0.6s ease-out;
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+    .login-register-form,
+    .page form {
+        padding: 2rem 1.5rem;
+        margin: 0 1rem;
+    }
+
+    .back-button {
+        top: 1rem;
+        left: 1rem;
+        padding: 0.5rem 0.75rem;
+        font-size: 0.8rem;
+    }
+
+    .login-register-form h2,
+    .page h2 {
+        font-size: 1.75rem;
+    }
 }
