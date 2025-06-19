@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useReducer } from 'react';
 import { Shield, Sword, Clock, Globe, Info } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import io from 'socket.io-client';
 
 const initialGameState = {
     state: 'intro',
