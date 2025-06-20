@@ -90,6 +90,13 @@ function Register() {
                     </button>
                 </div>
                 <button type="submit" className="login-register-btn">S'inscrire</button>
+
+                <div className="login-register-switch">
+                    <p>Déjà un compte ?</p>
+                    <a href="/login" className="login-register-switch-link">
+                        Se connecter
+                    </a>
+                </div>
             </form>
         </div>
     );

@@ -5,7 +5,7 @@
     justify-content: center;
     align-items: center;
     min-height: 100vh;
-    background: linear-gradient(135deg, #1e3a8a, #3b82f6);
+    background: linear-gradient(135deg, #060644 0%, #617f99 100%);
     position: relative;
 }
 
@@ -14,11 +14,11 @@
     position: absolute;
     top: 2rem;
     left: 2rem;
-    background: rgba(255, 255, 255, 0.15);
+    background: rgba(97, 127, 153, 0.15);
     backdrop-filter: blur(10px);
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(97, 127, 153, 0.3);
     border-radius: 8px;
-    color: white;
+    color: #617f99;
     padding: 0.5rem 1rem;
     cursor: pointer;
     font-size: 0.9rem;
@@ -31,9 +31,10 @@
 }
 
 .login-register-back-button:hover {
-    background: rgba(255, 255, 255, 0.25);
+    background: rgba(97, 127, 153, 0.25);
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 4px 12px rgba(6, 6, 68, 0.3);
+    color: #8ab0ff;
 }
 
 .login-register-back-button svg {
@@ -49,24 +50,27 @@
 
 .login-register-form {
     background: rgba(255, 255, 255, 0.95);
-    padding: 2rem;
-    border-radius: 12px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+    backdrop-filter: blur(15px);
+    padding: 2.5rem;
+    border-radius: 16px;
+    box-shadow: 0 8px 32px rgba(6, 6, 68, 0.4);
     width: 100%;
-    max-width: 400px;
+    max-width: 420px;
     display: flex;
     flex-direction: column;
     gap: 1.5rem;
     position: relative;
     z-index: 5;
+    border: 1px solid rgba(97, 127, 153, 0.2);
 }
 
 .login-register-form h2 {
     text-align: center;
-    color: #1e3a8a;
+    color: #060644;
     font-size: 1.8rem;
     margin-bottom: 1rem;
-    font-weight: 600;
+    font-weight: 700;
+    text-shadow: 0 1px 3px rgba(6, 6, 68, 0.1);
 }
 
 .login-register-input-container {
@@ -76,24 +80,25 @@
 
 .login-register-input {
     width: 100%;
-    padding: 0.75rem 1rem;
-    border: 2px solid #e5e7eb;
-    border-radius: 8px;
+    padding: 0.85rem 1rem;
+    border: 2px solid rgba(97, 127, 153, 0.3);
+    border-radius: 10px;
     font-size: 1rem;
-    color: #1f2937;
-    background: #f9fafb;
-    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+    color: #060644;
+    background: rgba(255, 255, 255, 0.8);
+    transition: all 0.3s ease;
     box-sizing: border-box;
 }
 
 .login-register-input:focus {
     outline: none;
-    border-color: #3b82f6;
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    border-color: #617f99;
+    box-shadow: 0 0 0 3px rgba(97, 127, 153, 0.15);
+    background: rgba(255, 255, 255, 0.95);
 }
 
 .login-register-input::placeholder {
-    color: #9ca3af;
+    color: rgba(97, 127, 153, 0.7);
 }
 
 .login-register-toggle-password {
@@ -112,33 +117,71 @@
 .login-register-toggle-password svg {
     width: 20px;
     height: 20px;
-    fill: #6b7280;
+    fill: #617f99;
     transition: fill 0.3s ease;
 }
 
 .login-register-toggle-password:hover svg {
-    fill: #3b82f6;
+    fill: #060644;
 }
 
 .login-register-btn {
-    padding: 0.75rem 1rem;
-    background: #3b82f6;
+    padding: 0.85rem 1rem;
+    background: linear-gradient(135deg, #617f99 0%, #060644 100%);
     color: white;
     border: none;
-    border-radius: 8px;
+    border-radius: 10px;
     font-size: 1rem;
-    font-weight: 500;
+    font-weight: 600;
     cursor: pointer;
-    transition: background 0.3s ease, transform 0.2s ease;
+    transition: all 0.3s ease;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    box-shadow: 0 4px 15px rgba(6, 6, 68, 0.3);
 }
 
 .login-register-btn:hover {
-    background: #1e40af;
+    background: linear-gradient(135deg, #8ab0ff 0%, #060644 100%);
     transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(6, 6, 68, 0.4);
 }
 
 .login-register-btn:active {
     transform: translateY(0);
+}
+
+/* Lien d'interconnexion entre formulaires */
+.login-register-switch {
+    text-align: center;
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid rgba(97, 127, 153, 0.2);
+}
+
+.login-register-switch p {
+    margin: 0 0 0.5rem 0;
+    color: rgba(6, 6, 68, 0.7);
+    font-size: 0.9rem;
+}
+
+.login-register-switch-link {
+    color: #617f99;
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 0.95rem;
+    transition: all 0.3s ease;
+    display: inline-block;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    border: 1px solid transparent;
+}
+
+.login-register-switch-link:hover {
+    color: #060644;
+    background: rgba(97, 127, 153, 0.1);
+    border-color: rgba(97, 127, 153, 0.3);
+    transform: translateY(-1px);
+    text-decoration: none;
 }
 
 /* Responsive pour mobile */
@@ -157,12 +200,12 @@
 
     .login-register-form {
         margin: 1rem;
-        padding: 1.5rem;
+        padding: 2rem;
         max-width: calc(100% - 2rem);
     }
 
     .login-register-form h2 {
-        font-size: 1.5rem;
+        font-size: 1.6rem;
     }
 }
 
@@ -179,5 +222,13 @@
         flex-direction: column;
         justify-content: flex-start;
         padding-top: 2rem;
+    }
+
+    .login-register-form {
+        padding: 1.5rem;
+    }
+
+    .login-register-form h2 {
+        font-size: 1.4rem;
     }
 }

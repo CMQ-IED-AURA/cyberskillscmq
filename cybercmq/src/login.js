@@ -90,6 +90,13 @@ function Login() {
                     </button>
                 </div>
                 <button type="submit" className="login-register-btn">Se connecter</button>
+
+                <div className="login-register-switch">
+                    <p>Pas encore de compte ?</p>
+                    <a href="/register" className="login-register-switch-link">
+                        Créer un compte
+                    </a>
+                </div>
             </form>
         </div>
     );
