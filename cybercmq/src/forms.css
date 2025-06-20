@@ -1,9 +1,50 @@
+/* forms.css - CSS spécifique pour les pages Login et Register */
+
 .login-register-page {
     display: flex;
     justify-content: center;
     align-items: center;
     min-height: 100vh;
     background: linear-gradient(135deg, #1e3a8a, #3b82f6);
+    position: relative;
+}
+
+/* Bouton retour subtil et discret */
+.login-register-back-button {
+    position: absolute;
+    top: 2rem;
+    left: 2rem;
+    background: rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    color: white;
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: all 0.3s ease;
+    z-index: 10;
+}
+
+.login-register-back-button:hover {
+    background: rgba(255, 255, 255, 0.25);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.login-register-back-button svg {
+    width: 18px;
+    height: 18px;
+    fill: currentColor;
+    transition: transform 0.3s ease;
+}
+
+.login-register-back-button:hover svg {
+    transform: translateX(-2px);
 }
 
 .login-register-form {
@@ -16,6 +57,8 @@
     display: flex;
     flex-direction: column;
     gap: 1.5rem;
+    position: relative;
+    z-index: 5;
 }
 
 .login-register-form h2 {
@@ -40,6 +83,7 @@
     color: #1f2937;
     background: #f9fafb;
     transition: border-color 0.3s ease, box-shadow 0.3s ease;
+    box-sizing: border-box;
 }
 
 .login-register-input:focus {
@@ -95,4 +139,45 @@
 
 .login-register-btn:active {
     transform: translateY(0);
+}
+
+/* Responsive pour mobile */
+@media (max-width: 640px) {
+    .login-register-back-button {
+        top: 1rem;
+        left: 1rem;
+        padding: 0.4rem 0.8rem;
+        font-size: 0.8rem;
+    }
+
+    .login-register-back-button svg {
+        width: 16px;
+        height: 16px;
+    }
+
+    .login-register-form {
+        margin: 1rem;
+        padding: 1.5rem;
+        max-width: calc(100% - 2rem);
+    }
+
+    .login-register-form h2 {
+        font-size: 1.5rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .login-register-back-button {
+        position: relative;
+        top: 0;
+        left: 0;
+        margin: 1rem 1rem 0 1rem;
+        align-self: flex-start;
+    }
+
+    .login-register-page {
+        flex-direction: column;
+        justify-content: flex-start;
+        padding-top: 2rem;
+    }
 }

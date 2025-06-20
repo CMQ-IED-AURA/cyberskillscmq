@@ -43,18 +43,19 @@ function Login() {
     };
 
     return (
-        <div className="page">
-            <button className="back-button" onClick={handleBackClick}>
+        <div className="login-register-page">
+            <button className="login-register-back-button" onClick={handleBackClick}>
                 <svg viewBox="0 0 24 24">
                     <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/>
                 </svg>
                 Retour
             </button>
 
-            <form onSubmit={handleLogin}>
+            <form className="login-register-form" onSubmit={handleLogin}>
                 <h2>Connexion</h2>
-                <div className="input-container">
+                <div className="login-register-input-container">
                     <input
+                        className="login-register-input"
                         type="text"
                         placeholder="Nom d'utilisateur"
                         value={username}
@@ -62,8 +63,9 @@ function Login() {
                         required
                     />
                 </div>
-                <div className="input-container">
+                <div className="login-register-input-container">
                     <input
+                        className="login-register-input"
                         type={showPassword ? 'text' : 'password'}
                         placeholder="Mot de passe"
                         value={password}
@@ -72,7 +74,7 @@ function Login() {
                     />
                     <button
                         type="button"
-                        className="toggle-password"
+                        className="login-register-toggle-password"
                         onClick={togglePasswordVisibility}
                         aria-label={showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
                     >
@@ -87,7 +89,7 @@ function Login() {
                         )}
                     </button>
                 </div>
-                <button type="submit" className="btn-modern">Se connecter</button>
+                <button type="submit" className="login-register-btn">Se connecter</button>
             </form>
         </div>
     );
