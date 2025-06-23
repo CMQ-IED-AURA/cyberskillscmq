@@ -1,9 +1,19 @@
 import express, { Application } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { Server as SocketIOServer } from 'socket.io';
+import { Server as SocketIOServer, Socket } from 'socket.io';
 import { createServer } from 'http';
 import { setupSocket } from './routes/match';
+
+// Ajout des imports manquants
+import authRoutes from './routes/auth';
+import matchRoutes from './routes/match';
+
+// Extension de l'interface Socket pour ajouter nos propriétés personnalisées
+interface CustomSocket extends Socket {
+  gameId?: string;
+  playerId?: string;
+}
 
 dotenv.config();
 
@@ -40,6 +50,7 @@ app.use((req, res, next) => {
   next();
 });
 
+// Maintenant ces routes sont correctement importées
 app.use('/auth', authRoutes);
 app.use('/match', matchRoutes);
 
@@ -218,10 +229,6 @@ class Game {
     console.log(`Partie ${this.id} terminée`);
   }
 
-  updateScore(team: string, points: number) {
-    this.scores[team] += points;
-    this.broadcastToAll('score-update', this.scores);
-  }
 
   broadcastToAll(event: string, data: any) {
     this.players.forEach(player => {
@@ -249,7 +256,7 @@ class Game {
   }
 }
 
-io.on('connection', (socket) => {
+io.on('connection', (socket: CustomSocket) => {
   console.log('Nouvelle connexion WebSocket:', socket.id);
 
   socket.on('join-game', (data) => {
