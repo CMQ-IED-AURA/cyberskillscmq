@@ -106,17 +106,6 @@ function Game() {
                 }
             });
 
-            newSocket.on('matchUpdated', (updatedMatch) => {
-                console.log('Match mis à jour:', updatedMatch);
-                setMatches((prev) =>
-                    prev.map((match) => (match.id === updatedMatch.id ? updatedMatch : match))
-                );
-                if (selectedMatch?.id === updatedMatch.id) {
-                    setSelectedMatch(updatedMatch);
-                }
-                fetchTeamMembers(updatedMatch.id, token);
-            });
-
             newSocket.on('teamAssigned', ({ matchId, userId, teamId, username, updatedMatch }) => {
                 console.log('Événement teamAssigned reçu:', { matchId, userId, teamId, username, updatedMatch });
                 setTeamMembersByMatch((prev) => ({
@@ -139,22 +128,6 @@ function Game() {
                 }));
             });
 
-            newSocket.on('start-game', ({ matchId, gameId }) => {
-                console.log('Démarrage du jeu reçu:', { matchId, gameId });
-                // Vérifier si l'utilisateur est dans le match
-                const match = matches.find(m => m.id === matchId);
-                if (match) {
-                    const isInMatch = [
-                        ...match.redTeam.users,
-                        ...match.blueTeam.users
-                    ].some(user => user.id === userId);
-                    if (isInMatch) {
-                        console.log('Redirection vers le jeu:', `/gameplay?gameId=${gameId}`);
-                        navigate(`/gameplay?gameId=${gameId}`);
-                    }
-                }
-            });
-
             return () => {
                 console.log('Déconnexion du WebSocket');
                 newSocket.disconnect();
@@ -165,7 +138,7 @@ function Game() {
             Cookies.remove('token');
             navigate('/login');
         }
-    }, [navigate, userId, matches, selectedMatch]);
+    }, [navigate]);
 
     const fetchMatches = async (token) => {
         setLoading(true);
@@ -271,44 +244,6 @@ function Game() {
         } catch (error) {
             console.error('Erreur lors de la création du match:', error);
             setError('Erreur serveur lors de la création du match.');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleStartMatch = async (matchId) => {
-        if (!matchId || loading) {
-            setError('Match non sélectionné ou invalide.');
-            return;
-        }
-
-        if (!window.confirm('Êtes-vous sûr de vouloir démarrer ce match ?')) {
-            return;
-        }
-
-        setLoading(true);
-        setError(null);
-        try {
-            console.log('Tentative de démarrage du match:', matchId);
-            const token = Cookies.get('token');
-            const res = await fetch('https://cyberskills.onrender.com/match/start', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`,
-                },
-                body: JSON.stringify({ matchId }),
-            });
-            const data = await res.json();
-            if (!data.success) {
-                console.error('Erreur serveur lors du démarrage:', data.message);
-                setError(data.message || 'Erreur lors du démarrage du match');
-            } else {
-                console.log('Match démarré avec succès:', matchId);
-            }
-        } catch (error) {
-            console.error('Erreur lors du démarrage du match:', error);
-            setError('Erreur serveur lors du démarrage du match.');
         } finally {
             setLoading(false);
         }
@@ -498,16 +433,17 @@ function Game() {
                                                 <hr className="role-divider" />
                                             </>
                                         )}
+
                                         <h4>Joueurs ({nonAdmins.length})</h4>
                                         {nonAdmins.length > 0 ? (
                                             nonAdmins.map((user) => (
                                                 <div key={user.id} className="user-item">
                                                     <span className={`user-status ${user.isConnected ? 'connected' : 'disconnected'}`}></span>
                                                     <span className="user-username">
-                                                        {user.username || 'Inconnu'}
+                                {user.username || 'Inconnu'}
                                                         {user.id === userId && ' (vous)'}
                                                         {!user.isConnected && ' (déconnecté)'}
-                                                    </span>
+                            </span>
                                                     <div className="user-actions cyber-buttons">
                                                         <button
                                                             onClick={() => handleAssignTeam(user.id, selectedMatch?.redTeamId, selectedMatch?.id)}
@@ -545,7 +481,7 @@ function Game() {
                         <div className="main-content">
                             <h2>Administration</h2>
                             <h3 className="selected-match">
-                                {selectedMatch ? `Match Sélectionné : ${selectedMatch?.id.slice(0, 8)} (${selectedMatch.status})` : 'Aucun match sélectionné'}
+                                {selectedMatch ? `Match Sélectionné : ${selectedMatch?.id.slice(0, 8)}` : 'Aucun match sélectionné'}
                             </h3>
                             <div className="admin-controls">
                                 <button
@@ -555,15 +491,6 @@ function Game() {
                                 >
                                     {loading ? 'Création...' : 'Créer un nouveau match'}
                                 </button>
-                                {selectedMatch && selectedMatch.status === 'waiting' && (
-                                    <button
-                                        onClick={() => handleStartMatch(selectedMatch.id)}
-                                        disabled={loading || (teamMembersByMatch[selectedMatch.id]?.redTeam?.length !== 3 || teamMembersByMatch[selectedMatch.id]?.blueTeam?.length !== 3)}
-                                        className="btn-modern btn-cyber btn-start"
-                                    >
-                                        {loading ? 'Démarrage...' : 'Démarrer le match'}
-                                    </button>
-                                )}
                                 <select
                                     value={selectedMatch?.id || ''}
                                     onChange={(e) => {
@@ -576,7 +503,7 @@ function Game() {
                                     <option value="">Sélectionner un match</option>
                                     {matches.map((match) => (
                                         <option key={match.id} value={match.id}>
-                                            Match {match.id.slice(0, 8)} ({match.status})
+                                            Match {match.id.slice(0, 8)}
                                         </option>
                                     ))}
                                 </select>
@@ -593,7 +520,7 @@ function Game() {
                                             }}
                                         >
                                             <div className="match-header">
-                                                <h4>Match {match.id.slice(0, 8)} ({match.status})</h4>
+                                                <h4>Match {match.id.slice(0, 8)}</h4>
                                             </div>
                                             <div className="teams">
                                                 <div className="team-card red-team">
@@ -661,7 +588,7 @@ function Game() {
                                         }}
                                     >
                                         <div className="match-header">
-                                            <h4>Match {match.id.slice(0, 8)} ({match.status})</h4>
+                                            <h4>Match {match.id.slice(0, 8)}</h4>
                                         </div>
                                         <div className="teams">
                                             <div className="team-card red-team">
