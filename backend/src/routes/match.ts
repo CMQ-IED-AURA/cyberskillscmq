@@ -158,79 +158,6 @@ router.post('/create', authenticateToken, requireAdmin, async (req: Authenticate
     }
 });
 
-router.post('/start', authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
-    const { matchId } = req.body;
-
-    console.log('Requête de démarrage de match reçue:', { matchId, user: req.user });
-
-    try {
-        if (!matchId) {
-            console.error('MatchId manquant');
-            return res.status(400).json({ success: false, message: 'matchId est requis' });
-        }
-
-        const match = await prisma.match.findUnique({
-            where: { id: matchId },
-            include: {
-                redTeam: { include: { users: true } },
-                blueTeam: { include: { users: true } },
-            },
-        });
-
-        if (!match) {
-            console.error('Match non trouvé:', matchId);
-            return res.status(404).json({ success: false, message: 'Match non trouvé' });
-        }
-
-        // Vérifier si les équipes ont le nombre requis de joueurs (3 par équipe)
-        const redTeamUsers = match.redTeam.users;
-        const blueTeamUsers = match.blueTeam.users;
-        if (redTeamUsers.length !== 3 || blueTeamUsers.length !== 3) {
-            console.error('Nombre de joueurs insuffisant:', { redTeam: redTeamUsers.length, blueTeam: blueTeamUsers.length });
-            return res.status(400).json({ success: false, message: 'Chaque équipe doit avoir exactement 3 joueurs' });
-        }
-
-        // Récupérer le match mis à jour
-        const updatedMatch = await prisma.match.findUnique({
-            where: { id: matchId },
-            include: {
-                redTeam: { include: { users: true } },
-                blueTeam: { include: { users: true } },
-            },
-        });
-
-        console.log('Match démarré:', { matchId });
-
-        // Notifier tous les joueurs du match via WebSocket
-        const io = getSocketIO(req);
-        if (io) {
-            const players = [...redTeamUsers, ...blueTeamUsers];
-            const gameId = matchId; // Utiliser matchId comme gameId pour la cohérence avec attack.js
-            io.to(gameId).emit('start-game', { matchId, gameId });
-
-            // Notifier chaque joueur individuellement
-            players.forEach(player => {
-                const connectedUser = connectedUsers.get(player.id);
-                if (connectedUser && connectedUser.socketId) {
-                    io.to(connectedUser.socketId).emit('start-game', { matchId, gameId });
-                }
-            });
-
-            // Mettre à jour la liste des matchs pour tous les clients
-            io.emit('matchUpdated', updatedMatch);
-        }
-
-        return res.status(200).json({
-            success: true,
-            message: 'Match démarré avec succès',
-            match: updatedMatch,
-        });
-    } catch (err: any) {
-        console.error('Erreur lors du démarrage du match:', err.message, err.stack);
-        res.status(500).json({ success: false, message: 'Erreur lors du démarrage du match', error: err.message });
-    }
-});
-
 router.get('/list', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
     try {
         const matches = await prisma.match.findMany({
@@ -352,18 +279,6 @@ router.post('/assign-team', authenticateToken, requireAdmin, async (req: Authent
             });
         }
 
-        // Vérifier le nombre de joueurs dans chaque équipe
-        const redTeamUsers = match.redTeam.users;
-        const blueTeamUsers = match.blueTeam.users;
-        if (teamId === match.redTeamId && redTeamUsers.length >= 3) {
-            console.error('Équipe Rouge pleine:', { teamId, userCount: redTeamUsers.length });
-            return res.status(400).json({ success: false, message: 'L\'équipe Rouge est déjà complète (3 joueurs maximum)' });
-        }
-        if (teamId === match.blueTeamId && blueTeamUsers.length >= 3) {
-            console.error('Équipe Bleue pleine:', { teamId, userCount: blueTeamUsers.length });
-            return res.status(400).json({ success: false, message: 'L\'équipe Bleue est déjà complète (3 joueurs maximum)' });
-        }
-
         // Retirer l'utilisateur de toutes les autres équipes avant assignation
         await prisma.user.update({
             where: { id: userId },
@@ -442,14 +357,14 @@ router.post('/assign-team', authenticateToken, requireAdmin, async (req: Authent
 });
 
 router.post('/ban-user', authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
-    const { userId } = req.body;
+    const { userId, ipAddress } = req.body;
 
-    console.log('Requête ban-user reçue:', { userId });
+    console.log('Requête ban-user reçue:', { userId, ipAddress });
 
     try {
-        if (!userId) {
-            console.error('Paramètre manquant:', { userId });
-            return res.status(400).json({ success: false, message: 'userId est requis' });
+        if (!userId || !ipAddress) {
+            console.error('Paramètres manquants:', { userId, ipAddress });
+            return res.status(400).json({ success: false, message: 'userId et ipAddress sont requis' });
         }
 
         const user = await prisma.user.findUnique({
@@ -472,7 +387,16 @@ router.post('/ban-user', authenticateToken, requireAdmin, async (req: Authentica
             data: { role: 'BANNED', teamId: null }
         });
 
-        console.log('Utilisateur banni:', { userId });
+        // Ajouter l'IP à la liste des IP bannies
+        await prisma.bannedIP.create({
+            data: {
+                ipAddress,
+                userId,
+                bannedAt: new Date()
+            }
+        });
+
+        console.log('Utilisateur banni:', { userId, ipAddress });
 
         const io = getSocketIO(req);
         if (io) {
@@ -621,13 +545,22 @@ router.delete('/:matchId', authenticateToken, requireAdmin, async (req: Authenti
     }
 });
 
-// Endpoint d'inscription
+// Endpoint d'inscription (ajouté pour gérer la vérification d'IP bannie)
 router.post('/register', async (req: Request, res: Response) => {
-    const { username, password } = req.body;
+    const { username, password, ipAddress } = req.body;
 
     try {
-        if (!username || !password) {
-            return res.status(400).json({ success: false, message: 'username et password sont requis' });
+        if (!username || !password || !ipAddress) {
+            return res.status(400).json({ success: false, message: 'username, password et ipAddress sont requis' });
+        }
+
+        // Vérifier si l'IP est bannie
+        const bannedIP = await prisma.bannedIP.findUnique({
+            where: { ipAddress }
+        });
+        if (bannedIP) {
+            console.warn('Tentative d\'inscription avec IP bannie:', ipAddress);
+            return res.status(403).json({ success: false, message: 'Inscription interdite : IP bannie' });
         }
 
         // Vérifier si l'utilisateur existe déjà
@@ -647,7 +580,7 @@ router.post('/register', async (req: Request, res: Response) => {
             }
         });
 
-        console.log('Utilisateur inscrit:', { username });
+        console.log('Utilisateur inscrit:', { username, ipAddress });
 
         return res.status(201).json({
             success: true,
