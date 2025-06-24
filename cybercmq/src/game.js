@@ -225,6 +225,7 @@ function Game() {
             const data = await res.json();
             if (!data.success) {
                 setError(data.message || 'Erreur lors de la réinitialisation du match');
+                console.log(`Échec de la réinitialisation: ${data.message}`);
             } else {
                 console.log(`Match ${matchId} réinitialisé avec succès`);
                 setError('Match réinitialisé. Essayez de lancer à nouveau.');
@@ -253,23 +254,20 @@ function Game() {
             return;
         }
         if (socket && socket.connected) {
-            console.log('Émission de start-game pour gameId:', selectedMatch.id);
+            console.log('Émission de start-game pour gameId:', selectedMatch.id, 'socketId:', socket.id);
             socket.emit('start-game', { gameId: selectedMatch.id });
-            // Listen for error to attempt reset if game is already started
             socket.once('error', (data) => {
                 console.log('Erreur reçue lors de start-game:', data);
                 if (data.message === 'Partie non disponible ou déjà commencée') {
-                    setError('Partie déjà commencée. Tentative de réinitialisation...');
-                    handleResetGame(selectedMatch.id).then(() => {
-                        console.log('Réessai de start-game après réinitialisation');
-                        socket.emit('start-game', { gameId: selectedMatch.id });
-                    });
+                    setError('Le match est déjà en cours ou terminé. Veuillez cliquer sur "Réinitialiser le match" avant de relancer.');
+                } else {
+                    setError(data.message || 'Erreur inconnue lors du lancement du match.');
                 }
             });
         } else {
             setError('Impossible de lancer le match: non connecté au serveur.');
         }
-    }, [selectedMatch, loading, socket, teamMembersByMatch, navigate, handleResetGame]);
+    }, [selectedMatch, loading, socket, teamMembersByMatch, navigate]);
 
     const handleJoinMatch = useCallback(() => {
         if (!selectedMatch) {

@@ -207,7 +207,7 @@ export const setupSocketIO = (io: SocketIOServer) => {
                     players: game.players,
                 });
 
-                console.log(`Joueur ${playerName} a rejoint la partie ${gameId} en tant que ${role.name} (${team})`);
+                console.log(`Joueur ${playerName} a rejoint la partie ${gameId} en tant que ${role.name} (${team}) avec socketId ${socket.id}`);
             } catch (err: any) {
                 console.error('Erreur join-game:', err.message);
                 socket.emit('error', { message: 'Erreur lors de la jointure: ' + err.message });
@@ -246,7 +246,7 @@ export const setupSocketIO = (io: SocketIOServer) => {
                     players: game.players,
                 });
 
-                console.log(`Joueur ${player.name} a rejoint la partie ${gameId}`);
+                console.log(`Joueur ${player.name} a rejoint la partie ${gameId} avec socketId ${socket.id}`);
             } catch (err: any) {
                 console.error('Erreur rejoin-game:', err.message);
                 socket.emit('error', { message: 'Erreur lors de la reconnection: ' + err.message });
@@ -269,7 +269,7 @@ export const setupSocketIO = (io: SocketIOServer) => {
                     return;
                 }
                 const game = games.get(gameId);
-                console.log(`État du jeu ${gameId} avant start-game:`, game ? { status: game.status, players: game.players.length } : 'non trouvé');
+                console.log(`État du jeu ${gameId} avant start-game:`, game ? { status: game.status, players: game.players.map(p => ({ id: p.id, name: p.name, socketId: p.socketId })) } : 'non trouvé');
                 if (!game || game.status !== 'waiting') {
                     console.error(`Erreur start-game: Partie ${gameId} non disponible ou déjà ${game?.status || 'non trouvée'}`);
                     socket.emit('error', { message: 'Partie non disponible ou déjà commencée' });
@@ -543,7 +543,7 @@ router.get('/:matchId/teams', authenticateToken, async (req: AuthenticatedReques
             blueTeam: match.blueTeam,
         });
     } catch (err: any) {
-        console.error('Erreur dans la récupération des équipes:', err.message);
+        console.error('Erreur lors de la récupération des équipes:', err.message);
         res.status(500).json({ success: false, message: 'Erreur lors de la récupération des équipes', error: err.message });
     }
 });
@@ -734,16 +734,30 @@ router.post('/:matchId/reset', authenticateToken, requireAdmin, async (req: Auth
             where: { id: matchId },
         });
         if (!match) {
+            console.error(`Réinitialisation échouée: Match ${matchId} non trouvé dans la base de données`);
             return res.status(404).json({ success: false, message: 'Match non trouvé' });
         }
 
         const game = games.get(matchId);
-        console.log(`Réinitialisation du match ${matchId}. État actuel:`, game ? { status: game.status, players: game.players.length } : 'non trouvé');
-        games.delete(matchId); // Reset game state
+        console.log(`Réinitialisation du match ${matchId}. État actuel dans games Map:`, game ? { status: game.status, players: game.players.map(p => ({ id: p.id, name: p.name, socketId: p.socketId })) } : 'non trouvé');
+
+        // Force players to leave the game room
         const io = getSocketIO(req);
         if (io) {
+            const socketsInRoom = io.sockets.adapter.rooms.get(matchId);
+            if (socketsInRoom) {
+                console.log(`Sockets dans le salon ${matchId} avant réinitialisation:`, socketsInRoom.size, socketsInRoom);
+                socketsInRoom.forEach((socketId) => {
+                    io.sockets.sockets.get(socketId)?.leave(matchId);
+                    console.log(`Socket ${socketId} retiré du salon ${matchId}`);
+                });
+            }
+            games.delete(matchId);
             io.to(matchId).emit('game-reset', { matchId });
-            console.log(`Partie ${matchId} réinitialisée`);
+            console.log(`Partie ${matchId} réinitialisée. games Map size après: ${games.size}`);
+        } else {
+            console.warn(`Réinitialisation de ${matchId}: instance Socket.IO non disponible`);
+            games.delete(matchId);
         }
 
         return res.status(200).json({
