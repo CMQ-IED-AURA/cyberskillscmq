@@ -194,6 +194,7 @@ function Game() {
             return;
         }
         if (socket && socket.connected) {
+            console.log('Émission de start-game pour gameId:', selectedMatch.id);
             socket.emit('start-game', { gameId: selectedMatch.id });
         } else {
             setError('Impossible de lancer le match: non connecté au serveur.');
@@ -205,6 +206,7 @@ function Game() {
             setError('Veuillez sélectionner un match.');
             return;
         }
+        console.log('Rejoindre le match, navigation vers /attack pour gameId:', selectedMatch.id);
         localStorage.setItem('selectedGameId', selectedMatch.id);
         navigate('/attack');
     }, [selectedMatch, navigate]);
@@ -247,20 +249,28 @@ function Game() {
             });
 
             newSocket.on('connect_error', (error) => {
-                setError('Erreur de connexion au serveur WebSocket.');
+                setError('Erreur de connexion au serveur WebSocket: ' + error.message);
+            });
+
+            newSocket.on('error', (data) => {
+                console.log('Erreur WebSocket reçue:', data);
+                setError(data.message || 'Erreur inconnue du serveur WebSocket');
             });
 
             newSocket.on('connectedUsers', (connectedUsers) => {
+                console.log('Mise à jour des utilisateurs connectés:', connectedUsers);
                 setUsers(connectedUsers || []);
             });
 
             newSocket.on('matchCreated', (newMatch) => {
+                console.log('Nouveau match créé:', newMatch);
                 setMatches((prev) => [...prev, newMatch]);
                 fetchTeamMembers(newMatch.id, token);
             });
 
             newSocket.on('matchDeleted', (data) => {
                 const matchId = data.matchId || data;
+                console.log('Match supprimé:', matchId);
                 setMatches((prev) => prev.filter((match) => match.id !== matchId));
                 setTeamMembersByMatch((prev) => {
                     const updated = { ...prev };
@@ -273,6 +283,7 @@ function Game() {
             });
 
             newSocket.on('teamAssigned', ({ matchId, userId, teamId, username, updatedMatch }) => {
+                console.log('Équipe assignée:', { matchId, userId, teamId, username });
                 setTeamMembersByMatch((prev) => ({
                     ...prev,
                     [matchId]: {
@@ -283,6 +294,7 @@ function Game() {
             });
 
             newSocket.on('game-started', ({ gameId }) => {
+                console.log('Événement game-started reçu pour gameId:', gameId);
                 localStorage.setItem('selectedGameId', gameId);
                 navigate('/attack');
             });
@@ -293,10 +305,11 @@ function Game() {
             }
 
             return () => {
+                console.log('Déconnexion du socket');
                 newSocket.disconnect();
             };
         } catch (error) {
-            setError('Erreur d\'authentification, veuillez vous reconnecter.');
+            setError('Erreur d\'authentification, veuillez réessayer')
             Cookies.remove('token');
             navigate('/login');
         }

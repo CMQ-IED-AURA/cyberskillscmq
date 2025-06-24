@@ -264,7 +264,7 @@ export const setupSocketIO = (io: SocketIOServer) => {
                     return;
                 }
 
-                // Assign roles to players who haven't joined yet
+                // Assign roles to players who haven't joined yet and join all players to the game room
                 const allPlayers = [...redTeamPlayers, ...blueTeamPlayers];
                 const assignedRoles = game.players.map((p) => p.roleId);
                 for (const user of allPlayers) {
@@ -285,6 +285,7 @@ export const setupSocketIO = (io: SocketIOServer) => {
                         assignedRoles.push(role.id);
                         const userSocket = connectedUsers.get(user.id);
                         if (userSocket) {
+                            io.sockets.sockets.get(userSocket.socketId)?.join(gameId);
                             io.to(userSocket.socketId).emit('role-assigned', {
                                 team,
                                 roleId: role.id,
@@ -305,6 +306,7 @@ export const setupSocketIO = (io: SocketIOServer) => {
                     players: game.players,
                 });
 
+                console.log(`Émission de game-started pour gameId: ${gameId}`);
                 io.to(gameId).emit('game-started', { gameId });
 
                 // Set timeout for game duration (30 minutes)
@@ -313,7 +315,7 @@ export const setupSocketIO = (io: SocketIOServer) => {
                 console.log(`Partie ${gameId} démarrée`);
             } catch (err: any) {
                 console.error('Erreur start-game:', err.message);
-                socket.emit('error', { message: 'Erreur lors du démarrage' });
+                socket.emit('error', { message: 'Erreur lors du démarrage: ' + err.message });
             }
         });
 
