@@ -292,7 +292,7 @@ const PasswordGame = ({ onComplete }) => {
             <input
                 type="number"
                 value={length}
-                onChange={(e) => setLength(parseInt(e.target.value))}
+                onChange={(e) => setLength(parseInt(e.target.value) || 0)}
                 className="w-full p-2 bg-gray-800 text-white border-none rounded mb-2"
             />
             <button
@@ -357,6 +357,7 @@ const CyberWarGame = () => {
     const [socket, setSocket] = useState(null);
     const [gameId] = useState(localStorage.getItem('selectedGameId') || 'default-game');
     const [playerId, setPlayerId] = useState(null);
+    const [playerName, setPlayerName] = useState(`Player_${Math.random().toString(36).substr(2, 9)}`);
     const [connectedPlayers, setConnectedPlayers] = useState([]);
     const [gameStatus, setGameStatus] = useState('waiting');
     const [connectionStatus, setConnectionStatus] = useState('disconnected');
@@ -370,6 +371,7 @@ const CyberWarGame = () => {
                 type: 'ADD_LOG',
                 payload: `[${new Date().toLocaleTimeString('fr-FR')}] ${game.selectedTeam === 'attackers' ? '💥' : '🛡️'} ${msg}`,
             });
+            console.log('Log:', msg);
         },
         [game.selectedTeam]
     );
@@ -377,6 +379,7 @@ const CyberWarGame = () => {
     const handleReconnect = useCallback(() => {
         if (reconnectAttempts >= 10) {
             setErrorMessage('Impossible de reconnecter après 10 tentatives.');
+            addLog('Échec de la reconnexion: limite d’essais atteinte.');
             return;
         }
         socketInstance = null;
@@ -384,9 +387,10 @@ const CyberWarGame = () => {
         setSocket(newSocket);
         setReconnectAttempts((prev) => prev + 1);
         if (playerId && gameId) {
-            newSocket.emit('rejoin-game', { gameId, playerId });
+            newSocket.emit('rejoin-game', { gameId, playerId, playerName });
+            addLog('Tentative de reconnexion...');
         }
-    }, [reconnectAttempts, playerId, gameId]);
+    }, [reconnectAttempts, playerId, gameId, playerName, addLog]);
 
     useEffect(() => {
         const newSocket = getSocket();
@@ -396,15 +400,39 @@ const CyberWarGame = () => {
             setConnectionStatus('connected');
             setReconnectAttempts(0);
             setErrorMessage('');
-            const playerName = `Player_${Math.random().toString(36).substr(2, 9)}`;
-            newSocket.emit('join-game', { gameId, playerName });
+            newSocket.emit('join-game', {
+                gameId,
+                playerName,
+                team: game.selectedTeam,
+                roleId: game.selectedRole,
+            });
             addLog(`Connecté au serveur en tant que ${playerName}.`);
+            console.log('WebSocket connected:', newSocket.id);
         });
 
         newSocket.on('connect_error', (error) => {
             setConnectionStatus('error');
             setErrorMessage('Erreur de connexion au serveur. Retentez ou vérifiez votre réseau.');
             addLog('Erreur de connexion au serveur.');
+            console.error('WebSocket connect error:', error);
+        });
+
+        newSocket.on('player-joined', (player) => {
+            setConnectedPlayers((prev) => {
+                const updated = [...prev.filter((p) => p.id !== player.id), player];
+                console.log('Player joined:', updated);
+                return updated;
+            });
+            addLog(`Joueur ${player.name} a rejoint (${player.team}).`);
+        });
+
+        newSocket.on('player-left', (player) => {
+            setConnectedPlayers((prev) => {
+                const updated = prev.filter((p) => p.id !== player.id);
+                console.log('Player left:', updated);
+                return updated;
+            });
+            addLog(`Joueur ${player.name} a quitté.`);
         });
 
         newSocket.on('role-assigned', (data) => {
@@ -412,7 +440,20 @@ const CyberWarGame = () => {
             dispatch({ type: 'SET_ROLE', payload: data.roleId });
             dispatch({ type: 'SET_ROLE_ASSIGNED' });
             setPlayerId(data.playerId);
+            setPlayerName(data.playerName);
             setAssignedRoles((prev) => [...new Set([...prev, data.roleId])]);
+            setConnectedPlayers((prev) => {
+                const updated = [...prev.filter((p) => p.id !== data.playerId), {
+                    id: data.playerId,
+                    name: data.playerName,
+                    team: data.team,
+                    roleId: data.roleId,
+                    roleName: roles[data.team]?.find((r) => r.id === data.roleId)?.name || 'Unknown',
+                    roleIcon: roles[data.team]?.find((r) => r.id === data.roleId)?.icon || '',
+                }];
+                console.log('Role assigned, updated players:', updated);
+                return updated;
+            });
             addLog(`Rôle assigné : ${data.roleName} (${data.team}).`);
         });
 
@@ -421,6 +462,7 @@ const CyberWarGame = () => {
             setGameStatus(gameState.status);
             const rolesAssigned = gameState.players.map((p) => p.roleId);
             setAssignedRoles([...new Set(rolesAssigned)]);
+            console.log('Game state update:', gameState);
             if (gameState.status === 'playing' && game.state !== 'game') {
                 dispatch({ type: 'SET_STATE', payload: 'intro' });
             }
@@ -461,6 +503,19 @@ const CyberWarGame = () => {
             dispatch({ type: 'SET_ROLE', payload: data.roleId });
             dispatch({ type: 'SET_ROLE_ASSIGNED' });
             setPlayerId(data.playerId);
+            setPlayerName(data.playerName);
+            setConnectedPlayers((prev) => {
+                const updated = [...prev.filter((p) => p.id !== data.playerId), {
+                    id: data.playerId,
+                    name: data.playerName,
+                    team: data.team,
+                    roleId: data.roleId,
+                    roleName: roles[data.team]?.find((r) => r.id === data.roleId)?.name || 'Unknown',
+                    roleIcon: roles[data.team]?.find((r) => r.id === data.roleId)?.icon || '',
+                }];
+                console.log('Rejoin success, updated players:', updated);
+                return updated;
+            });
             addLog(`Reconnexion réussie : ${data.roleName} (${data.team}).`);
         });
 
@@ -468,7 +523,7 @@ const CyberWarGame = () => {
             newSocket.close();
             setConnectionStatus('disconnected');
         };
-    }, [addLog, gameId, game.state]);
+    }, [addLog, gameId, game.state, game.selectedTeam, game.selectedRole, playerName]);
 
     const sendAction = useCallback(
         (actionType, actionData) => {
@@ -478,14 +533,14 @@ const CyberWarGame = () => {
                     gameId,
                     type: actionType,
                     data: actionData,
-                    playerName: connectedPlayers.find((p) => p.id === playerId)?.name || 'Unknown',
+                    playerName,
                     timestamp: Date.now(),
                 });
             } else {
                 addLog('Impossible d’envoyer l’action: non connecté.');
             }
         },
-        [socket, playerId, gameId, connectedPlayers, addLog]
+        [socket, playerId, gameId, playerName, addLog]
     );
 
     const handleAction = useCallback(
@@ -518,9 +573,11 @@ const CyberWarGame = () => {
         setMiniGame(null);
         setGameStatus('waiting');
         setAssignedRoles([]);
+        const newPlayerName = `Player_${Math.random().toString(36).substr(2, 9)}`;
+        setPlayerName(newPlayerName);
         socket.emit('join-game', {
             gameId,
-            playerName: `Player_${Math.random().toString(36).substr(2, 9)}`,
+            playerName: newPlayerName,
         });
     }, [socket, gameId]);
 
@@ -532,9 +589,12 @@ const CyberWarGame = () => {
             const uniqueRoles = [...new Set(assignedRoles)];
             if (uniqueRoles.length === 6 && requiredRoles.every((r) => uniqueRoles.includes(r))) {
                 socket.emit('start-game', { gameId });
+                addLog('Partie démarrée.');
             } else {
                 addLog('Impossible de démarrer : tous les rôles uniques ne sont pas assignés.');
             }
+        } else {
+            addLog('Impossible de démarrer : non connecté au serveur.');
         }
     }, [socket, gameId, assignedRoles, addLog]);
 
@@ -700,6 +760,14 @@ const CyberWarGame = () => {
             roles.attackers.every((r) => assignedRoles.includes(r.id)) &&
             roles.defenders.every((r) => assignedRoles.includes(r.id));
 
+        const currentPlayer = connectedPlayers.find((p) => p.id === playerId) || {
+            id: playerId,
+            name: playerName,
+            team: game.selectedTeam || 'unknown',
+            roleName: game.selectedRole ? roles[game.selectedTeam]?.find((r) => r.id === game.selectedRole)?.name || 'Non assigné' : 'Non assigné',
+            roleIcon: game.selectedRole ? roles[game.selectedTeam]?.find((r) => r.id === game.selectedRole)?.icon || '' : '',
+        };
+
         return (
             <div className="bg-gray-900 min-h-screen p-8 text-white text-center">
                 {errorMessage && (
@@ -716,7 +784,7 @@ const CyberWarGame = () => {
                 )}
                 <h1 className="text-3xl text-blue-500 mb-5">Salle d'Attente - Technetron Bank CyberWar</h1>
                 <p className={`text-lg mb-5 ${connectionStatus === 'connected' ? 'text-green-500' : 'text-red-500'}`}>
-                    Statut : {connectionStatus === 'connected' ? 'Connecté au serveur' : 'En attente de connexion...'}
+                    Statut : {connectionStatus === 'connected' ? `Connecté en tant que ${currentPlayer.name}` : 'En attente de connexion...'}
                 </p>
                 <div className="bg-gray-800 p-5 rounded-lg mb-5 max-w-2xl mx-auto">
                     <h3 className="text-blue-500 mb-4">Joueurs connectés ({connectedPlayers.length}/6)</h3>
@@ -726,8 +794,8 @@ const CyberWarGame = () => {
                             {connectedPlayers
                                 .filter((p) => p.team === 'attackers')
                                 .map((player) => (
-                                    <div key={player.id} className="bg-red-500 p-2 rounded mb-2 text-white">
-                                        {player.name} - {player.roleName} {player.roleIcon}
+                                    <div key={player.id} className={`p-2 rounded mb-2 ${player.id === playerId ? 'bg-yellow-500 text-black' : 'bg-red-500 text-white'}`}>
+                                        {player.name} - {player.roleName} {player.roleIcon} {player.id === playerId ? '(Vous)' : ''}
                                     </div>
                                 ))}
                         </div>
@@ -736,8 +804,8 @@ const CyberWarGame = () => {
                             {connectedPlayers
                                 .filter((p) => p.team === 'defenders')
                                 .map((player) => (
-                                    <div key={player.id} className="bg-green-500 p-2 rounded mb-2 text-black">
-                                        {player.name} - {player.roleName} {player.roleIcon}
+                                    <div key={player.id} className={`p-2 rounded mb-2 ${player.id === playerId ? 'bg-yellow-500 text-black' : 'bg-green-500 text-black'}`}>
+                                        {player.name} - {player.roleName} {player.roleIcon} {player.id === playerId ? '(Vous)' : ''}
                                     </div>
                                 ))}
                         </div>
@@ -811,7 +879,7 @@ const CyberWarGame = () => {
                             ))}
                         </div>
                     </aside>
-                    <div className="flex-1">
+                    < Division className="flex-1">
                         <div className="flex gap-3 mb-4">
                             <button
                                 onClick={() => dispatch({ type: 'SET_ACTIVE_TAB', payload: 'website' })}
@@ -838,10 +906,10 @@ const CyberWarGame = () => {
                                 addLog={addLog}
                             />
                         )}
-                    </div>
-                </main>
             </div>
-        );
+    </main>
+    </div>
+    );
     };
 
     const RoleDetailsScreen = () => {
