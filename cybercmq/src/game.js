@@ -214,6 +214,7 @@ function Game() {
                 navigate('/login');
                 return;
             }
+            console.log(`Tentative de réinitialisation du match ${matchId}`);
             const res = await fetch(`https://cyberskills.onrender.com/match/${matchId}/reset`, {
                 method: 'POST',
                 headers: {
@@ -224,9 +225,13 @@ function Game() {
             const data = await res.json();
             if (!data.success) {
                 setError(data.message || 'Erreur lors de la réinitialisation du match');
+            } else {
+                console.log(`Match ${matchId} réinitialisé avec succès`);
+                setError('Match réinitialisé. Essayez de lancer à nouveau.');
             }
         } catch (error) {
             setError('Erreur serveur lors de la réinitialisation du match.');
+            console.error('Erreur reset:', error);
         } finally {
             setLoading(false);
         }
@@ -250,10 +255,21 @@ function Game() {
         if (socket && socket.connected) {
             console.log('Émission de start-game pour gameId:', selectedMatch.id);
             socket.emit('start-game', { gameId: selectedMatch.id });
+            // Listen for error to attempt reset if game is already started
+            socket.once('error', (data) => {
+                console.log('Erreur reçue lors de start-game:', data);
+                if (data.message === 'Partie non disponible ou déjà commencée') {
+                    setError('Partie déjà commencée. Tentative de réinitialisation...');
+                    handleResetGame(selectedMatch.id).then(() => {
+                        console.log('Réessai de start-game après réinitialisation');
+                        socket.emit('start-game', { gameId: selectedMatch.id });
+                    });
+                }
+            });
         } else {
             setError('Impossible de lancer le match: non connecté au serveur.');
         }
-    }, [selectedMatch, loading, socket, teamMembersByMatch, navigate]);
+    }, [selectedMatch, loading, socket, teamMembersByMatch, navigate, handleResetGame]);
 
     const handleJoinMatch = useCallback(() => {
         if (!selectedMatch) {
@@ -359,9 +375,14 @@ function Game() {
             });
 
             newSocket.on('game-started', ({ gameId }) => {
-                console.log('Événement game-started reçu pour gameId:', gameId);
+                console.log('Événement game-started reçu pour gameId:', gameId, 'par socketId:', newSocket.id);
                 localStorage.setItem('selectedGameId', gameId);
                 navigate('/attack');
+            });
+
+            newSocket.on('game-reset', ({ matchId }) => {
+                console.log('Événement game-reset reçu pour matchId:', matchId);
+                setError('Match réinitialisé par le serveur. Essayez de lancer à nouveau.');
             });
 
             fetchMatches(token);

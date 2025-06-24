@@ -269,6 +269,7 @@ export const setupSocketIO = (io: SocketIOServer) => {
                     return;
                 }
                 const game = games.get(gameId);
+                console.log(`État du jeu ${gameId} avant start-game:`, game ? { status: game.status, players: game.players.length } : 'non trouvé');
                 if (!game || game.status !== 'waiting') {
                     console.error(`Erreur start-game: Partie ${gameId} non disponible ou déjà ${game?.status || 'non trouvée'}`);
                     socket.emit('error', { message: 'Partie non disponible ou déjà commencée' });
@@ -317,7 +318,7 @@ export const setupSocketIO = (io: SocketIOServer) => {
                         assignedRoles.push(role.id);
                         const userSocket = connectedUsers.get(user.id);
                         if (userSocket) {
-                            console.log(`Ajout de l'utilisateur ${user.id} au salon ${gameId}`);
+                            console.log(`Ajout de l'utilisateur ${user.id} (${user.username}) au salon ${gameId} avec socketId ${userSocket.socketId}`);
                             io.sockets.sockets.get(userSocket.socketId)?.join(gameId);
                             io.to(userSocket.socketId).emit('role-assigned', {
                                 team,
@@ -326,6 +327,8 @@ export const setupSocketIO = (io: SocketIOServer) => {
                                 roleIcon: role.icon,
                                 playerId: user.id,
                             });
+                        } else {
+                            console.warn(`Utilisateur ${user.id} (${user.username}) non connecté, ajouté sans socketId`);
                         }
                     }
                 }
@@ -339,7 +342,7 @@ export const setupSocketIO = (io: SocketIOServer) => {
                     players: game.players,
                 });
 
-                console.log(`Émission de game-started pour gameId: ${gameId} à ${game.players.length} joueurs`);
+                console.log(`Émission de game-started pour gameId: ${gameId} à ${game.players.length} joueurs:`, game.players.map(p => ({ id: p.id, name: p.name, socketId: p.socketId })));
                 io.to(gameId).emit('game-started', { gameId });
 
                 // Set timeout for game duration (30 minutes)
@@ -734,6 +737,8 @@ router.post('/:matchId/reset', authenticateToken, requireAdmin, async (req: Auth
             return res.status(404).json({ success: false, message: 'Match non trouvé' });
         }
 
+        const game = games.get(matchId);
+        console.log(`Réinitialisation du match ${matchId}. État actuel:`, game ? { status: game.status, players: game.players.length } : 'non trouvé');
         games.delete(matchId); // Reset game state
         const io = getSocketIO(req);
         if (io) {
