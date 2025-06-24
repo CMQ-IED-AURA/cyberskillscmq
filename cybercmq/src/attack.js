@@ -879,7 +879,7 @@ const CyberWarGame = () => {
                             ))}
                         </div>
                     </aside>
-                    < Division className="flex-1">
+                    <div className="flex-1">
                         <div className="flex gap-3 mb-4">
                             <button
                                 onClick={() => dispatch({ type: 'SET_ACTIVE_TAB', payload: 'website' })}
@@ -906,10 +906,10 @@ const CyberWarGame = () => {
                                 addLog={addLog}
                             />
                         )}
+                    </div>
+                </main>
             </div>
-    </main>
-    </div>
-    );
+        );
     };
 
     const RoleDetailsScreen = () => {
