@@ -8,13 +8,15 @@ import './game.css';
 let socketInstance = null;
 
 function getSocket(token) {
-    if (!socketInstance || !socketInstance.connected) {
+    if (!socketInstance || socketInstance.disconnected) {
         socketInstance = io('https://cyberskills.onrender.com', {
             auth: { token },
             transports: ['websocket', 'polling'],
             reconnection: true,
             reconnectionAttempts: 15,
             reconnectionDelay: 1000,
+            reconnectionDelayMax: 5000,
+            randomizationFactor: 0.5,
         });
     }
     return socketInstance;
@@ -55,6 +57,7 @@ function Game() {
             }
         } catch (error) {
             setError('Erreur serveur lors de la récupération des matchs.');
+            console.error('Erreur fetchMatches:', error);
         } finally {
             setLoading(false);
         }
@@ -80,6 +83,7 @@ function Game() {
             }
         } catch (error) {
             setError('Erreur serveur lors de la récupération des membres.');
+            console.error('Erreur fetchTeamMembers:', error);
         }
     }, []);
 
@@ -96,6 +100,7 @@ function Game() {
             }
         } catch (error) {
             setError('Erreur lors de la récupération des utilisateurs.');
+            console.error('Erreur fetchUsers:', error);
         }
     }, []);
 
@@ -123,6 +128,7 @@ function Game() {
             }
         } catch (error) {
             setError('Erreur serveur lors de la création du match.');
+            console.error('Erreur handleCreateMatch:', error);
         } finally {
             setLoading(false);
         }
@@ -156,6 +162,7 @@ function Game() {
             }
         } catch (error) {
             setError('Erreur serveur lors de la suppression du match.');
+            console.error('Erreur handleDeleteMatch:', error);
         } finally {
             setLoading(false);
         }
@@ -194,6 +201,7 @@ function Game() {
             }
         } catch (error) {
             setError(`Erreur lors de l'assignation: ${error.message}`);
+            console.error('Erreur handleAssignTeam:', error);
         } finally {
             setLoading(false);
         }
@@ -229,14 +237,16 @@ function Game() {
             } else {
                 console.log(`Match ${matchId} réinitialisé avec succès`);
                 setError('Match réinitialisé. Essayez de lancer à nouveau.');
+                // Forcer la récupération des matchs pour s'assurer que l'état est à jour
+                fetchMatches(token);
             }
         } catch (error) {
             setError('Erreur serveur lors de la réinitialisation du match.');
-            console.error('Erreur reset:', error);
+            console.error('Erreur handleResetGame:', error);
         } finally {
             setLoading(false);
         }
-    }, [loading, navigate]);
+    }, [loading, navigate, fetchMatches]);
 
     const handleLaunchMatch = useCallback(() => {
         if (!selectedMatch || loading) {
@@ -259,15 +269,29 @@ function Game() {
             socket.once('error', (data) => {
                 console.log('Erreur reçue lors de start-game:', data);
                 if (data.message === 'Partie non disponible ou déjà commencée') {
-                    setError('Le match est déjà en cours ou terminé. Veuillez cliquer sur "Réinitialiser le match" avant de relancer.');
+                    setError('Le match est déjà en cours ou terminé. Veuillez réinitialiser le match avant de relancer.');
                 } else {
                     setError(data.message || 'Erreur inconnue lors du lancement du match.');
                 }
             });
+            socket.once('game-started', ({ gameId }) => {
+                console.log('Événement game-started reçu pour gameId:', gameId);
+                localStorage.setItem('selectedGameId', gameId);
+                socket.emit('join-game', { gameId, playerName: username || 'Joueur' });
+                navigate('/attack');
+            });
         } else {
-            setError('Impossible de lancer le match: non connecté au serveur.');
+            setError('Impossible de lancer le match: non connecté au serveur. Tentative de reconnexion...');
+            const newSocket = getSocket(token);
+            newSocket.on('connect', () => {
+                console.log('Reconnexion réussie, nouvelle tentative de lancement');
+                newSocket.emit('start-game', { gameId: selectedMatch.id });
+            });
+            newSocket.on('connect_error', (error) => {
+                setError('Échec de la reconnexion au serveur: ' + error.message);
+            });
         }
-    }, [selectedMatch, loading, socket, teamMembersByMatch, navigate]);
+    }, [selectedMatch, loading, socket, teamMembersByMatch, navigate, username]);
 
     const handleJoinMatch = useCallback(() => {
         if (!selectedMatch) {
@@ -280,10 +304,21 @@ function Game() {
             navigate('/login');
             return;
         }
-        console.log('Rejoindre le match, navigation vers /attack pour gameId:', selectedMatch.id);
-        localStorage.setItem('selectedGameId', selectedMatch.id);
-        socket.emit('join-game', { gameId: selectedMatch.id, playerName: username || 'Joueur' });
-        navigate('/attack');
+        if (socket && socket.connected) {
+            console.log('Rejoindre le match, émission de join-game pour gameId:', selectedMatch.id);
+            localStorage.setItem('selectedGameId', selectedMatch.id);
+            socket.emit('join-game', { gameId: selectedMatch.id, playerName: username || 'Joueur' });
+            socket.once('role-assigned', (data) => {
+                console.log('Rôle assigné:', data);
+                navigate('/attack');
+            });
+            socket.once('error', (data) => {
+                console.log('Erreur reçue lors de join-game:', data);
+                setError(data.message || 'Erreur inconnue lors de la jointure du match.');
+            });
+        } else {
+            setError('Impossible de rejoindre le match: non connecté au serveur.');
+        }
     }, [selectedMatch, navigate, socket, username]);
 
     useEffect(() => {
@@ -328,7 +363,18 @@ function Game() {
 
             newSocket.on('connect_error', (error) => {
                 console.log('Erreur de connexion WebSocket:', error);
-                setError('Erreur de connexion au serveur WebSocket: ' + error.message);
+                setError('Erreur de connexion au serveur Web - tentative de reconnexion...');
+            });
+
+            newSocket.on('reconnect', (attempt) => {
+                console.log(`Reconnexion réussie après ${attempt} tentatives`);
+                setError(null);
+                newSocket.emit('authenticate', token);
+            });
+
+            newSocket.on('reconnect_error', (error) => {
+                console.log('Erreur de reconnexion WebSocket:', error);
+                setError('Échec de la reconnexion au serveur: ' + error.message);
             });
 
             newSocket.on('error', (data) => {
@@ -375,12 +421,14 @@ function Game() {
             newSocket.on('game-started', ({ gameId }) => {
                 console.log('Événement game-started reçu pour gameId:', gameId, 'par socketId:', newSocket.id);
                 localStorage.setItem('selectedGameId', gameId);
+                newSocket.emit('join-game', { gameId, playerName: username || 'Joueur' });
                 navigate('/attack');
             });
 
             newSocket.on('game-reset', ({ matchId }) => {
                 console.log('Événement game-reset reçu pour matchId:', matchId);
                 setError('Match réinitialisé par le serveur. Essayez de lancer à nouveau.');
+                fetchMatches(token); // Rafraîchir les matchs après réinitialisation
             });
 
             fetchMatches(token);
