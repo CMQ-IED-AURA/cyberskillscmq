@@ -154,20 +154,11 @@ export const setupSocketIO = (io: SocketIOServer) => {
                     return;
                 }
 
-                if (game.players.length >= 6) {
-                    socket.emit('error', { message: 'Partie complète' });
-                    return;
-                }
-
                 const assignedRoles = game.players.map((p) => p.roleId);
-                const team = game.players.filter((p) => p.team === 'attackers').length < 3 ? 'attackers' : 'defenders';
+                const team = game.players.filter((p) => p.team === 'attackers').length <= game.players.filter((p) => p.team === 'defenders').length ? 'attackers' : 'defenders';
                 const availableRoles = roles[team].filter((r) => !assignedRoles.includes(r.id));
-                if (availableRoles.length === 0) {
-                    socket.emit('error', { message: 'Aucun rôle disponible' });
-                    return;
-                }
+                const role = availableRoles.length > 0 ? availableRoles[Math.floor(Math.random() * availableRoles.length)] : roles[team][Math.floor(Math.random() * roles[team].length)];
 
-                const role = availableRoles[Math.floor(Math.random() * availableRoles.length)];
                 const player: Player = {
                     id: decoded.userId,
                     name: playerName,
@@ -266,57 +257,43 @@ export const setupSocketIO = (io: SocketIOServer) => {
                     return;
                 }
 
-                const players = [...match.redTeam.users, ...match.blueTeam.users];
-                if (players.length !== 6) {
-                    socket.emit('error', { message: 'La partie doit avoir exactement 6 joueurs' });
+                const redTeamPlayers = match.redTeam.users;
+                const blueTeamPlayers = match.blueTeam.users;
+                if (redTeamPlayers.length < 1 || blueTeamPlayers.length < 1) {
+                    socket.emit('error', { message: 'Chaque équipe doit avoir au moins un joueur' });
                     return;
                 }
 
-                // Assign roles randomly if not already assigned
+                // Assign roles to players who haven't joined yet
+                const allPlayers = [...redTeamPlayers, ...blueTeamPlayers];
                 const assignedRoles = game.players.map((p) => p.roleId);
-                const unassignedPlayers = players.filter((p) => !game.players.find((gp) => gp.id === p.id));
-                for (const user of unassignedPlayers) {
-                    const team = game.players.filter((p) => p.team === 'attackers').length < 3 ? 'attackers' : 'defenders';
-                    const availableRoles = roles[team].filter((r) => !assignedRoles.includes(r.id));
-                    if (availableRoles.length === 0) {
-                        socket.emit('error', { message: 'Aucun rôle disponible' });
-                        return;
-                    }
-                    const role = availableRoles[Math.floor(Math.random() * availableRoles.length)];
-                    const player: Player = {
-                        id: user.id,
-                        name: user.username,
-                        socketId: connectedUsers.get(user.id)?.socketId || '',
-                        team,
-                        roleId: role.id,
-                        roleName: role.name,
-                        roleIcon: role.icon,
-                    };
-                    game.players.push(player);
-                    assignedRoles.push(role.id);
-                    const userSocket = connectedUsers.get(user.id);
-                    if (userSocket) {
-                        io.to(userSocket.socketId).emit('role-assigned', {
+                for (const user of allPlayers) {
+                    if (!game.players.find((p) => p.id === user.id)) {
+                        const team = redTeamPlayers.some((p) => p.id === user.id) ? 'attackers' : 'defenders';
+                        const availableRoles = roles[team].filter((r) => !assignedRoles.includes(r.id));
+                        const role = availableRoles.length > 0 ? availableRoles[Math.floor(Math.random() * availableRoles.length)] : roles[team][Math.floor(Math.random() * roles[team].length)];
+                        const player: Player = {
+                            id: user.id,
+                            name: user.username,
+                            socketId: connectedUsers.get(user.id)?.socketId || '',
                             team,
                             roleId: role.id,
                             roleName: role.name,
                             roleIcon: role.icon,
-                            playerId: user.id,
-                        });
+                        };
+                        game.players.push(player);
+                        assignedRoles.push(role.id);
+                        const userSocket = connectedUsers.get(user.id);
+                        if (userSocket) {
+                            io.to(userSocket.socketId).emit('role-assigned', {
+                                team,
+                                roleId: role.id,
+                                roleName: role.name,
+                                roleIcon: role.icon,
+                                playerId: user.id,
+                            });
+                        }
                     }
-                }
-
-                const attackerRoles = roles.attackers.map((r) => r.id);
-                const defenderRoles = roles.defenders.map((r) => r.id);
-                const uniqueRoles = [...new Set(game.players.map((p) => p.roleId))];
-                if (
-                    game.players.length !== 6 ||
-                    uniqueRoles.length !== 6 ||
-                    !attackerRoles.every((r) => uniqueRoles.includes(r)) ||
-                    !defenderRoles.every((r) => uniqueRoles.includes(r))
-                ) {
-                    socket.emit('error', { message: 'Conditions de démarrage non remplies' });
-                    return;
                 }
 
                 game.status = 'playing';
@@ -330,8 +307,8 @@ export const setupSocketIO = (io: SocketIOServer) => {
 
                 io.to(gameId).emit('game-started', { gameId });
 
-                // Set timeout for game duration (10 minutes)
-                setTimeout(() => endGame(gameId, io), 10 * 60 * 1000);
+                // Set timeout for game duration (30 minutes)
+                setTimeout(() => endGame(gameId, io), 30 * 60 * 1000);
 
                 console.log(`Partie ${gameId} démarrée`);
             } catch (err: any) {
@@ -377,14 +354,15 @@ export const setupSocketIO = (io: SocketIOServer) => {
                     connectedUsers.delete(userId);
                     prisma.user
                         .findMany({ select: { id: true, username: true, teamId: true, role: true } })
-                        .then((allUsers) => {
-                            const usersWithConnectionInfo = allUsers.map((u) => ({
+                        .then((users) => {
+                            const usersWithConnectionInfo = users.map((u) => ({
                                 ...u,
                                 isConnected: connectedUsers.has(u.id),
                                 socketId: connectedUsers.get(u.id)?.socketId || null,
                             }));
                             io.emit('connectedUsers', usersWithConnectionInfo);
-                        });
+                        })
+                        .catch((err) => console.error('Erreur lors de la mise à jour des utilisateurs:', err.message));
                     break;
                 }
             }

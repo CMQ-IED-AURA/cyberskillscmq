@@ -32,7 +32,6 @@ function Game() {
     const [socket, setSocket] = useState(null);
     const [error, setError] = useState(null);
     const [loading, setLoading] = useState(false);
-    const [reconnectAttempts, setReconnectAttempts] = useState(0);
 
     const fetchMatches = useCallback(async (token) => {
         setLoading(true);
@@ -190,8 +189,8 @@ function Game() {
             setError('Veuillez sélectionner un match.');
             return;
         }
-        if (teamMembersByMatch[selectedMatch.id]?.redTeam?.length !== 3 || teamMembersByMatch[selectedMatch.id]?.blueTeam?.length !== 3) {
-            setError('Chaque équipe doit avoir exactement 3 joueurs.');
+        if (!teamMembersByMatch[selectedMatch.id]?.redTeam?.length || !teamMembersByMatch[selectedMatch.id]?.blueTeam?.length) {
+            setError('Chaque équipe doit avoir au moins un joueur.');
             return;
         }
         if (socket && socket.connected) {
@@ -209,15 +208,6 @@ function Game() {
         localStorage.setItem('selectedGameId', selectedMatch.id);
         navigate('/attack');
     }, [selectedMatch, navigate]);
-
-    const handleReconnect = useCallback(() => {
-        if (reconnectAttempts >= 10) return;
-        const token = Cookies.get('token');
-        socketInstance = null;
-        const newSocket = getSocket(token);
-        setSocket(newSocket);
-        setReconnectAttempts((prev) => prev + 1);
-    }, [reconnectAttempts]);
 
     useEffect(() => {
         const token = Cookies.get('token');
@@ -244,7 +234,6 @@ function Game() {
             newSocket.on('connect', () => {
                 console.log('Connecté au WebSocket:', newSocket.id);
                 newSocket.emit('authenticate', token);
-                setReconnectAttempts(0);
             });
 
             newSocket.on('authenticated', (data) => {
@@ -340,11 +329,6 @@ function Game() {
                 {error && (
                     <div className="error-message">
                         {error}
-                        {error.includes('WebSocket') && (
-                            <button onClick={handleReconnect} disabled={reconnectAttempts >= 10} className="btn btn-modern">
-                                Réessayer ({10 - reconnectAttempts} tentatives restantes)
-                            </button>
-                        )}
                     </div>
                 )}
                 {loading && <div className="loading">Chargement...</div>}
