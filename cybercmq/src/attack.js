@@ -3,6 +3,21 @@ import { Shield, Sword, Clock, Globe, Info } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import io from 'socket.io-client';
 
+// Singleton WebSocket instance
+let socketInstance = null;
+
+function getSocket() {
+    if (!socketInstance || !socketInstance.connected) {
+        socketInstance = io('https://cyberskills.onrender.com', {
+            transports: ['websocket'],
+            reconnection: true,
+            reconnectionAttempts: 10,
+            reconnectionDelay: 1000,
+        });
+    }
+    return socketInstance;
+}
+
 const initialGameState = {
     state: 'intro',
     selectedTeam: null,
@@ -227,7 +242,7 @@ const TerminalInterface = ({ role, team, serverState, setServerState, handleActi
                 addLog('Scan nmap effectué.');
             } else if (cmdTrim === 'ssh admin@10.0.0.1 admin2025' && serverState.services.ssh.vulnerable && !serverState.services.ssh.fixed) {
                 result = 'Accès SSH obtenu ! Flag: FLAG-SSH-101';
-                setServerState((prev) => ({ ...prev, accessLevel: 'user' }));
+                setServerState((prev) => ({ ...prev, accessLevel: 'team' }));
                 addLog('Accès SSH réussi. Soumettez FLAG-SSH-101.');
             } else {
                 result = 'Commande invalide.';
@@ -391,11 +406,13 @@ const CyberWarGame = () => {
     const [server, setServer] = useState(serverInitialState);
     const [miniGame, setMiniGame] = useState(null);
     const [socket, setSocket] = useState(null);
-    const [gameId, setGameId] = useState('default-game');
+    const [gameId] = useState(localStorage.getItem('selectedGameId') || 'default-game');
     const [playerId, setPlayerId] = useState(null);
     const [connectedPlayers, setConnectedPlayers] = useState([]);
     const [gameStatus, setGameStatus] = useState('waiting');
     const [connectionStatus, setConnectionStatus] = useState('disconnected');
+    const [reconnectAttempts, setReconnectAttempts] = useState(0);
+    const [assignedRoles, setAssignedRoles] = useState([]);
 
     const addLog = useCallback(
         (msg) => dispatch({
@@ -405,22 +422,28 @@ const CyberWarGame = () => {
         [game.selectedTeam]
     );
 
-    useEffect(() => {
-        const socketUrl = 'https://cyberskills.onrender.com';
-        const newSocket = io(socketUrl, {
-            transports: ['websocket'],
-            reconnectionAttempts: 5,
-        });
+    const handleReconnect = useCallback(() => {
+        if (reconnectAttempts >= 10) return;
+        socketInstance = null;
+        const newSocket = getSocket();
+        setSocket(newSocket);
+        setReconnectAttempts((prev) => prev + 1);
+        if (playerId && gameId) {
+            newSocket.emit('rejoin-game', { gameId, playerId });
+        }
+    }, [reconnectAttempts, playerId, gameId]);
 
-        setConnectionStatus('connecting');
+    useEffect(() => {
+        const newSocket = getSocket();
         setSocket(newSocket);
 
         newSocket.on('connect', () => {
             console.log('Connecté au serveur WebSocket:', newSocket.id);
             setConnectionStatus('connected');
+            setReconnectAttempts(0);
             newSocket.emit('join-game', {
-                gameId: gameId,
-                playerName: `Player_${Math.random().toString(36).substr(2, 9)}`
+                gameId,
+                playerName: `Player_${Math.random().toString(36).substr(2, 9)}`,
             });
         });
 
@@ -436,13 +459,16 @@ const CyberWarGame = () => {
             dispatch({ type: 'SET_ROLE', payload: data.roleId });
             dispatch({ type: 'SET_ROLE_ASSIGNED' });
             setPlayerId(data.playerId);
+            setAssignedRoles((prev) => [...new Set([...prev, data.roleId])]);
             addLog(`Rôle assigné : ${data.roleName} (${data.team}).`);
         });
 
         newSocket.on('game-state-update', (gameState) => {
             console.log('État de jeu mis à jour:', gameState);
-            setConnectedPlayers(gameState.players);
+            setConnectedPlayers(gameState.players || []);
             setGameStatus(gameState.status);
+            const rolesAssigned = gameState.players.map((p) => p.roleId);
+            setAssignedRoles([...new Set(rolesAssigned)]);
             if (gameState.status === 'playing' && game.state !== 'game') {
                 dispatch({ type: 'SET_STATE', payload: 'intro' });
             }
@@ -480,11 +506,20 @@ const CyberWarGame = () => {
             addLog(`Partie terminée. Gagnant: ${data.winner}`);
         });
 
+        newSocket.on('rejoin-success', (data) => {
+            console.log('Rejoin réussi:', data);
+            dispatch({ type: 'SET_TEAM', payload: data.team });
+            dispatch({ type: 'SET_ROLE', payload: data.roleId });
+            dispatch({ type: 'SET_ROLE_ASSIGNED' });
+            setPlayerId(data.playerId);
+            addLog(`Reconnexion réussie : ${data.roleName} (${data.team}).`);
+        });
+
         return () => {
             newSocket.close();
             setConnectionStatus('disconnected');
         };
-    }, [gameId, addLog]);
+    }, [addLog, gameId, game.state]);
 
     const sendAction = useCallback((actionType, actionData) => {
         if (socket && socket.connected) {
@@ -527,6 +562,7 @@ const CyberWarGame = () => {
         setServer(serverInitialState);
         setMiniGame(null);
         setGameStatus('waiting');
+        setAssignedRoles([]);
         socket.emit('join-game', {
             gameId,
             playerName: `Player_${Math.random().toString(36).substr(2, 9)}`,
@@ -535,9 +571,17 @@ const CyberWarGame = () => {
 
     const startGame = useCallback(() => {
         if (socket && socket.connected) {
-            socket.emit('start-game', { gameId });
+            const attackerRoles = roles.attackers.map(r => r.id);
+            const defenderRoles = roles.defenders.map(r => r.id);
+            const requiredRoles = [...attackerRoles, ...defenderRoles];
+            const uniqueRoles = [...new Set(assignedRoles)];
+            if (uniqueRoles.length === 6 && requiredRoles.every(r => uniqueRoles.includes(r))) {
+                socket.emit('start-game', { gameId });
+            } else {
+                addLog('Impossible de démarrer : tous les rôles uniques ne sont pas assignés.');
+            }
         }
-    }, [socket, gameId]);
+    }, [socket, gameId, assignedRoles, addLog]);
 
     const updateVuln = (vuln, updates) => {
         setWebsite((prev) => ({
@@ -698,95 +742,132 @@ const CyberWarGame = () => {
         );
     };
 
-    const WaitingRoom = () => (
-        <div style={{
-            background: '#111',
-            minHeight: '100vh',
-            padding: '30px',
-            color: '#fff',
-            textAlign: 'center',
-        }}>
-            <h1 style={{ fontSize: '2rem', color: '#007bff', marginBottom: '20px' }}>
-                Salle d'attente - Technetron Bank CyberWar
-            </h1>
-            <p style={{ fontSize: '1.1rem', color: connectionStatus === 'connected' ? '#55ff55' : '#ff5555', marginBottom: '20px' }}>
-                Statut: {connectionStatus === 'connected' ? 'Connecté au serveur' : 'Déconnecté - tentative de reconnexion...'}
-            </p>
+    const WaitingRoom = () => {
+        const isReadyToStart = connectedPlayers.length === 6 && assignedRoles.length === 6 &&
+            [...new Set(assignedRoles)].length === 6 &&
+            roles.attackers.every(r => assignedRoles.includes(r.id)) &&
+            roles.defenders.every(r => assignedRoles.includes(r.id));
+
+        return (
             <div style={{
-                background: '#222',
-                padding: '20px',
-                borderRadius: '8px',
-                marginBottom: '20px',
-                maxWidth: '600px',
-                margin: '0 auto 20px',
+                background: '#111',
+                minHeight: '100vh',
+                padding: '30px',
+                color: '#fff',
+                textAlign: 'center',
             }}>
-                <h3 style={{ color: '#007bff', marginBottom: '15px' }}>
-                    Joueurs connectés ({connectedPlayers.length}/6)
-                </h3>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-                    <div>
-                        <h4 style={{ color: '#ff5555', marginBottom: '10px' }}>🔥 Attaquants</h4>
-                        {connectedPlayers
-                            .filter(p => p.team === 'attackers')
-                            .map(player => (
-                                <div key={player.id} style={{
-                                    background: '#ff5555',
-                                    padding: '8px',
-                                    borderRadius: '4px',
-                                    marginBottom: '5px',
-                                    color: '#fff',
-                                }}>
-                                    {player.name} - {player.roleName} {player.roleIcon}
-                                </div>
-                            ))}
+                {connectionStatus === 'disconnected' && (
+                    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+                        <div style={{ background: '#222', padding: '20px', borderRadius: '8px', textAlign: 'center' }}>
+                            <h3 style={{ color: '#ff5555' }}>Connexion perdue</h3>
+                            <p>Tentative de reconnexion ({10 - reconnectAttempts} restantes)</p>
+                            <button
+                                onClick={handleReconnect}
+                                disabled={reconnectAttempts >= 10}
+                                style={{ padding: '10px 20px', background: '#007bff', color: '#fff', border: 'none', borderRadius: '4px' }}
+                            >
+                                Réessayer
+                            </button>
+                        </div>
                     </div>
-                    <div>
-                        <h4 style={{ color: '#55ff55', marginBottom: '10px' }}>🛡️ Défenseurs</h4>
-                        {connectedPlayers
-                            .filter(p => p.team === 'defenders')
-                            .map(player => (
-                                <div key={player.id} style={{
-                                    background: '#55ff55',
-                                    padding: '8px',
-                                    borderRadius: '4px',
-                                    marginBottom: '5px',
-                                    color: '#000',
-                                }}>
-                                    {player.name} - {player.roleName} {player.roleIcon}
-                                </div>
-                            ))}
+                )}
+                <h1 style={{ fontSize: '2rem', color: '#007bff', marginBottom: '20px' }}>
+                    Salle d'attente - Technetron Bank CyberWar
+                </h1>
+                <p style={{ fontSize: '1.1rem', color: connectionStatus === 'connected' ? '#55ff55' : '#ff5555', marginBottom: '20px' }}>
+                    Statut: {connectionStatus === 'connected' ? 'Connecté au serveur' : 'Déconnecté - tentative de reconnexion...'}
+                </p>
+                <div style={{
+                    background: '#222',
+                    padding: '20px',
+                    borderRadius: '8px',
+                    marginBottom: '20px',
+                    maxWidth: '600px',
+                    margin: '0 auto 20px',
+                }}>
+                    <h3 style={{ color: '#007bff', marginBottom: '15px' }}>
+                        Joueurs connectés ({connectedPlayers.length}/6)
+                    </h3>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                        <div>
+                            <h4 style={{ color: '#ff5555', marginBottom: '10px' }}>🔥 Attaquants</h4>
+                            {connectedPlayers
+                                .filter(p => p.team === 'attackers')
+                                .map(player => (
+                                    <div key={player.id} style={{
+                                        background: '#ff5555',
+                                        padding: '8px',
+                                        borderRadius: '4px',
+                                        marginBottom: '5px',
+                                        color: '#fff',
+                                    }}>
+                                        {player.name} - {player.roleName} {player.roleIcon}
+                                    </div>
+                                ))}
+                        </div>
+                        <div>
+                            <h4 style={{ color: '#55ff55', marginBottom: '10px' }}>🛡️ Défenseurs</h4>
+                            {connectedPlayers
+                                .filter(p => p.team === 'defenders')
+                                .map(player => (
+                                    <div key={player.id} style={{
+                                        background: '#55ff55',
+                                        padding: '8px',
+                                        borderRadius: '4px',
+                                        marginBottom: '5px',
+                                        color: '#000',
+                                    }}>
+                                        {player.name} - {player.roleName} {player.roleIcon}
+                                    </div>
+                                ))}
+                        </div>
                     </div>
                 </div>
+                {isReadyToStart && gameStatus === 'waiting' && (
+                    <button
+                        onClick={startGame}
+                        style={{
+                            padding: '15px 30px',
+                            background: '#007bff',
+                            color: '#fff',
+                            border: 'none',
+                            borderRadius: '8px',
+                            fontSize: '1.2rem',
+                            cursor: 'pointer',
+                        }}
+                    >
+                        🚀 Démarrer la partie
+                    </button>
+                )}
+                {!isReadyToStart && (
+                    <p style={{ color: '#aaa', fontSize: '1.1rem' }}>
+                        En attente de {6 - connectedPlayers.length} joueur(s) ou rôles non uniques...
+                    </p>
+                )}
             </div>
-            {connectedPlayers.length === 6 && gameStatus === 'waiting' && (
-                <button
-                    onClick={startGame}
-                    style={{
-                        padding: '15px 30px',
-                        background: '#007bff',
-                        color: '#fff',
-                        border: 'none',
-                        borderRadius: '8px',
-                        fontSize: '1.2rem',
-                        cursor: 'pointer',
-                    }}
-                >
-                    🚀 Démarrer la partie
-                </button>
-            )}
-            {connectedPlayers.length < 6 && (
-                <p style={{ color: '#aaa', fontSize: '1.1rem' }}>
-                    En attente de {6 - connectedPlayers.length} joueur(s) supplémentaire(s)...
-                </p>
-            )}
-        </div>
-    );
+        );
+    };
 
     const GameInterface = () => {
         const role = roles[game.selectedTeam]?.find((r) => r.id === game.selectedRole);
 
         return (
             <div style={{ background: '#111', minHeight: '100vh', padding: '20px', color: '#fff', fontFamily: 'Arial, sans-serif' }}>
+                {connectionStatus === 'disconnected' && (
+                    <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: '0', background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
+                        <div style={{ background: '#222', padding: '20px', borderRadius: '8px', textAlign: 'center' }}>
+                            <h3 style={{ color: '#ff5555' }}>Connexion perdue</h3>
+                            <p>Tentative de reconnexion ({10 - reconnectAttempts} restantes)</p>
+                            <button
+                                onClick={handleReconnect}
+                                disabled={reconnectAttempts >= 10}
+                                style={{ padding: '10px 20px', background: '#007bff', color: '#fff', border: 'none', borderRadius: '4px' }}
+                            >
+                                Réessayer
+                            </button>
+                        </div>
+                    </div>
+                )}
                 <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#1a1a1a', padding: '15px', borderRadius: '8px', marginBottom: '20px' }}>
                     <h1 style={{ fontSize: '1.8rem', color: '#007bff' }}>Technetron Bank - CyberWar</h1>
                     <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
@@ -803,10 +884,10 @@ const CyberWarGame = () => {
                     </div>
                 </header>
                 <main style={{ display: 'flex', gap: '20px' }}>
-                    <aside style={{ width: '250px', display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                    <aside style={{ width: '300px', display: 'flex', flexDirection: 'column', gap: '15px' }}>
                         <div style={{ background: '#222', padding: '15px', borderRadius: '8px' }}>
-                            <h3 style={{ fontSize: '1.3rem', marginBottom: '5px' }}>{role.name} {role.icon}</h3>
-                            <p style={{ color: '#aaa' }}>{role.specialty}</p>
+                            <h3 style={{ fontSize: '1.3rem', marginBottom: '5px' }}>{role?.name} {role?.icon || ''}</h3>
+                            <p style={{ color: '#aaa' }}>{role?.specialty}</p>
                         </div>
                         {game.selectedTeam === 'attackers' && (
                             <FlagSubmission onSubmitFlag={handleSubmitFlag} submittedFlags={game.submittedFlags} />
@@ -823,7 +904,7 @@ const CyberWarGame = () => {
                             <button
                                 onClick={() => dispatch({ type: 'SET_ACTIVE_TAB', payload: 'website' })}
                                 style={{
-                                    padding: '8px 15px',
+                                    padding: '10px 15px',
                                     background: game.activeTab === 'website' ? '#007bff' : '#444',
                                     color: '#fff',
                                     border: 'none',
@@ -835,7 +916,7 @@ const CyberWarGame = () => {
                             <button
                                 onClick={() => dispatch({ type: 'SET_ACTIVE_TAB', payload: 'network' })}
                                 style={{
-                                    padding: '8px 15px',
+                                    padding: '10px 15px',
                                     background: game.activeTab === 'network' ? '#007bff' : '#444',
                                     color: '#fff',
                                     border: 'none',
@@ -865,57 +946,82 @@ const CyberWarGame = () => {
 
     const RoleDetailsScreen = () => {
         const role = roles[game.selectedTeam]?.find((r) => r.id === game.selectedRole);
+
         return (
             <div style={{ background: '#111', minHeight: '100vh', padding: '30px', color: '#fff', textAlign: 'center' }}>
-                <h1 style={{ fontSize: '2rem', color: '#007bff', marginBottom: '20px' }}>Mission</h1>
-                <div style={{ background: game.selectedTeam === 'attackers' ? '#ff5555' : '#55ff55', padding: '20px', borderRadius: '8px' }}>
-                    <h2 style={{ fontSize: '1.5rem', marginBottom: '10px' }}>{role.name} {role.icon}</h2>
-                    <p><strong>Spécialité :</strong> {role.specialty}</p>
-                    <p style={{ margin: '10px 0' }}><strong>Mission :</strong> {role.description}</p>
-                    <h3 style={{ fontSize: '1.2rem', marginTop: '15px' }}>Tâches</h3>
-                    <ul style={{ listStyle: 'disc', marginLeft: '20px', textAlign: 'left' }}>
-                        {role.tasks.map((task, idx) => (
-                            <li key={idx}>{task}</li>
+                <h1 style={{ fontSize: '2rem', color: '#007bff', marginBottom: '20px' }}>Détails de la Mission</h1>
+                <div style={{ background: game.selectedTeam === 'attackers' ? '#ff5555' : '#55ff55', padding: '20px', borderRadius: '8px', maxWidth: '600px', margin: '0 auto' }}>
+                    <h2 style={{ fontSize: '1.5rem', marginBottom: '10px' }}>{role?.name} {role?.icon}</h2>
+                    <p style={{ fontSize: '1.1rem', marginBottom: '10px' }}><strong>Équipe :</strong> {game.selectedTeam === 'attackers' ? 'Attaquants' : 'Défenseurs'}</p>
+                    <p style={{ fontSize: '1.1rem', marginBottom: '10px' }}><strong>Spécialité :</strong> {role?.specialty}</p>
+                    <p style={{ fontSize: '1rem', marginBottom: '15px' }}><strong>Description :</strong> {role?.description}</p>
+                    <h3 style={{ fontSize: '1.2rem', marginBottom: '10px' }}>Tâches :</h3>
+                    <ul style={{ listStyleType: 'disc', textAlign: 'left', margin: '0 auto 20px auto', paddingLeft: '20px' }}>
+                        {role?.tasks.map((task, idx) => (
+                            <li key={idx} style={{ marginBottom: '5px' }}>{task}</li>
                         ))}
                     </ul>
+                    <button
+                        onClick={() => dispatch({ type: 'SET_STATE', payload: 'game' })}
+                        style={{
+                            padding: '10px 20px',
+                            background: '#007bff',
+                            color: '#fff',
+                            border: 'none',
+                            borderRadius: '4px',
+                            fontSize: '1rem',
+                            cursor: 'pointer',
+                        }}
+                    >
+                        Retour au jeu
+                    </button>
                 </div>
-                <button
-                    onClick={() => dispatch({ type: 'SET_STATE', payload: 'game' })}
-                    style={{ padding: '8px 15px', background: '#007bff', color: '#fff', border: 'none', borderRadius: '4px', marginTop: '20px' }}
-                >
-                    Retour
-                </button>
             </div>
         );
     };
 
-    const Results = () => (
-        <div style={{ background: '#111', minHeight: '100vh', padding: '30px', color: '#fff', textAlign: 'center' }}>
-            <h1 style={{ fontSize: '2rem', color: '#007bff', marginBottom: '20px' }}>Résultats</h1>
-            <p style={{ fontSize: '1.5rem', marginBottom: '10px' }}>Attaquants : {game.scores.attackers} points</p>
-            <p style={{ fontSize: '1.5rem', marginBottom: '20px' }}>Défenseurs : {game.scores.defenders} points</p>
-            <button
-                onClick={handleReset}
-                style={{ padding: '8px 15px', background: '#007bff', color: '#fff', border: 'none', borderRadius: '4px' }}
-            >
-                Nouvelle Mission
-            </button>
-        </div>
-    );
+    const ResultsScreen = () => {
+        const winner = game.scores.attackers > game.scores.defenders ? 'Attaquants' : game.scores.defenders > game.scores.attackers ? 'Défenseurs' : 'Égalité';
+
+        return (
+            <div style={{ background: '#111', minHeight: '100vh', padding: '30px', color: '#fff', textAlign: 'center' }}>
+                <h1 style={{ fontSize: '#2rem', color: '#007bff', marginBottom: '20px' }}>Partie Terminée</h1>
+                <div style={{ background: '#222', padding: '20px', borderRadius: '8px', maxWidth: '600px', margin: '0 auto' }}>
+                    <h2 style={{ fontSize: '1.5rem', marginBottom: '15px' }}>Résultats</h2>
+                    <p style={{ fontSize: '1.2rem', marginBottom: '10px' }}><strong>Gagnant :</strong> {winner}</p>
+                    <p style={{ fontSize: '1.1rem', marginBottom: '10px' }}><strong>Scores :</strong> Attaquants : {game.scores.attackers} | Défenseurs : {game.scores.defenders}</p>
+                    <button
+                        onClick={handleReset}
+                        style={{
+                            padding: '10px 20px',
+                            background: '#007bff',
+                            color: '#fff',
+                            border: 'none',
+                            borderRadius: '4px',
+                            fontSize: '1rem',
+                            cursor: 'pointer',
+                        }}
+                    >
+                        Nouvelle Partie
+                    </button>
+                </div>
+            </div>
+        );
+    };
 
     return (
         <AnimatePresence>
-            {gameStatus === 'waiting' && <WaitingRoom />}
-            {game.state === 'intro' && gameStatus === 'playing' && (
+            {game.state === 'waiting' && <WaitingRoom />}
+            {game.state === 'intro' && game.selectedRole && (
                 <IntroAnimation
                     role={roles[game.selectedTeam]?.find((r) => r.id === game.selectedRole)}
                     team={game.selectedTeam}
                     onComplete={() => dispatch({ type: 'SET_STATE', payload: 'game' })}
                 />
             )}
-            {game.state === 'game' && gameStatus === 'playing' && <GameInterface />}
+            {game.state === 'game' && <GameInterface />}
             {game.state === 'role-details' && <RoleDetailsScreen />}
-            {game.state === 'results' && <Results />}
+            {game.state === 'results' && <ResultsScreen />}
         </AnimatePresence>
     );
 };

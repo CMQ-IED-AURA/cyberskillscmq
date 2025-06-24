@@ -5,64 +5,72 @@ import authRoutes from './routes/auth';
 import matchRoutes from './routes/match';
 import { Server as SocketIOServer } from 'socket.io';
 import { createServer } from 'http';
-import { setupSocket } from './routes/match';
+import { setupSocketIO } from './routes/match';
+import rateLimit from 'express-rate-limit';
 
 dotenv.config();
 
 const app: Application = express();
 const server = createServer(app);
 
-// Configure CORS for socket.io
+// Initialize Socket.IO
 const io = new SocketIOServer(server, {
   cors: {
-    origin: 'https://cyberskillscmq.vercel.app',
+    origin: process.env.CLIENT_URL || 'https://cyberskillscmq.vercel.app',
     methods: ['GET', 'POST', 'DELETE'],
     credentials: true,
     allowedHeaders: ['Authorization', 'Content-Type'],
   },
 });
 
-// Configure CORS for Express
+// Rate limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per windowMs
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use(limiter);
+
+// Configure CORS
 app.use(cors({
-  origin: 'https://cyberskillscmq.vercel.app',
+  origin: process.env.CLIENT_URL || 'https://cyberskillscmq.vercel.app',
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   credentials: true,
   allowedHeaders: ['Authorization', 'Content-Type'],
 }));
 
-// Debug middleware to log requests and responses
+// Request logging middleware
 app.use((req, res, next) => {
   console.log(`Request: ${req.method} ${req.url}, Body:`, req.body);
   res.on('finish', () => {
-    console.log(`Response: ${req.method} ${req.url}, Status: ${res.statusCode}, Headers:`, res.getHeaders());
+    console.log(`Response: ${req.method} ${req.url}, Status: ${res.statusCode}`);
   });
   next();
 });
 
 app.use(express.json());
 
-// Attach Socket.IO instance to the app
+// Attach Socket.IO instance to app
 app.use((req, res, next) => {
   req.app.set('io', io);
   next();
 });
 
+// Routes
 app.use('/auth', authRoutes);
 app.use('/match', matchRoutes);
 
-// Initialize Socket.IO event handlers
-setupSocket(io);
+// Initialize Socket.IO handlers
+setupSocketIO(io);
 
-// Debug logging for WebSocket connections
-io.on('connection', (socket) => {
-  console.log(`WebSocket connected: ${socket.id}, Origin: ${socket.handshake.headers.origin}`);
-  socket.on('disconnect', () => {
-    console.log(`WebSocket disconnected: ${socket.id}`);
-  });
+// Health check
+app.get('/health', (req, res) => {
+  res.status(200).json({ success: true, message: 'Server is healthy' });
 });
 
 const PORT = process.env.PORT || 4000;
 server.listen(PORT, () => {
-  console.log(`✅ Server running on https://cyberskills.onrender.com:${PORT}`);
-  console.log(`WebSocket server ready at wss://cyberskills.onrender.com`);
+  console.log(`✅ Server running on https://localhost:${PORT}`);
+  console.log(`WebSocket server ready at wss://localhost:${PORT}`);
 });

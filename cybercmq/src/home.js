@@ -13,7 +13,6 @@ function Home() {
             <main className="container">
                 <div className="hero">
                     <h1>Bienvenue sur CyberSkills</h1>
-                    <p>Rejoignez la bataille, formez votre équipe et dominez le classement !</p>
                     <div>
                         <button
                             onClick={() => navigate('/login')}
