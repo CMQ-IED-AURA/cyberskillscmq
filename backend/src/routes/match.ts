@@ -239,24 +239,81 @@ export const setupSocketIO = (io: SocketIOServer) => {
             }
         });
 
-        socket.on('start-game', (payload) => {
+        socket.on('start-game', async (payload) => {
             try {
                 const { gameId } = z.object({ gameId: z.string().uuid() }).parse(payload);
+                const token = socket.handshake.auth.token;
+                const decoded = jwt.verify(token, JWT_SECRET) as { userId: string; role: string };
+                if (decoded.role !== 'ADMIN') {
+                    socket.emit('error', { message: 'Seuls les administrateurs peuvent lancer la partie' });
+                    return;
+                }
                 const game = games.get(gameId);
                 if (!game || game.status !== 'waiting') {
                     socket.emit('error', { message: 'Partie non disponible ou déjà commencée' });
                     return;
                 }
 
+                const match = await prisma.match.findUnique({
+                    where: { id: gameId },
+                    include: {
+                        redTeam: { include: { users: true } },
+                        blueTeam: { include: { users: true } },
+                    },
+                });
+                if (!match) {
+                    socket.emit('error', { message: 'Match non trouvé' });
+                    return;
+                }
+
+                const players = [...match.redTeam.users, ...match.blueTeam.users];
+                if (players.length !== 6) {
+                    socket.emit('error', { message: 'La partie doit avoir exactement 6 joueurs' });
+                    return;
+                }
+
+                // Assign roles randomly if not already assigned
+                const assignedRoles = game.players.map((p) => p.roleId);
+                const unassignedPlayers = players.filter((p) => !game.players.find((gp) => gp.id === p.id));
+                for (const user of unassignedPlayers) {
+                    const team = game.players.filter((p) => p.team === 'attackers').length < 3 ? 'attackers' : 'defenders';
+                    const availableRoles = roles[team].filter((r) => !assignedRoles.includes(r.id));
+                    if (availableRoles.length === 0) {
+                        socket.emit('error', { message: 'Aucun rôle disponible' });
+                        return;
+                    }
+                    const role = availableRoles[Math.floor(Math.random() * availableRoles.length)];
+                    const player: Player = {
+                        id: user.id,
+                        name: user.username,
+                        socketId: connectedUsers.get(user.id)?.socketId || '',
+                        team,
+                        roleId: role.id,
+                        roleName: role.name,
+                        roleIcon: role.icon,
+                    };
+                    game.players.push(player);
+                    assignedRoles.push(role.id);
+                    const userSocket = connectedUsers.get(user.id);
+                    if (userSocket) {
+                        io.to(userSocket.socketId).emit('role-assigned', {
+                            team,
+                            roleId: role.id,
+                            roleName: role.name,
+                            roleIcon: role.icon,
+                            playerId: user.id,
+                        });
+                    }
+                }
+
                 const attackerRoles = roles.attackers.map((r) => r.id);
                 const defenderRoles = roles.defenders.map((r) => r.id);
-                const assignedRoles = game.players.map((p) => p.roleId);
-                const uniqueRoles = [...new Set(assignedRoles)];
+                const uniqueRoles = [...new Set(game.players.map((p) => p.roleId))];
                 if (
                     game.players.length !== 6 ||
                     uniqueRoles.length !== 6 ||
-                    !attackerRoles.every((r) => assignedRoles.includes(r)) ||
-                    !defenderRoles.every((r) => assignedRoles.includes(r))
+                    !attackerRoles.every((r) => uniqueRoles.includes(r)) ||
+                    !defenderRoles.every((r) => uniqueRoles.includes(r))
                 ) {
                     socket.emit('error', { message: 'Conditions de démarrage non remplies' });
                     return;
@@ -270,6 +327,8 @@ export const setupSocketIO = (io: SocketIOServer) => {
                     status: game.status,
                     players: game.players,
                 });
+
+                io.to(gameId).emit('game-started', { gameId });
 
                 // Set timeout for game duration (10 minutes)
                 setTimeout(() => endGame(gameId, io), 10 * 60 * 1000);
@@ -387,7 +446,6 @@ const getSocketIO = (req: Request): SocketIOServer | null => {
 };
 
 // Match routes
-// @ts-ignore
 router.post('/create', authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
     try {
         const redTeam = await prisma.team.create({ data: { name: 'Équipe Rouge' } });
@@ -422,7 +480,6 @@ router.post('/create', authenticateToken, requireAdmin, async (req: Authenticate
     }
 });
 
-// @ts-ignore
 router.get('/list', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
     try {
         const matches = await prisma.match.findMany({
@@ -443,7 +500,6 @@ router.get('/list', authenticateToken, async (req: AuthenticatedRequest, res: Re
     }
 });
 
-// @ts-ignore
 router.get('/:matchId/teams', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
     const { matchId } = req.params;
 
@@ -471,7 +527,6 @@ router.get('/:matchId/teams', authenticateToken, async (req: AuthenticatedReques
     }
 });
 
-// @ts-ignore
 router.get('/users', authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
     try {
         const users = await prisma.user.findMany({
@@ -494,7 +549,6 @@ router.get('/users', authenticateToken, requireAdmin, async (req: AuthenticatedR
     }
 });
 
-// @ts-ignore
 router.post('/assign-team', authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
     const { userId, teamId, matchId } = z
         .object({
@@ -596,7 +650,6 @@ router.post('/assign-team', authenticateToken, requireAdmin, async (req: Authent
     }
 });
 
-// @ts-ignore
 router.post('/ban-user', authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
     const { userId } = z
         .object({
@@ -652,7 +705,6 @@ router.post('/ban-user', authenticateToken, requireAdmin, async (req: Authentica
     }
 });
 
-// @ts-ignore
 router.delete('/:matchId', authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
     const { matchId } = req.params;
 
@@ -717,7 +769,6 @@ router.delete('/:matchId', authenticateToken, requireAdmin, async (req: Authenti
     }
 });
 
-// @ts-ignore
 router.post('/register', async (req: Request, res: Response) => {
     const { username, password } = z
         .object({
@@ -754,7 +805,6 @@ router.post('/register', async (req: Request, res: Response) => {
     }
 });
 
-// @ts-ignore
 router.post('/join', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
     return res.status(403).json({
         success: false,
@@ -762,7 +812,6 @@ router.post('/join', authenticateToken, async (req: AuthenticatedRequest, res: R
     });
 });
 
-// @ts-ignore
 router.post('/leave-team', authenticateToken, async (req: AuthenticatedRequest, res: Response) => {
     return res.status(403).json({
         success: false,
