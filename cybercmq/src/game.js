@@ -33,12 +33,6 @@ function Game() {
     const [error, setError] = useState(null);
     const [loading, setLoading] = useState(false);
     const [reconnectAttempts, setReconnectAttempts] = useState(0);
-    const [selectedRole, setSelectedRole] = useState('');
-
-    const roles = {
-        attackers: ['web_hacker', 'network_intruder', 'social_engineer'],
-        defenders: ['web_protector', 'network_guard', 'security_analyst'],
-    };
 
     const fetchMatches = useCallback(async (token) => {
         setLoading(true);
@@ -159,8 +153,8 @@ function Game() {
     }, [loading]);
 
     const handleAssignTeam = useCallback(async (userId, teamId, matchId) => {
-        if (!matchId || !selectedMatch?.id || !userId || !selectedRole) {
-            setError('Veuillez sélectionner un match, un utilisateur et un rôle.');
+        if (!matchId || !selectedMatch?.id || !userId) {
+            setError('Veuillez sélectionner un match et un utilisateur.');
             return;
         }
         if (teamId && teamId !== selectedMatch?.redTeamId && teamId !== selectedMatch?.blueTeamId) {
@@ -178,7 +172,7 @@ function Game() {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`,
                 },
-                body: JSON.stringify({ userId, teamId, matchId, role: selectedRole }),
+                body: JSON.stringify({ userId, teamId, matchId }),
             });
             const data = await res.json();
             if (!data.success) {
@@ -188,9 +182,8 @@ function Game() {
             setError(`Erreur lors de l'assignation: ${error.message}`);
         } finally {
             setLoading(false);
-            setSelectedRole('');
         }
-    }, [loading, selectedMatch, selectedRole]);
+    }, [loading, selectedMatch]);
 
     const handleLaunchMatch = useCallback(() => {
         if (!selectedMatch || loading) {
@@ -203,11 +196,10 @@ function Game() {
         }
         if (socket && socket.connected) {
             socket.emit('start-game', { gameId: selectedMatch.id });
-            navigate('/cyber-war-game');
         } else {
             setError('Impossible de lancer le match: non connecté au serveur.');
         }
-    }, [selectedMatch, loading, socket, teamMembersByMatch, navigate]);
+    }, [selectedMatch, loading, socket, teamMembersByMatch]);
 
     const handleJoinMatch = useCallback(() => {
         if (!selectedMatch) {
@@ -215,7 +207,7 @@ function Game() {
             return;
         }
         localStorage.setItem('selectedGameId', selectedMatch.id);
-        navigate('/cyber-war-game');
+        navigate('/attack');
     }, [selectedMatch, navigate]);
 
     const handleReconnect = useCallback(() => {
@@ -291,7 +283,7 @@ function Game() {
                 }
             });
 
-            newSocket.on('teamAssigned', ({ matchId, userId, teamId, username, updatedMatch, role }) => {
+            newSocket.on('teamAssigned', ({ matchId, userId, teamId, username, updatedMatch }) => {
                 setTeamMembersByMatch((prev) => ({
                     ...prev,
                     [matchId]: {
@@ -301,14 +293,9 @@ function Game() {
                 }));
             });
 
-            newSocket.on('teamsUpdated', ({ matchId, redTeam, blueTeam }) => {
-                setTeamMembersByMatch((prev) => ({
-                    ...prev,
-                    [matchId]: {
-                        redTeam: redTeam || [],
-                        blueTeam: blueTeam || [],
-                    },
-                }));
+            newSocket.on('game-started', ({ gameId }) => {
+                localStorage.setItem('selectedGameId', gameId);
+                navigate('/attack');
             });
 
             fetchMatches(token);
@@ -335,9 +322,9 @@ function Game() {
             <header className="game-header">
                 <h1>CyberSkills</h1>
                 <nav>
-          <span className="user-info">
-            Connecté en tant que: {username || 'Inconnu'} ({role || 'Rôle inconnu'})
-          </span>
+                    <span className="user-info">
+                        Connecté en tant que: {username || 'Inconnu'} ({role || 'Rôle inconnu'})
+                    </span>
                     <button
                         onClick={() => {
                             Cookies.remove('token');
@@ -375,35 +362,21 @@ function Game() {
                                                     <div key={user.id} className="user-item">
                                                         <span className={`user-status ${user.isConnected ? 'connected' : 'disconnected'}`}></span>
                                                         <span className="user-username">
-                              {user.username || 'Inconnu'}
+                                                            {user.username || 'Inconnu'}
                                                             {user.id === userId && ' (vous)'}
                                                             {!user.isConnected && ' (déconnecté)'}
-                            </span>
-                                                        <select
-                                                            value={selectedRole}
-                                                            onChange={(e) => setSelectedRole(e.target.value)}
-                                                            className="role-selector"
-                                                            disabled={!selectedMatch}
-                                                        >
-                                                            <option value="">Sélectionner un rôle</option>
-                                                            {roles.attackers.map((r) => (
-                                                                <option key={r} value={r}>{r}</option>
-                                                            ))}
-                                                            {roles.defenders.map((r) => (
-                                                                <option key={r} value={r}>{r}</option>
-                                                            ))}
-                                                        </select>
+                                                        </span>
                                                         <div className="user-actions cyber-buttons">
                                                             <button
                                                                 onClick={() => handleAssignTeam(user.id, selectedMatch?.redTeamId, selectedMatch?.id)}
-                                                                disabled={!selectedMatch || !selectedRole || loading}
+                                                                disabled={!selectedMatch || loading}
                                                                 className="btn btn-cyber btn-red"
                                                             >
                                                                 Équipe Rouge
                                                             </button>
                                                             <button
                                                                 onClick={() => handleAssignTeam(user.id, selectedMatch?.blueTeamId, selectedMatch?.id)}
-                                                                disabled={!selectedMatch || !selectedRole || loading}
+                                                                disabled={!selectedMatch || loading}
                                                                 className="btn-cyber btn-blue"
                                                             >
                                                                 Équipe Bleue
@@ -427,35 +400,21 @@ function Game() {
                                                 <div key={user.id} className="user-item">
                                                     <span className={`user-status ${user.isConnected ? 'connected' : 'disconnected'}`}></span>
                                                     <span className="user-username">
-                            {user.username || 'Inconnu'}
+                                                        {user.username || 'Inconnu'}
                                                         {user.id === userId && ' (vous)'}
                                                         {!user.isConnected && ' (déconnecté)'}
-                          </span>
-                                                    <select
-                                                        value={selectedRole}
-                                                        onChange={(e) => setSelectedRole(e.target.value)}
-                                                        className="role-selector"
-                                                        disabled={!selectedMatch}
-                                                    >
-                                                        <option value="">Sélectionner un rôle</option>
-                                                        {roles.attackers.map((r) => (
-                                                            <option key={r} value={r}>{r}</option>
-                                                        ))}
-                                                        {roles.defenders.map((r) => (
-                                                            <option key={r} value={r}>{r}</option>
-                                                        ))}
-                                                    </select>
+                                                    </span>
                                                     <div className="user-actions cyber-buttons">
                                                         <button
                                                             onClick={() => handleAssignTeam(user.id, selectedMatch?.redTeamId, selectedMatch?.id)}
-                                                            disabled={!selectedMatch || !selectedRole || loading}
+                                                            disabled={!selectedMatch || loading}
                                                             className="btn btn-cyber btn-red"
                                                         >
                                                             Équipe Rouge
                                                         </button>
                                                         <button
                                                             onClick={() => handleAssignTeam(user.id, selectedMatch?.blueTeamId, selectedMatch?.id)}
-                                                            disabled={!selectedMatch || !selectedRole || loading}
+                                                            disabled={!selectedMatch || loading}
                                                             className="btn-cyber btn-blue"
                                                         >
                                                             Équipe Bleue
@@ -539,7 +498,7 @@ function Game() {
                                                         {teamMembersByMatch[match.id]?.redTeam?.length > 0 ? (
                                                             teamMembersByMatch[match.id].redTeam.map((user) => (
                                                                 <li key={user.id}>
-                                                                    {user.username} ({user.role || 'Rôle inconnu'})
+                                                                    {user.username}
                                                                     {user.id === userId && ' (vous)'}
                                                                 </li>
                                                             ))
@@ -554,7 +513,7 @@ function Game() {
                                                         {teamMembersByMatch[match.id]?.blueTeam?.length > 0 ? (
                                                             teamMembersByMatch[match.id].blueTeam.map((user) => (
                                                                 <li key={user.id}>
-                                                                    {user.username} ({user.role || 'Rôle inconnu'})
+                                                                    {user.username}
                                                                     {user.id === userId && ' (vous)'}
                                                                 </li>
                                                             ))
@@ -608,7 +567,7 @@ function Game() {
                                                     {teamMembersByMatch[match.id]?.redTeam?.length > 0 ? (
                                                         teamMembersByMatch[match.id].redTeam.map((user) => (
                                                             <li key={user.id}>
-                                                                {user.username} ({user.role || 'Rôle inconnu'})
+                                                                {user.username}
                                                                 {user.id === userId && ' (vous)'}
                                                             </li>
                                                         ))
@@ -623,7 +582,7 @@ function Game() {
                                                     {teamMembersByMatch[match.id]?.blueTeam?.length > 0 ? (
                                                         teamMembersByMatch[match.id].blueTeam.map((user) => (
                                                             <li key={user.id}>
-                                                                {user.username} ({user.role || 'Rôle inconnu'})
+                                                                {user.username}
                                                                 {user.id === userId && ' (vous)'}
                                                             </li>
                                                         ))
