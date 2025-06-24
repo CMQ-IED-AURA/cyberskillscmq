@@ -13,7 +13,7 @@ function getSocket(token) {
             auth: { token },
             transports: ['websocket', 'polling'],
             reconnection: true,
-            reconnectionAttempts: 10,
+            reconnectionAttempts: 15,
             reconnectionDelay: 1000,
         });
     }
@@ -105,6 +105,11 @@ function Game() {
         setError(null);
         try {
             const token = Cookies.get('token');
+            if (!token) {
+                setError('Token d\'authentification manquant. Veuillez vous reconnecter.');
+                navigate('/login');
+                return;
+            }
             const res = await fetch('https://cyberskills.onrender.com/match/create', {
                 method: 'POST',
                 headers: {
@@ -121,7 +126,7 @@ function Game() {
         } finally {
             setLoading(false);
         }
-    }, [loading]);
+    }, [loading, navigate]);
 
     const handleDeleteMatch = useCallback(async (matchId) => {
         if (!matchId || loading) {
@@ -133,6 +138,11 @@ function Game() {
         setError(null);
         try {
             const token = Cookies.get('token');
+            if (!token) {
+                setError('Token d\'authentification manquant. Veuillez vous reconnecter.');
+                navigate('/login');
+                return;
+            }
             const res = await fetch(`https://cyberskills.onrender.com/match/${matchId}`, {
                 method: 'DELETE',
                 headers: {
@@ -149,7 +159,7 @@ function Game() {
         } finally {
             setLoading(false);
         }
-    }, [loading]);
+    }, [loading, navigate]);
 
     const handleAssignTeam = useCallback(async (userId, teamId, matchId) => {
         if (!matchId || !selectedMatch?.id || !userId) {
@@ -165,6 +175,11 @@ function Game() {
         setError(null);
         try {
             const token = Cookies.get('token');
+            if (!token) {
+                setError('Token d\'authentification manquant. Veuillez vous reconnecter.');
+                navigate('/login');
+                return;
+            }
             const res = await fetch('https://cyberskills.onrender.com/match/assign-team', {
                 method: 'POST',
                 headers: {
@@ -182,7 +197,40 @@ function Game() {
         } finally {
             setLoading(false);
         }
-    }, [loading, selectedMatch]);
+    }, [loading, selectedMatch, navigate]);
+
+    const handleResetGame = useCallback(async (matchId) => {
+        if (!matchId || loading) {
+            setError('Match non sélectionné ou invalide.');
+            return;
+        }
+        if (!window.confirm('Êtes-vous sûr de vouloir réinitialiser ce match ?')) return;
+        setLoading(true);
+        setError(null);
+        try {
+            const token = Cookies.get('token');
+            if (!token) {
+                setError('Token d\'authentification manquant. Veuillez vous reconnecter.');
+                navigate('/login');
+                return;
+            }
+            const res = await fetch(`https://cyberskills.onrender.com/match/${matchId}/reset`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                },
+            });
+            const data = await res.json();
+            if (!data.success) {
+                setError(data.message || 'Erreur lors de la réinitialisation du match');
+            }
+        } catch (error) {
+            setError('Erreur serveur lors de la réinitialisation du match.');
+        } finally {
+            setLoading(false);
+        }
+    }, [loading, navigate]);
 
     const handleLaunchMatch = useCallback(() => {
         if (!selectedMatch || loading) {
@@ -193,27 +241,41 @@ function Game() {
             setError('Chaque équipe doit avoir au moins un joueur.');
             return;
         }
+        const token = Cookies.get('token');
+        if (!token) {
+            setError('Token d\'authentification manquant. Veuillez vous reconnecter.');
+            navigate('/login');
+            return;
+        }
         if (socket && socket.connected) {
             console.log('Émission de start-game pour gameId:', selectedMatch.id);
             socket.emit('start-game', { gameId: selectedMatch.id });
         } else {
             setError('Impossible de lancer le match: non connecté au serveur.');
         }
-    }, [selectedMatch, loading, socket, teamMembersByMatch]);
+    }, [selectedMatch, loading, socket, teamMembersByMatch, navigate]);
 
     const handleJoinMatch = useCallback(() => {
         if (!selectedMatch) {
             setError('Veuillez sélectionner un match.');
             return;
         }
+        const token = Cookies.get('token');
+        if (!token) {
+            setError('Token d\'authentification manquant. Veuillez vous reconnecter.');
+            navigate('/login');
+            return;
+        }
         console.log('Rejoindre le match, navigation vers /attack pour gameId:', selectedMatch.id);
         localStorage.setItem('selectedGameId', selectedMatch.id);
+        socket.emit('join-game', { gameId: selectedMatch.id, playerName: username || 'Joueur' });
         navigate('/attack');
-    }, [selectedMatch, navigate]);
+    }, [selectedMatch, navigate, socket, username]);
 
     useEffect(() => {
         const token = Cookies.get('token');
         if (!token) {
+            setError('Token d\'authentification manquant. Veuillez vous reconnecter.');
             navigate('/login');
             return;
         }
@@ -223,6 +285,7 @@ function Game() {
             const exp = decoded.exp * 1000;
             if (Date.now() >= exp) {
                 Cookies.remove('token');
+                setError('Session expirée. Veuillez vous reconnecter.');
                 navigate('/login');
                 return;
             }
@@ -243,12 +306,14 @@ function Game() {
             });
 
             newSocket.on('authError', (error) => {
-                setError('Erreur d\'authentification WebSocket.');
+                console.log('Erreur d\'authentification WebSocket:', error);
+                setError('Erreur d\'authentification WebSocket: ' + error.message);
                 Cookies.remove('token');
                 navigate('/login');
             });
 
             newSocket.on('connect_error', (error) => {
+                console.log('Erreur de connexion WebSocket:', error);
                 setError('Erreur de connexion au serveur WebSocket: ' + error.message);
             });
 
@@ -309,7 +374,8 @@ function Game() {
                 newSocket.disconnect();
             };
         } catch (error) {
-            setError('Erreur d\'authentification, veuillez réessayer')
+            console.log('Erreur d\'authentification:', error);
+            setError('Erreur d\'authentification, veuillez vous reconnecter.');
             Cookies.remove('token');
             navigate('/login');
         }
@@ -454,6 +520,13 @@ function Game() {
                                     className="btn-modern btn-cyber"
                                 >
                                     Lancer le match
+                                </button>
+                                <button
+                                    onClick={() => handleResetGame(selectedMatch?.id)}
+                                    disabled={!selectedMatch || loading}
+                                    className="btn-modern btn-cyber btn-reset"
+                                >
+                                    Réinitialiser le match
                                 </button>
                                 <select
                                     value={selectedMatch?.id || ''}

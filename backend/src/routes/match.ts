@@ -80,6 +80,12 @@ export const setupSocketIO = (io: SocketIOServer) => {
         console.log(`Utilisateur connecté: ${socket.id}`);
 
         socket.on('authenticate', async (token: string) => {
+            if (!token) {
+                console.error('Erreur authenticate: Token non fourni');
+                socket.emit('authError', { message: 'Token non fourni' });
+                socket.disconnect();
+                return;
+            }
             try {
                 const decoded = jwt.verify(token, JWT_SECRET) as { userId: string; username?: string; role: string };
                 const user = await prisma.user.findUnique({
@@ -88,6 +94,7 @@ export const setupSocketIO = (io: SocketIOServer) => {
                 });
 
                 if (!user || user.role === 'BANNED') {
+                    console.error(`Erreur authenticate: Utilisateur ${user?.role === 'BANNED' ? 'banni' : 'non trouvé'}`);
                     socket.emit('authError', { message: user?.role === 'BANNED' ? 'Utilisateur banni' : 'Utilisateur non trouvé' });
                     socket.disconnect();
                     return;
@@ -122,18 +129,25 @@ export const setupSocketIO = (io: SocketIOServer) => {
 
         socket.on('join-game', async (payload) => {
             try {
-                const { gameId, playerName } = joinGameSchema.parse(payload);
                 const token = socket.handshake.auth.token;
+                if (!token) {
+                    console.error('Erreur join-game: Token non fourni');
+                    socket.emit('error', { message: 'Token d\'authentification requis' });
+                    return;
+                }
                 const decoded = jwt.verify(token, JWT_SECRET) as { userId: string; username?: string; role: string };
+                const { gameId, playerName } = joinGameSchema.parse(payload);
                 const user = await prisma.user.findUnique({ where: { id: decoded.userId } });
 
                 if (!user || user.role === 'BANNED') {
+                    console.error('Erreur join-game: Accès refusé pour utilisateur:', decoded.userId);
                     socket.emit('authError', { message: 'Accès refusé' });
                     return;
                 }
 
                 const match = await prisma.match.findUnique({ where: { id: gameId } });
                 if (!match) {
+                    console.error(`Erreur join-game: Match non trouvé: ${gameId}`);
                     socket.emit('error', { message: 'Match non trouvé' });
                     return;
                 }
@@ -149,7 +163,14 @@ export const setupSocketIO = (io: SocketIOServer) => {
                     games.set(gameId, game);
                 }
 
+                if (game.status !== 'waiting') {
+                    console.error(`Erreur join-game: Partie ${gameId} déjà ${game.status}`);
+                    socket.emit('error', { message: 'Partie non disponible ou déjà commencée' });
+                    return;
+                }
+
                 if (game.players.find((p) => p.id === decoded.userId)) {
+                    console.error(`Erreur join-game: Joueur ${decoded.userId} déjà dans la partie`);
                     socket.emit('error', { message: 'Déjà dans la partie' });
                     return;
                 }
@@ -189,7 +210,7 @@ export const setupSocketIO = (io: SocketIOServer) => {
                 console.log(`Joueur ${playerName} a rejoint la partie ${gameId} en tant que ${role.name} (${team})`);
             } catch (err: any) {
                 console.error('Erreur join-game:', err.message);
-                socket.emit('error', { message: 'Erreur lors de la jointure' });
+                socket.emit('error', { message: 'Erreur lors de la jointure: ' + err.message });
             }
         });
 
@@ -198,12 +219,14 @@ export const setupSocketIO = (io: SocketIOServer) => {
                 const { gameId, playerId } = rejoinGameSchema.parse(payload);
                 const game = games.get(gameId);
                 if (!game) {
+                    console.error(`Erreur rejoin-game: Partie non trouvée: ${gameId}`);
                     socket.emit('error', { message: 'Partie non trouvée' });
                     return;
                 }
 
                 const player = game.players.find((p) => p.id === playerId);
                 if (!player) {
+                    console.error(`Erreur rejoin-game: Joueur non trouvé: ${playerId}`);
                     socket.emit('error', { message: 'Joueur non trouvé' });
                     return;
                 }
@@ -226,7 +249,7 @@ export const setupSocketIO = (io: SocketIOServer) => {
                 console.log(`Joueur ${player.name} a rejoint la partie ${gameId}`);
             } catch (err: any) {
                 console.error('Erreur rejoin-game:', err.message);
-                socket.emit('error', { message: 'Erreur lors de la reconnection' });
+                socket.emit('error', { message: 'Erreur lors de la reconnection: ' + err.message });
             }
         });
 
@@ -234,13 +257,20 @@ export const setupSocketIO = (io: SocketIOServer) => {
             try {
                 const { gameId } = z.object({ gameId: z.string().uuid() }).parse(payload);
                 const token = socket.handshake.auth.token;
+                if (!token) {
+                    console.error('Erreur start-game: Token non fourni');
+                    socket.emit('error', { message: 'Token d\'authentification requis' });
+                    return;
+                }
                 const decoded = jwt.verify(token, JWT_SECRET) as { userId: string; role: string };
                 if (decoded.role !== 'ADMIN') {
+                    console.error(`Erreur start-game: Utilisateur ${decoded.userId} n'est pas administrateur`);
                     socket.emit('error', { message: 'Seuls les administrateurs peuvent lancer la partie' });
                     return;
                 }
                 const game = games.get(gameId);
                 if (!game || game.status !== 'waiting') {
+                    console.error(`Erreur start-game: Partie ${gameId} non disponible ou déjà ${game?.status || 'non trouvée'}`);
                     socket.emit('error', { message: 'Partie non disponible ou déjà commencée' });
                     return;
                 }
@@ -253,6 +283,7 @@ export const setupSocketIO = (io: SocketIOServer) => {
                     },
                 });
                 if (!match) {
+                    console.error(`Erreur start-game: Match non trouvé: ${gameId}`);
                     socket.emit('error', { message: 'Match non trouvé' });
                     return;
                 }
@@ -260,6 +291,7 @@ export const setupSocketIO = (io: SocketIOServer) => {
                 const redTeamPlayers = match.redTeam.users;
                 const blueTeamPlayers = match.blueTeam.users;
                 if (redTeamPlayers.length < 1 || blueTeamPlayers.length < 1) {
+                    console.error(`Erreur start-game: Équipes incomplètes pour ${gameId} (Rouge: ${redTeamPlayers.length}, Bleu: ${blueTeamPlayers.length})`);
                     socket.emit('error', { message: 'Chaque équipe doit avoir au moins un joueur' });
                     return;
                 }
@@ -285,6 +317,7 @@ export const setupSocketIO = (io: SocketIOServer) => {
                         assignedRoles.push(role.id);
                         const userSocket = connectedUsers.get(user.id);
                         if (userSocket) {
+                            console.log(`Ajout de l'utilisateur ${user.id} au salon ${gameId}`);
                             io.sockets.sockets.get(userSocket.socketId)?.join(gameId);
                             io.to(userSocket.socketId).emit('role-assigned', {
                                 team,
@@ -306,7 +339,7 @@ export const setupSocketIO = (io: SocketIOServer) => {
                     players: game.players,
                 });
 
-                console.log(`Émission de game-started pour gameId: ${gameId}`);
+                console.log(`Émission de game-started pour gameId: ${gameId} à ${game.players.length} joueurs`);
                 io.to(gameId).emit('game-started', { gameId });
 
                 // Set timeout for game duration (30 minutes)
@@ -324,12 +357,14 @@ export const setupSocketIO = (io: SocketIOServer) => {
                 const action = playerActionSchema.parse(payload);
                 const game = games.get(action.gameId);
                 if (!game || game.status !== 'playing') {
+                    console.error(`Erreur player-action: Partie ${action.gameId} non active (statut: ${game?.status || 'non trouvée'})`);
                     socket.emit('error', { message: 'Partie non active' });
                     return;
                 }
 
                 const player = game.players.find((p) => p.id === action.playerId);
                 if (!player) {
+                    console.error(`Erreur player-action: Joueur ${action.playerId} non trouvé dans ${action.gameId}`);
                     socket.emit('error', { message: 'Joueur non trouvé' });
                     return;
                 }
@@ -345,7 +380,7 @@ export const setupSocketIO = (io: SocketIOServer) => {
                 console.log(`Action ${action.type} par ${action.playerName} dans ${action.gameId}`);
             } catch (err: any) {
                 console.error('Erreur player-action:', err.message);
-                socket.emit('error', { message: 'Erreur lors de l\'action' });
+                socket.emit('error', { message: 'Erreur lors de l\'action: ' + err.message });
             }
         });
 
@@ -374,7 +409,10 @@ export const setupSocketIO = (io: SocketIOServer) => {
 
 const endGame = (gameId: string, io: SocketIOServer) => {
     const game = games.get(gameId);
-    if (!game || game.status !== 'playing') return;
+    if (!game || game.status !== 'playing') {
+        console.log(`Fin de partie ${gameId} ignorée: statut ${game?.status || 'non trouvé'}`);
+        return;
+    }
 
     game.status = 'ended';
     game.endedAt = new Date();
@@ -502,7 +540,7 @@ router.get('/:matchId/teams', authenticateToken, async (req: AuthenticatedReques
             blueTeam: match.blueTeam,
         });
     } catch (err: any) {
-        console.error('Erreur lors de la récupération des équipes:', err.message);
+        console.error('Erreur dans la récupération des équipes:', err.message);
         res.status(500).json({ success: false, message: 'Erreur lors de la récupération des équipes', error: err.message });
     }
 });
@@ -682,6 +720,39 @@ router.post('/ban-user', authenticateToken, requireAdmin, async (req: Authentica
     } catch (err: any) {
         console.error('Erreur lors du bannissement:', err.message);
         res.status(500).json({ success: false, message: 'Erreur lors du bannissement de l\'utilisateur', error: err.message });
+    }
+});
+
+router.post('/:matchId/reset', authenticateToken, requireAdmin, async (req: AuthenticatedRequest, res: Response) => {
+    const { matchId } = req.params;
+
+    try {
+        const match = await prisma.match.findUnique({
+            where: { id: matchId },
+        });
+        if (!match) {
+            return res.status(404).json({ success: false, message: 'Match non trouvé' });
+        }
+
+        games.delete(matchId); // Reset game state
+        const io = getSocketIO(req);
+        if (io) {
+            io.to(matchId).emit('game-reset', { matchId });
+            console.log(`Partie ${matchId} réinitialisée`);
+        }
+
+        return res.status(200).json({
+            success: true,
+            message: 'Match réinitialisé avec succès',
+            matchId,
+        });
+    } catch (err: any) {
+        console.error('Erreur lors de la réinitialisation du match:', err.message);
+        return res.status(500).json({
+            success: false,
+            message: 'Erreur lors de la réinitialisation du match',
+            error: err.message,
+        });
     }
 });
 
