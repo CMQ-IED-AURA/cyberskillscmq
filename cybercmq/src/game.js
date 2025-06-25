@@ -17,6 +17,26 @@ function getSocket(token) {
             reconnectionDelay: 1000,
             reconnectionDelayMax: 5000,
             randomizationFactor: 0.5,
+            timeout: 30000, // Augmenté pour éviter les timeouts sur Render
+        });
+
+        // Gestion des erreurs de reconnexion
+        let reconnectFailureCount = 0;
+        const maxReconnectFailures = 5;
+
+        socketInstance.on('reconnect_error', (error) => {
+            console.error('Erreur de reconnexion WebSocket:', error);
+            reconnectFailureCount++;
+            if (reconnectFailureCount >= maxReconnectFailures) {
+                socketInstance.disconnect();
+                reconnectFailureCount = 0;
+            }
+        });
+
+        socketInstance.on('reconnect', (attempt) => {
+            console.log(`Reconnexion réussie après ${attempt} tentatives`);
+            reconnectFailureCount = 0;
+            socketInstance.emit('authenticate', token);
         });
     }
     return socketInstance;
@@ -34,6 +54,19 @@ function Game() {
     const [socket, setSocket] = useState(null);
     const [error, setError] = useState(null);
     const [loading, setLoading] = useState(false);
+
+    // Valider le token via une requête API
+    const validateToken = async (token) => {
+        try {
+            const res = await fetch('https://cyberskills.onrender.com/auth/validate', {
+                headers: { 'Authorization': `Bearer ${token}` },
+            });
+            const data = await res.json();
+            return data.success;
+        } catch {
+            return false;
+        }
+    };
 
     const fetchMatches = useCallback(async (token) => {
         setLoading(true);
@@ -207,20 +240,12 @@ function Game() {
         }
     }, [loading, selectedMatch, navigate]);
 
-    // Fonction pour vérifier si l'utilisateur peut rejoindre un match
     const canJoinMatch = useCallback((matchId) => {
-        // L'admin peut rejoindre n'importe quel match
-        if (role === 'ADMIN') {
-            return true;
-        }
-
-        // Vérifier si l'utilisateur est dans une des équipes du match
+        if (role === 'ADMIN') return true;
         const matchTeams = teamMembersByMatch[matchId];
         if (!matchTeams) return false;
-
         const isInRedTeam = matchTeams.redTeam?.some(user => user.id === userId);
         const isInBlueTeam = matchTeams.blueTeam?.some(user => user.id === userId);
-
         return isInRedTeam || isInBlueTeam;
     }, [role, teamMembersByMatch, userId]);
 
@@ -231,7 +256,6 @@ function Game() {
             return;
         }
 
-        // Vérifier si l'utilisateur peut rejoindre ce match
         if (!canJoinMatch(matchId)) {
             setError('Vous devez être assigné à une équipe pour rejoindre ce match.');
             return;
@@ -243,21 +267,37 @@ function Game() {
             navigate('/login');
             return;
         }
-        if (socket && socket.connected) {
-            console.log('Rejoindre le match, émission de join-game pour gameId:', matchId);
-            localStorage.setItem('selectedGameId', matchId);
-            socket.emit('join-game', { gameId: matchId, playerName: username || 'Joueur' });
-            socket.once('role-assigned', (data) => {
-                console.log('Rôle assigné:', data);
-                navigate('/attack');
+
+        const ensureSocketConnected = () => {
+            return new Promise((resolve, reject) => {
+                if (socket && socket.connected) {
+                    resolve();
+                } else {
+                    socket?.once('connect', () => resolve());
+                    socket?.once('connect_error', () => reject(new Error('Impossible de se connecter au WebSocket.')));
+                    socket?.connect();
+                }
             });
-            socket.once('error', (data) => {
-                console.log('Erreur reçue lors de join-game:', data);
-                setError(data.message || 'Erreur inconnue lors de la jointure du match.');
+        };
+
+        ensureSocketConnected()
+            .then(() => {
+                console.log('Rejoindre le match, émission de join-game pour gameId:', matchId);
+                localStorage.setItem('selectedGameId', matchId);
+                socket.emit('join-game', { gameId: matchId, playerName: username || 'Joueur' });
+                socket.once('role-assigned', (data) => {
+                    console.log('Rôle assigné:', data);
+                    navigate('/attack');
+                });
+                socket.once('error', (data) => {
+                    console.log('Erreur reçue lors de join-game:', data);
+                    setError(data.message || 'Erreur inconnue lors de la jointure du match.');
+                });
+            })
+            .catch((err) => {
+                setError(err.message);
+                console.error('Erreur WebSocket:', err);
             });
-        } else {
-            setError('Impossible de rejoindre le match: non connecté au serveur.');
-        }
     }, [matches, canJoinMatch, navigate, socket, username]);
 
     useEffect(() => {
@@ -267,118 +307,134 @@ function Game() {
             navigate('/login');
             return;
         }
-        try {
-            const payload = token.split('.')[1];
-            const decoded = JSON.parse(atob(payload));
-            const exp = decoded.exp * 1000;
-            if (Date.now() >= exp) {
+
+        validateToken(token).then((isValid) => {
+            if (!isValid) {
                 Cookies.remove('token');
-                setError('Session expirée. Veuillez vous reconnecter.');
+                setError('Token invalide ou expiré. Veuillez vous reconnecter.');
                 navigate('/login');
                 return;
             }
-            setRole(decoded.role);
-            setUserId(decoded.userId);
-            setUsername(decoded.username);
 
-            const newSocket = getSocket(token);
-            setSocket(newSocket);
+            try {
+                const payload = token.split('.')[1];
+                const decoded = JSON.parse(atob(payload));
+                const exp = decoded.exp * 1000;
+                if (Date.now() >= exp) {
+                    Cookies.remove('token');
+                    setError('Session expirée. Veuillez vous reconnecter.');
+                    navigate('/login');
+                    return;
+                }
+                setRole(decoded.role);
+                setUserId(decoded.userId);
+                setUsername(decoded.username);
 
-            newSocket.on('connect', () => {
-                console.log('Connecté au WebSocket:', newSocket.id);
-                newSocket.emit('authenticate', token);
-            });
+                const newSocket = getSocket(token);
+                setSocket(newSocket);
 
-            newSocket.on('authenticated', (data) => {
-                console.log('Authentification WebSocket réussie:', data);
-            });
+                newSocket.on('connect', () => {
+                    console.log('Connecté au WebSocket:', newSocket.id);
+                    newSocket.emit('authenticate', token);
+                });
 
-            newSocket.on('authError', (error) => {
-                console.log('Erreur d\'authentification WebSocket:', error);
-                setError('Erreur d\'authentification WebSocket: ' + error.message);
+                newSocket.on('authenticated', (data) => {
+                    console.log('Authentification WebSocket réussie:', data);
+                });
+
+                newSocket.on('authError', (error) => {
+                    console.error('Erreur d\'authentification WebSocket:', error);
+                    setError('Erreur d\'authentification WebSocket: ' + error.message);
+                    validateToken(token).then((isValid) => {
+                        if (!isValid) {
+                            Cookies.remove('token');
+                            navigate('/login');
+                        } else {
+                            newSocket.emit('authenticate', token);
+                        }
+                    });
+                });
+
+                newSocket.on('connect_error', (error) => {
+                    console.error('Erreur de connexion WebSocket:', error);
+                    setError('Erreur de connexion au serveur Web - tentative de reconnexion...');
+                });
+
+                newSocket.on('reconnect', (attempt) => {
+                    console.log(`Reconnexion réussie après ${attempt} tentatives`);
+                    setError(null);
+                    newSocket.emit('authenticate', token);
+                });
+
+                newSocket.on('reconnect_error', (error) => {
+                    console.error('Erreur de reconnexion WebSocket:', error);
+                    setError('Échec de la reconnexion au serveur: ' + error.message);
+                });
+
+                newSocket.on('error', (data) => {
+                    console.error('Erreur WebSocket:', { message: data.message, code: data.code, details: data });
+                    setError(data.message || 'Erreur inconnue du serveur WebSocket');
+                });
+
+                newSocket.on('connectedUsers', (connectedUsers) => {
+                    console.log('Mise à jour des utilisateurs connectés:', connectedUsers);
+                    setUsers(connectedUsers || []);
+                });
+
+                newSocket.on('matchCreated', (newMatch) => {
+                    console.log('Nouveau match créé:', newMatch);
+                    setMatches((prev) => [...prev, newMatch]);
+                    fetchTeamMembers(newMatch.id, token);
+                });
+
+                newSocket.on('matchDeleted', (data) => {
+                    const matchId = data.matchId || data;
+                    console.log('Match supprimé:', matchId);
+                    setMatches((prev) => prev.filter((match) => match.id !== matchId));
+                    setTeamMembersByMatch((prev) => {
+                        const updated = { ...prev };
+                        delete updated[matchId];
+                        return updated;
+                    });
+                    if (selectedMatch?.id === matchId) {
+                        setSelectedMatch(null);
+                    }
+                });
+
+                newSocket.on('teamAssigned', ({ matchId, userId, teamId, username, updatedMatch }) => {
+                    console.log('Équipe assignée:', { matchId, userId, teamId, username });
+                    setTeamMembersByMatch((prev) => ({
+                        ...prev,
+                        [matchId]: {
+                            redTeam: updatedMatch.redTeam?.users || [],
+                            blueTeam: updatedMatch.blueTeam?.users || [],
+                        },
+                    }));
+                });
+
+                newSocket.on('game-started', ({ gameId }) => {
+                    console.log('Événement game-started reçu pour gameId:', gameId, 'par socketId:', newSocket.id);
+                    localStorage.setItem('selectedGameId', gameId);
+                    newSocket.emit('join-game', { gameId, playerName: username || 'Joueur' });
+                    navigate('/attack');
+                });
+
+                fetchMatches(token);
+                if (decoded.role === 'ADMIN') {
+                    fetchUsers(token);
+                }
+
+                return () => {
+                    console.log('Déconnexion du socket');
+                    newSocket.disconnect();
+                };
+            } catch (error) {
+                console.error('Erreur d\'authentification:', error);
+                setError('Erreur d\'authentification, veuillez vous reconnecter.');
                 Cookies.remove('token');
                 navigate('/login');
-            });
-
-            newSocket.on('connect_error', (error) => {
-                console.log('Erreur de connexion WebSocket:', error);
-                setError('Erreur de connexion au serveur Web - tentative de reconnexion...');
-            });
-
-            newSocket.on('reconnect', (attempt) => {
-                console.log(`Reconnexion réussie après ${attempt} tentatives`);
-                setError(null);
-                newSocket.emit('authenticate', token);
-            });
-
-            newSocket.on('reconnect_error', (error) => {
-                console.log('Erreur de reconnexion WebSocket:', error);
-                setError('Échec de la reconnexion au serveur: ' + error.message);
-            });
-
-            newSocket.on('error', (data) => {
-                console.log('Erreur WebSocket reçue:', data);
-                setError(data.message || 'Erreur inconnue du serveur WebSocket');
-            });
-
-            newSocket.on('connectedUsers', (connectedUsers) => {
-                console.log('Mise à jour des utilisateurs connectés:', connectedUsers);
-                setUsers(connectedUsers || []);
-            });
-
-            newSocket.on('matchCreated', (newMatch) => {
-                console.log('Nouveau match créé:', newMatch);
-                setMatches((prev) => [...prev, newMatch]);
-                fetchTeamMembers(newMatch.id, token);
-            });
-
-            newSocket.on('matchDeleted', (data) => {
-                const matchId = data.matchId || data;
-                console.log('Match supprimé:', matchId);
-                setMatches((prev) => prev.filter((match) => match.id !== matchId));
-                setTeamMembersByMatch((prev) => {
-                    const updated = { ...prev };
-                    delete updated[matchId];
-                    return updated;
-                });
-                if (selectedMatch?.id === matchId) {
-                    setSelectedMatch(null);
-                }
-            });
-
-            newSocket.on('teamAssigned', ({ matchId, userId, teamId, username, updatedMatch }) => {
-                console.log('Équipe assignée:', { matchId, userId, teamId, username });
-                setTeamMembersByMatch((prev) => ({
-                    ...prev,
-                    [matchId]: {
-                        redTeam: updatedMatch.redTeam?.users || [],
-                        blueTeam: updatedMatch.blueTeam?.users || [],
-                    },
-                }));
-            });
-
-            newSocket.on('game-started', ({ gameId }) => {
-                console.log('Événement game-started reçu pour gameId:', gameId, 'par socketId:', newSocket.id);
-                localStorage.setItem('selectedGameId', gameId);
-                newSocket.emit('join-game', { gameId, playerName: username || 'Joueur' });
-                navigate('/attack');
-            });
-
-            fetchMatches(token);
-            if (decoded.role === 'ADMIN') {
-                fetchUsers(token);
             }
-
-            return () => {
-                console.log('Déconnexion du socket');
-                newSocket.disconnect();
-            };
-        } catch (error) {
-            console.log('Erreur d\'authentification:', error);
-            setError('Erreur d\'authentification, veuillez vous reconnecter.');
-            Cookies.remove('token');
-            navigate('/login');
-        }
+        });
     }, [navigate, fetchMatches, fetchUsers, fetchTeamMembers, selectedMatch]);
 
     const filteredUsers = users.filter(user => user.isConnected || (!user.isConnected && user.teamId));

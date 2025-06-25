@@ -3,6 +3,7 @@ import { Shield, Sword, Clock, Globe, Info } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import io from 'socket.io-client';
 import Cookies from 'js-cookie';
+import './CyberWarGame.css';
 
 // Singleton WebSocket instance
 let socketInstance = null;
@@ -10,19 +11,42 @@ let socketInstance = null;
 function getSocket(token) {
     if (!socketInstance || socketInstance.disconnected) {
         socketInstance = io('https://cyberskills.onrender.com', {
-            auth: { token }, // Add token for authentication
+            auth: { token },
             transports: ['websocket', 'polling'],
             reconnection: true,
-            reconnectionAttempts: 10,
+            reconnectionAttempts: 15,
             reconnectionDelay: 1000,
-            timeout: 20000,
+            reconnectionDelayMax: 5000,
+            timeout: 30000, // Timeout augmenté pour Render
+        });
+
+        let reconnectFailureCount = 0;
+        const maxReconnectFailures = 5;
+
+        socketInstance.on('reconnect_error', (error) => {
+            console.error('Erreur de reconnexion WebSocket:', error);
+            reconnectFailureCount++;
+            if (reconnectFailureCount >= maxReconnectFailures) {
+                socketInstance.disconnect();
+                reconnectFailureCount = 0;
+            }
+        });
+
+        socketInstance.on('reconnect', (attempt) => {
+            console.log(`Reconnexion réussie après ${attempt} tentatives`);
+            reconnectFailureCount = 0;
+            socketInstance.emit('authenticate', token);
+        });
+
+        socketInstance.on('connect_error', (error) => {
+            console.error('Erreur de connexion WebSocket:', error);
         });
     }
     return socketInstance;
 }
 
 const initialGameState = {
-    state: 'waiting', // Start in waiting state to skip team/role selection
+    state: 'waiting',
     selectedTeam: null,
     selectedRole: null,
     scores: { attackers: 0, defenders: 0 },
@@ -95,13 +119,13 @@ const IntroAnimation = ({ role, team, onComplete }) => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="min-h-screen flex flex-col items-center justify-center bg-black text-white font-mono text-center"
+            className="min-h-screen flex flex-col items-center justify-center"
         >
             <motion.h1
                 initial={{ y: 20, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
                 transition={{ duration: 1 }}
-                className={`text-4xl ${team === 'attackers' ? 'text-red-500' : 'text-green-500'}`}
+                className={`text-4xl ${team === 'attackers' ? 'text-attaquants' : 'text-défenseurs'}`}
             >
                 Mission : Technetron Bank
             </motion.h1>
@@ -118,7 +142,7 @@ const IntroAnimation = ({ role, team, onComplete }) => {
 };
 
 const GameTimer = ({ onTimeUp }) => {
-    const [timeLeft, setTimeLeft] = useState(600); // 10 minutes
+    const [timeLeft, setTimeLeft] = useState(600);
 
     useEffect(() => {
         if (timeLeft <= 0) {
@@ -133,7 +157,7 @@ const GameTimer = ({ onTimeUp }) => {
 
     return (
         <div className="flex items-center text-lg">
-            <Clock className="mr-2" /> Temps : <span className="text-blue-500 ml-1">{formatTime(timeLeft)}</span>
+            <Clock className="mr-2" /> Temps : <span className="timer-value">{formatTime(timeLeft)}</span>
         </div>
     );
 };
@@ -158,23 +182,23 @@ const FlagSubmission = ({ onSubmitFlag, submittedFlags }) => {
     };
 
     return (
-        <div className="bg-gray-800 p-4 rounded-lg mb-4">
-            <h3 className="text-blue-500 mb-2">Soumettre un Flag</h3>
+        <div className="panel">
+            <h3 className="panel-title">Soumettre un Flag</h3>
             <input
                 type="text"
                 value={flagInput}
                 onChange={(e) => setFlagInput(e.target.value)}
                 placeholder="Ex: FLAG-XSS-123"
-                className="w-full p-2 bg-gray-700 text-white border-none rounded mb-2"
+                className="input w-full"
             />
             <button
                 onClick={handleSubmit}
-                className="px-4 py-2 bg-blue-600 text-white rounded"
+                className="button défenseurs mt-2"
             >
                 Valider
             </button>
             {feedback && (
-                <p className={`mt-2 ${feedback.includes('validé') ? 'text-green-500' : 'text-red-500'}`}>{feedback}</p>
+                <p className={`feedback ${feedback.includes('validé') ? '[data-status-success]' : '[data-status-failure]'}`}>{feedback}</p>
             )}
         </div>
     );
@@ -206,22 +230,25 @@ const TerminalInterface = ({ role, team, serverState, setServerState, handleActi
     };
 
     return (
-        <div className="bg-gray-900 p-4 rounded-lg font-mono text-white">
-            <h2 className="text-blue-500 mb-2">Terminal</h2>
-            <div className="bg-black p-3 h-48 overflow-y-auto mb-2 text-sm">
+        <div className="terminal">
+            <h2 className="panel-title">Terminal</h2>
+            <div className="terminal-list">
                 {output.map((line, idx) => (
-                    <div key={idx} className="text-green-500">{line}</div>
+                    <div key={idx} className="log-entry">{line}</div>
                 ))}
             </div>
-            <input
-                type="text"
-                value={cmd}
-                onChange={(e) => setCmd(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && execute()}
-                placeholder="Ex: nmap -sV 10.0.0.1"
-                className="w-full p-2 bg-gray-700 text-white border-none rounded"
-            />
-            <p className="mt-2 text-gray-400 text-sm">Tâches : {role.tasks.join(' | ')}</p>
+            <div className="terminal-prompt">
+                <span>$</span>
+                <input
+                    type="text"
+                    value={cmd}
+                    onChange={(e) => setCmd(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && execute()}
+                    placeholder="Ex: nmap -sV 10.0.0.1"
+                    className="terminal-input"
+                />
+            </div>
+            <p className="text-gray-400 text-sm mt-2">Tâches : {role.tasks.join(' | ')}</p>
         </div>
     );
 };
@@ -243,14 +270,14 @@ const XssGame = ({ onComplete }) => {
         <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="bg-gray-700 p-4 rounded-lg text-white"
+            className="challenge-board"
         >
-            <h3 className="text-green-500 mb-2">Protéger contre XSS</h3>
+            <h3 className="panel-title">Protéger contre XSS</h3>
             <p className="mb-2">Choisis la règle pour bloquer les scripts.</p>
             <select
                 value={rule}
                 onChange={(e) => setRule(e.target.value)}
-                className="w-full p-2 bg-gray-800 text-white border-none rounded mb-2"
+                className="input w-full"
             >
                 <option value="">Choisir...</option>
                 <option>Block scripts</option>
@@ -259,12 +286,12 @@ const XssGame = ({ onComplete }) => {
             </select>
             <button
                 onClick={handleSubmit}
-                className="px-4 py-2 bg-green-500 text-white rounded"
+                className="button défenseurs mt-2"
             >
                 Valider
             </button>
             {feedback && (
-                <p className={`mt-2 ${feedback.includes('bloqué') ? 'text-green-500' : 'text-red-500'}`}>{feedback}</p>
+                <p className={`feedback ${feedback.includes('bloqué') ? '[data-status-success]' : '[data-status-failure]'}`}>{feedback}</p>
             )}
         </motion.div>
     );
@@ -272,7 +299,7 @@ const XssGame = ({ onComplete }) => {
 
 const PasswordGame = ({ onComplete }) => {
     const [length, setLength] = useState(0);
-    const [feedback, setFeedback] = use-lhes
+    const [feedback, setFeedback] = useState('');
 
     const handleSubmit = () => {
         if (length >= 8) {
@@ -287,24 +314,24 @@ const PasswordGame = ({ onComplete }) => {
         <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="bg-gray-700 p-4 rounded-lg text-white"
+            className="challenge-board"
         >
-            <h3 className="text-green-500 mb-2">Renforcer les Mots de Passe</h3>
+            <h3 className="panel-title">Renforcer les Mots de Passe</h3>
             <p className="mb-2">Choisis une longueur minimale.</p>
             <input
                 type="number"
                 value={length}
                 onChange={(e) => setLength(parseInt(e.target.value) || 0)}
-                className="w-full p-2 bg-gray-800 text-white border-none rounded mb-2"
+                className="input w-full"
             />
             <button
                 onClick={handleSubmit}
-                className="px-4 py-2 bg-green-500 text-white rounded"
+                className="button défenseurs mt-2"
             >
                 Valider
             </button>
             {feedback && (
-                <p className={`mt-2 ${feedback.includes('sécurisés') ? 'text-green-500' : 'text-red-500'}`}>{feedback}</p>
+                <p className={`feedback ${feedback.includes('sécurisés') ? '[data-status-success]' : '[data-status-failure]'}`}>{feedback}</p>
             )}
         </motion.div>
     );
@@ -327,69 +354,231 @@ const FirewallGame = ({ onComplete }) => {
         <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="bg-gray-700 p-4 rounded-lg text-white"
+            className="challenge-board"
         >
-            <h3 className="text-green-500 mb-2">Configurer le Pare-feu</h3>
+            <h3 className="panel-title">Configurer le Pare-feu</h3>
             <p className="mb-2">Entre le port à bloquer.</p>
             <input
                 type="text"
                 value={port}
                 onChange={(e) => setPort(e.target.value)}
                 placeholder="Ex: 22"
-                className="w-full p-2 bg-gray-800 text-white border-none rounded mb-2"
+                className="input w-full"
             />
             <button
                 onClick={handleSubmit}
-                className="px-4 py-2 bg-green-500 text-white rounded"
+                className="button défenseurs mt-2"
             >
                 Valider
             </button>
             {feedback && (
-                <p className={`mt-2 ${feedback.includes('bloqué') ? 'text-green-500' : 'text-red-500'}`}>{feedback}</p>
+                <p className={`feedback ${feedback.includes('bloqué') ? '[data-status-success]' : '[data-status-failure]'}`}>{feedback}</p>
             )}
         </motion.div>
     );
 };
 
-// Keep TeamSelectionScreen for reference but it won't be used
-const TeamSelectionScreen = ({ onTeamSelect }) => {
+const WaitingRoomScreen = ({ connectedPlayers, currentPlayer, connectionStatus, errorMessage, handleReconnect, reconnectAttempts }) => {
     return (
-        <div className="bg-gray-900 min-h-screen p-8 text-white text-center">
-            <h1 className="text-3xl text-blue-500 mb-5">Choisir votre équipe</h1>
-            <div className="flex gap-5 justify-center">
-                <button
-                    onClick={() => onTeamSelect('attackers')}
-                    className="px-6 py-3 bg-red-500 text-white rounded-lg text-lg"
-                >
-                    Attaquants (Équipe Rouge)
-                </button>
-                <button
-                    onClick={() => onTeamSelect('defenders')}
-                    className="px-6 py-3 bg-green-500 text-white rounded-lg text-lg"
-                >
-                    Défenseurs (Équipe Bleue)
-                </button>
+        <div className="waiting-room">
+            {errorMessage && (
+                <div className="error-message">
+                    <p>{errorMessage}</p>
+                    <button
+                        onClick={handleReconnect}
+                        disabled={reconnectAttempts >= 15}
+                        className="button"
+                    >
+                        Réessayer
+                    </button>
+                </div>
+            )}
+            <h1 className="waiting-room-title">Salle d'Attente - Technetron Bank CyberWar</h1>
+            <p className={`connection-status ${connectionStatus === 'connected' ? 'connected' : 'disconnected'}`}>
+                Statut : {connectionStatus === 'connected' ? `Connecté en tant que ${currentPlayer.name}` : 'En attente de connexion...'}
+            </p>
+            <div className="players-panel">
+                <h3 className="players-title">Joueurs connectés ({connectedPlayers.length})</h3>
+                <div className="team-section">
+                    <h4 className="team-title attaquants">🔥 Attaquants</h4>
+                    <div className="player-list">
+                        {connectedPlayers
+                            .filter((p) => p.team === 'attackers')
+                            .map((player) => (
+                                <div
+                                    key={player.id}
+                                    className={`player-item attaquants ${player.userId === currentPlayer.userId ? 'current-player' : ''}`}
+                                >
+                                    {player.name} - {player.roleName} {player.roleIcon} {player.userId === currentPlayer.userId ? '(Vous)' : ''}
+                                </div>
+                            ))}
+                    </div>
+                </div>
+                <div className="team-section">
+                    <h4 className="team-title défenseurs">🛡️ Défenseurs</h4>
+                    <div className="player-list">
+                        {connectedPlayers
+                            .filter((p) => p.team === 'defenders')
+                            .map((player) => (
+                                <div
+                                    key={player.id}
+                                    className={`player-item défenseurs ${player.userId === currentPlayer.userId ? 'current-player' : ''}`}
+                                >
+                                    {player.name} - {player.roleName} {player.roleIcon} {player.userId === currentPlayer.userId ? '(Vous)' : ''}
+                                </div>
+                            ))}
+                    </div>
+                </div>
+                <p className="waiting-message">
+                    La partie démarrera automatiquement lorsqu'il y aura au moins un joueur dans chaque équipe.
+                </p>
             </div>
         </div>
     );
 };
 
-// Keep RoleSelectionScreen for reference but it won't be used
-const RoleSelectionScreen = ({ team, onRoleSelect }) => {
+const GameInterfaceScreen = ({ game, dispatch, role, connectionStatus, reconnectAttempts, handleReconnect, handleSubmitFlag, handleAction, addLog, server, setServer, website, updateVuln, setMiniGame }) => {
     return (
-        <div className="bg-gray-900 min-h-screen p-8 text-white text-center">
-            <h1 className="text-3xl text-blue-500 mb-5">Choisir votre rôle</h1>
-            <div className="grid grid-cols-3 gap-5 max-w-4xl mx-auto">
-                {roles[team].map((role) => (
+        <div className="game-container">
+            {connectionStatus === 'disconnected' && (
+                <div className="role-details-overlay">
+                    <div className="role-details-container">
+                        <div className="error-message">
+                            <h3>Connexion perdue</h3>
+                            <p>Tentative de reconnexion ({15 - reconnectAttempts} restantes)</p>
+                            <button
+                                onClick={handleReconnect}
+                                disabled={reconnectAttempts >= 15}
+                                className="button"
+                            >
+                                Réessayer
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            <header className="header">
+                <div className="header-content">
+                    <h1 className="header-title">Technetron Bank - CyberWar</h1>
+                    <div className="flex gap-5 items-center">
+                        <GameTimer onTimeUp={() => dispatch({ type: 'SET_STATE', payload: 'results' })} />
+                        <div className="score-value">
+                            Score : <span className="attaquants">{game.scores.attackers}</span> - <span className="défenseurs">{game.scores.defenders}</span>
+                        </div>
+                        <button
+                            onClick={() => dispatch({ type: 'SET_STATE', payload: 'role-details' })}
+                            className="button défenseurs"
+                        >
+                            <Info className="mr-2" /> Mission
+                        </button>
+                    </div>
+                </div>
+            </header>
+            <main className="main-content">
+                <aside className="sidebar">
+                    <div className={`role-panel ${game.selectedTeam}`}>
+                        <div className="role-icon">{role?.icon}</div>
+                        <h3 className="role-name">{role?.name}</h3>
+                        <p>{role?.specialty}</p>
+                    </div>
+                    {game.selectedTeam === 'attackers' && (
+                        <FlagSubmission onSubmitFlag={handleSubmitFlag} submittedFlags={game.submittedFlags} />
+                    )}
+                    <div className="activity-log">
+                        <h3 className="panel-title">Logs</h3>
+                        {game.logs.map((log, idx) => (
+                            <p key={idx} className="log-entry">{log}</p>
+                        ))}
+                    </div>
+                </aside>
+                <div className="content-wrapper">
+                    <div className="tabs">
+                        <button
+                            onClick={() => dispatch({ type: 'SET_ACTIVE_TAB', payload: 'website' })}
+                            className={`tab ${game.activeTab === 'website' ? 'active' : ''} ${game.selectedTeam}`}
+                        >
+                            Site Web
+                        </button>
+                        <button
+                            onClick={() => dispatch({ type: 'SET_ACTIVE_TAB', payload: 'network' })}
+                            className={`tab ${game.activeTab === 'network' ? 'active' : ''} ${game.selectedTeam}`}
+                        >
+                            Réseau
+                        </button>
+                    </div>
+                    {game.activeTab === 'website' ? (
+                        <WebsiteInterface
+                            game={game}
+                            updateVuln={updateVuln}
+                            addLog={addLog}
+                            handleAction={handleAction}
+                            setMiniGame={setMiniGame}
+                            website={website}
+                        />
+                    ) : (
+                        <TerminalInterface
+                            role={role}
+                            team={game.selectedTeam}
+                            serverState={server}
+                            setServerState={setServer}
+                            handleAction={handleAction}
+                            addLog={addLog}
+                        />
+                    )}
+                </div>
+            </main>
+        </div>
+    );
+};
+
+const RoleDetailsScreen = ({ game, dispatch, role }) => {
+    return (
+        <div className="role-details-overlay">
+            <div className="role-details-container">
+                <div className={`role-details ${game.selectedTeam}`}>
+                    <h1 className="panel-title">Détails de la Mission</h1>
+                    <h2 className="role-name">{role?.name} {role?.icon}</h2>
+                    <p><strong>Équipe :</strong> {game.selectedTeam === 'attackers' ? 'Attaquants' : 'Défenseurs'}</p>
+                    <p><strong>Spécialité :</strong> {role?.specialty}</p>
+                    <p><strong>Description :</strong> {role?.description}</p>
+                    <h3>Tâches :</h3>
+                    <ul className="list-disc pl-5">
+                        {role?.tasks.map((task, idx) => (
+                            <li key={idx}>{task}</li>
+                        ))}
+                    </ul>
                     <button
-                        key={role.id}
-                        onClick={() => onRoleSelect(role.id)}
-                        className={`p-4 rounded-lg ${team === 'attackers' ? 'bg-red-500' : 'bg-green-500'} text-white`}
+                        onClick={() => dispatch({ type: 'SET_STATE', payload: 'game' })}
+                        className="button défenseurs mt-4"
                     >
-                        <h3 className="text-lg mb-2">{role.name} {role.icon}</h3>
-                        <p className="text-sm">{role.specialty}</p>
+                        Retour à la partie
                     </button>
-                ))}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+const ResultsScreen = ({ game, handleReset }) => {
+    const winner = game.scores.attackers > game.scores.defenders ? 'Attaquants' : game.scores.defenders > game.scores.attackers ? 'Défenseurs' : 'Égalité';
+
+    return (
+        <div className="waiting-room">
+            <div className="results-panel">
+                <h1 className={`results-title ${winner === 'Attaquants' ? 'attaquants' : winner === 'Défenseurs' ? 'défenseurs' : ''}`}>Partie Terminée</h1>
+                <h2>Gagnant : {winner}</h2>
+                <div className="score-card attaquants">
+                    Attaquants : {game.scores.attackers}
+                </div>
+                <div className="score-card défenseurs">
+                    Défenseurs : {game.scores.defenders}
+                </div>
+                <button
+                    onClick={handleReset}
+                    className="button défenseurs"
+                >
+                    Nouvelle Partie
+                </button>
             </div>
         </div>
     );
@@ -410,7 +599,7 @@ const CyberWarGame = () => {
                 const payload = token.split('.')[1];
                 const decoded = JSON.parse(atob(payload));
                 return { id: decoded.userId, username: decoded.username || `Player_${Math.random().toString(36).substr(2, 9)}` };
-            } catch (err) {
+            } catch {
                 return { id: null, username: null };
             }
         }
@@ -427,7 +616,7 @@ const CyberWarGame = () => {
         (msg) => {
             dispatch({
                 type: 'ADD_LOG',
-                payload: `[${new Date().toLocaleTimeString('fr-FR')}] ${game.selectedTeam === 'attackers' ? '💥' : '🛡️'} ${msg}`,
+                payload: `[${new Date().toLocaleTimeString('fr-FR')}] ${game.selectedTeam === 'attackers' ? '💥' : '🗡️'} ${msg}`,
             });
             console.log('Log:', msg);
         },
@@ -435,8 +624,8 @@ const CyberWarGame = () => {
     );
 
     const handleReconnect = useCallback(() => {
-        if (reconnectAttempts >= 10) {
-            setErrorMessage('Impossible de reconnecter après 10 tentatives.');
+        if (reconnectAttempts >= 15) {
+            setErrorMessage('Impossible de reconnecter après 15 tentatives.');
             addLog('Échec de la reconnexion: limite d’essais atteinte.');
             return;
         }
@@ -450,7 +639,7 @@ const CyberWarGame = () => {
                 gameId,
                 playerId,
                 userId: user.id,
-                playerName: user.username || `Player_${Math.random().toString(36).substr(2, 9)}`
+                playerName: user.username,
             });
             addLog('Tentative de reconnexion...');
         } else {
@@ -479,21 +668,21 @@ const CyberWarGame = () => {
                 newSocket.emit('join-game', {
                     gameId,
                     userId: user.id,
-                    playerName: user.username || `Player_${Math.random().toString(36).substr(2, 9)}`,
+                    playerName: user.username,
                 });
                 addLog(`Connecté au serveur en tant que ${user.username}.`);
             } else {
                 setErrorMessage('Erreur: informations utilisateur manquantes.');
                 addLog('Échec de la jointure: informations utilisateur manquantes.');
             }
-            console.log('WebSocket connected:', newSocket.id);
+            console.log('WebSocket connecté:', newSocket.id);
         });
 
         newSocket.on('connect_error', (error) => {
-            setConnectionStatus('error');
+            setConnectionStatus('disconnected');
             setErrorMessage('Erreur de connexion au serveur. Retentez ou vérifiez votre réseau.');
             addLog('Erreur de connexion au serveur.');
-            console.error('WebSocket connect error:', error);
+            console.error('Erreur de connexion WebSocket:', error);
         });
 
         newSocket.on('authenticated', (data) => {
@@ -507,18 +696,34 @@ const CyberWarGame = () => {
             Cookies.remove('token');
         });
 
+        newSocket.on('initial-players', (players) => {
+            setConnectedPlayers(players.map((player) => ({
+                id: player.id,
+                userId: player.userId,
+                name: player.playerName,
+                team: player.team === 'attackers' ? 'attackers' : 'defenders',
+                roleId: player.roleId,
+                roleName: roles[player.team === 'attackers' ? 'attackers' : 'defenders']?.find((r) => r.id === player.roleId)?.name || 'Unknown',
+                roleIcon: roles[player.team === 'attackers' ? 'attackers' : 'defenders']?.find((r) => r.id === player.roleId)?.icon || '',
+            })));
+            addLog(`Synchronisation initiale: ${players.length} joueurs connectés.`);
+        });
+
         newSocket.on('player-joined', (player) => {
             setConnectedPlayers((prev) => {
-                const updated = [...prev.filter((p) => p.id !== player.id), {
-                    id: player.id,
-                    userId: player.userId,
-                    name: player.playerName, // Changed from username to playerName
-                    team: player.team === 'attackers' ? 'attackers' : 'defenders',
-                    roleId: player.roleId,
-                    roleName: roles[player.team === 'attackers' ? 'attackers' : 'defenders']?.find((r) => r.id === player.roleId)?.name || 'Unknown',
-                    roleIcon: roles[player.team === 'attackers' ? 'attackers' : 'defenders']?.find((r) => r.id === player.roleId)?.icon || '',
-                }];
-                console.log('Player joined:', updated);
+                const updated = [
+                    ...prev.filter((p) => p.id !== player.id && p.userId !== player.userId),
+                    {
+                        id: player.id,
+                        userId: player.userId,
+                        name: player.playerName,
+                        team: player.team === 'attackers' ? 'attackers' : 'defenders',
+                        roleId: player.roleId,
+                        roleName: roles[player.team === 'attackers' ? 'attackers' : 'defenders']?.find((r) => r.id === player.roleId)?.name || 'Unknown',
+                        roleIcon: roles[player.team === 'attackers' ? 'attackers' : 'defenders']?.find((r) => r.id === player.roleId)?.icon || '',
+                    },
+                ];
+                console.log('Joueur rejoint:', updated);
                 return updated;
             });
             addLog(`Joueur ${player.playerName} a rejoint (${player.team}).`);
@@ -526,8 +731,8 @@ const CyberWarGame = () => {
 
         newSocket.on('player-left', (player) => {
             setConnectedPlayers((prev) => {
-                const updated = prev.filter((p) => p.id !== player.id);
-                console.log('Player left:', updated);
+                const updated = prev.filter((p) => p.id !== player.id && p.userId !== player.userId);
+                console.log('Joueur quitté:', updated);
                 return updated;
             });
             addLog(`Joueur ${player.playerName} a quitté.`);
@@ -535,13 +740,14 @@ const CyberWarGame = () => {
 
         newSocket.on('role-assigned', (data) => {
             dispatch({ type: 'SET_TEAM', payload: data.team === 'attackers' ? 'attackers' : 'defenders' });
-            dispatch({ type: 'SET_ROLE', payload: data.roleId });
+            dispatch({ type: 'SET_ROLE', payload: roles[data.team === 'attackers' ? 'attackers' : 'defenders'].find((r) => r.id === data.roleId) });
             dispatch({ type: 'SET_ROLE_ASSIGNED' });
             setPlayerId(data.playerId);
             setUser((prev) => ({ ...prev, username: data.playerName }));
             setAssignedRoles((prev) => [...new Set([...prev, data.roleId])]);
-            setConnectedPlayers((prev) => {
-                const updated = [...prev.filter((p) => p.id !== data.playerId), {
+            setConnectedPlayers((prev) => [
+                ...prev.filter((p) => p.id !== data.playerId && p.userId !== data.userId),
+                {
                     id: data.playerId,
                     userId: data.userId,
                     name: data.playerName,
@@ -549,10 +755,8 @@ const CyberWarGame = () => {
                     roleId: data.roleId,
                     roleName: roles[data.team === 'attackers' ? 'attackers' : 'defenders']?.find((r) => r.id === data.roleId)?.name || 'Unknown',
                     roleIcon: roles[data.team === 'attackers' ? 'attackers' : 'defenders']?.find((r) => r.id === data.roleId)?.icon || '',
-                }];
-                console.log('Role assigned, updated players:', updated);
-                return updated;
-            });
+                },
+            ]);
             addLog(`Rôle assigné : ${data.roleName} (${data.team}).`);
         });
 
@@ -565,11 +769,10 @@ const CyberWarGame = () => {
                 roleId: p.roleId,
                 roleName: roles[p.team === 'attackers' ? 'attackers' : 'defenders']?.find((r) => r.id === p.roleId)?.name || 'Unknown',
                 roleIcon: roles[p.team === 'attackers' ? 'attackers' : 'defenders']?.find((r) => r.id === p.roleId)?.icon || '',
-            })) || []);
+            })));
             setGameStatus(gameState.status);
             const rolesAssigned = gameState.players.map((p) => p.roleId);
             setAssignedRoles([...new Set(rolesAssigned)]);
-            console.log('Game state update:', gameState);
             if (gameState.status === 'playing' && game.state !== 'game') {
                 dispatch({ type: 'SET_STATE', payload: 'intro' });
             }
@@ -601,24 +804,25 @@ const CyberWarGame = () => {
         });
 
         newSocket.on('game-started', (data) => {
-            console.log('Game started:', data);
+            console.log('Partie démarrée:', data);
             dispatch({ type: 'SET_STATE', payload: 'intro' });
             addLog('Partie démarrée.');
         });
 
         newSocket.on('game-ended', (data) => {
             dispatch({ type: 'SET_STATE', payload: 'results' });
-            addLog(`Partie terminée. Gagnant: ${data.winner}`);
+            addLog(`Partie terminée. Gagnant : ${data.winner}`);
         });
 
         newSocket.on('rejoin-success', (data) => {
             dispatch({ type: 'SET_TEAM', payload: data.team === 'attackers' ? 'attackers' : 'defenders' });
-            dispatch({ type: 'SET_ROLE', payload: data.roleId });
+            dispatch({ type: 'SET_ROLE', payload: roles[data.team === 'attackers' ? 'attackers' : 'defenders'].find((r) => r.id === data.roleId) });
             dispatch({ type: 'SET_ROLE_ASSIGNED' });
             setPlayerId(data.playerId);
             setUser((prev) => ({ ...prev, username: data.playerName }));
-            setConnectedPlayers((prev) => {
-                const updated = [...prev.filter((p) => p.id !== data.playerId), {
+            setConnectedPlayers((prev) => [
+                ...prev.filter((p) => p.id !== data.playerId && p.userId !== data.userId),
+                {
                     id: data.playerId,
                     userId: data.userId,
                     name: data.playerName,
@@ -626,24 +830,22 @@ const CyberWarGame = () => {
                     roleId: data.roleId,
                     roleName: roles[data.team === 'attackers' ? 'attackers' : 'defenders']?.find((r) => r.id === data.roleId)?.name || 'Unknown',
                     roleIcon: roles[data.team === 'attackers' ? 'attackers' : 'defenders']?.find((r) => r.id === data.roleId)?.icon || '',
-                }];
-                console.log('Rejoin success, updated players:', updated);
-                return updated;
-            });
+                },
+            ]);
             addLog(`Reconnexion réussie : ${data.roleName} (${data.team}).`);
         });
 
         newSocket.on('error', (data) => {
             setErrorMessage(data.message || 'Erreur inconnue du serveur.');
-            addLog(`Erreur serveur: ${data.message} (Attendu: playerName, Reçu: undefined)`);
+            addLog(`Erreur serveur : ${data.message}`);
         });
 
         return () => {
             console.log('Déconnexion du socket');
-            newSocket.close();
+            newSocket.disconnect();
             setConnectionStatus('disconnected');
         };
-    }, [addLog, gameId, user]);
+    }, [game.state, gameId, user, addLog]);
 
     const sendAction = useCallback(
         (actionType, actionData) => {
@@ -658,7 +860,7 @@ const CyberWarGame = () => {
                     timestamp: Date.now(),
                 });
             } else {
-                addLog('Impossible d’envoyer l’action: non connecté.');
+                addLog('Impossible d’envoyer l’action : non connecté.');
                 setErrorMessage('Non connecté au serveur. Tentative de reconnexion...');
                 handleReconnect();
             }
@@ -699,7 +901,7 @@ const CyberWarGame = () => {
         socket.emit('join-game', {
             gameId,
             userId: user.id,
-            playerName: user.username || `Player_${Math.random().toString(36).substr(2, 9)}`,
+            playerName: user.username,
         });
     }, [socket, gameId, user]);
 
@@ -714,7 +916,7 @@ const CyberWarGame = () => {
         });
     };
 
-    const WebsiteInterface = () => {
+    const WebsiteInterface = ({ game, updateVuln, addLog, handleAction, setMiniGame, website }) => {
         const [page, setPage] = useState('home');
         const [form, setForm] = useState({ user: '', pass: '', comment: '' });
         const [feedback, setFeedback] = useState('');
@@ -741,14 +943,14 @@ const CyberWarGame = () => {
         };
 
         return (
-            <div className="bg-white p-5 rounded-lg shadow-md">
-                <h2 className="text-blue-800 mb-4">Technetron Bank</h2>
-                <nav className="flex gap-3 mb-4">
+            <div className="interface-content">
+                <h2 className="panel-title">Technetron Bank</h2>
+                <nav className="tabs">
                     {['home', 'osint', 'login', 'contact'].map((p) => (
                         <button
                             key={p}
                             onClick={() => setPage(p)}
-                            className={`px-4 py-2 rounded ${page === p ? 'bg-blue-800 text-white' : 'bg-gray-100 text-blue-800'}`}
+                            className={`tab ${page === p ? 'active' : ''} ${game.selectedTeam}`}
                         >
                             {p === 'home' ? 'Accueil' : p === 'osint' ? 'OSINT' : p === 'login' ? 'Connexion' : 'Contact'}
                         </button>
@@ -756,31 +958,58 @@ const CyberWarGame = () => {
                 </nav>
                 {miniGame && (
                     <div className="mb-4">
-                        {miniGame === 'xss' && <XssGame onComplete={() => { updateVuln('xss', { fixed: true }); handleAction({ team: 'defenders', message: 'XSS corrigé.', points: 50 }); setMiniGame(null); }} />}
-                        {miniGame === 'weak_password' && <PasswordGame onComplete={() => { updateVuln('weak_password', { fixed: true }); handleAction({ team: 'defenders', message: 'Mots de passe sécurisés.', points: 50 }); setMiniGame(null); }} />}
-                        {miniGame === 'ssh' && <FirewallGame onComplete={() => { setServer((prev) => ({ ...prev, services: { ...prev.services, ssh: { ...prev.services.ssh, fixed: true } } })); handleAction({ team: 'defenders', message: 'SSH sécurisé.', points: 50 }); setMiniGame(null); }} />}
+                        {miniGame === 'xss' && (
+                            <XssGame
+                                onComplete={() => {
+                                    updateVuln('xss', { fixed: true });
+                                    handleAction({ team: 'defenders', message: 'XSS corrigé', points: 50 });
+                                    setMiniGame(null);
+                                }}
+                            />
+                        )}
+                        {miniGame === 'weak-password' && (
+                            <PasswordGame
+                                onComplete={() => {
+                                    updateVuln('weak_password', { fixed: true });
+                                    handleAction({ team: 'defenders', message: 'Mots de passe sécurisés', points: 50 });
+                                    setMiniGame(null);
+                                }}
+                            />
+                        )}
+                        {miniGame === 'ssh' && (
+                            <FirewallGame
+                                onComplete={() => {
+                                    setServer((prev) => ({
+                                        ...prev,
+                                        services: { ...prev.services, ssh: { ...prev.services.ssh, fixed: true } },
+                                    }));
+                                    handleAction({ team: 'defenders', message: 'SSH sécurisé', points: 50 });
+                                    setMiniGame(null);
+                                }}
+                            />
+                        )}
                     </div>
                 )}
                 {feedback && (
-                    <p className={`mb-4 ${feedback.includes('Flag') ? 'text-green-500' : 'text-red-500'}`}>{feedback}</p>
+                    <p className={`feedback ${feedback.includes('Flag') ? '[data-status-success]' : '[data-status-failure]'}`}>{feedback}</p>
                 )}
                 {page === 'home' && (
                     <div>
-                        <h3 className="text-blue-800 mb-2">Bienvenue</h3>
+                        <h3 className="panel-title">Bienvenue</h3>
                         <p>Technetron Bank, votre banque sécurisée depuis 2025.</p>
-                        <Globe className="mt-4 text-blue-800 w-10 h-10" />
+                        <Globe className="mt-4" />
                     </div>
                 )}
                 {page === 'osint' && (
                     <div>
-                        <h3 className="text-blue-600 mb-2">OSINT</h3>
+                        <h3 className="panel-title">OSINT</h3>
                         {website.osint.map((item, idx) => (
-                            <div key={idx} className="p-3 bg-gray-100 rounded mb-2">
+                            <div key={idx} className="challenge-item">
                                 <p><strong>{item.source} :</strong> {item.info}</p>
                                 {game.selectedTeam === 'attackers' && (
                                     <button
                                         onClick={() => addLog(`OSINT analysé : ${item.source}.`)}
-                                        className="px-4 py-2 bg-red-500 text-white rounded mt-2"
+                                        className="button attaquants mt-2"
                                     >
                                         Analyser
                                     </button>
@@ -791,35 +1020,34 @@ const CyberWarGame = () => {
                 )}
                 {page === 'login' && (
                     <div>
-                        <h3 className="text-blue-600 mb-2">Connexion</h3>
+                        <h3 className="panel-title">Connexion</h3>
                         <input
                             type="text"
                             value={form.user}
                             onChange={(e) => setForm({ ...form, user: e.target.value })}
                             placeholder="Utilisateur"
-                            className="w-full p-2 border border-gray-300 rounded mb-2"
+                            className="input w-full"
                         />
-
                         <input
                             type="text"
                             value={form.pass}
                             onChange={(e) => setForm({ ...form, pass: e.target.value })}
                             placeholder="Mot de passe"
-                            className="w-full p-2 border border-gray-300 rounded mb-2"
+                            className="input w-full"
                         />
                         <button
                             onClick={() => {
                                 const passFlag = testWeakPass(form.user, form.pass);
                                 setFeedback(passFlag ? 'Flag: FLAG-PASS-789' : 'Identifiants incorrects.');
                             }}
-                            className="px-4 py-2 bg-blue-600 text-white rounded"
+                            className="button défenseurs mt-2"
                         >
                             Connexion
                         </button>
                         {game.selectedTeam === 'defenders' && !website.vulnerabilities.weak_password?.fixed && (
                             <button
-                                onClick={() => setMiniGame('weak_password')}
-                                className="px-4 py-2 bg-green-500 text-white rounded ml-2"
+                                onClick={() => setMiniGame('weak-password')}
+                                className="button défenseurs mt-2"
                             >
                                 Sécuriser Mots de Passe
                             </button>
@@ -828,26 +1056,26 @@ const CyberWarGame = () => {
                 )}
                 {page === 'contact' && (
                     <div>
-                        <h3 className="text-blue-600 mb-2">Contact</h3>
+                        <h3 className="panel-title">Contact</h3>
                         <textarea
                             value={form.comment}
                             onChange={(e) => setForm({ ...form, comment: e.target.value })}
                             placeholder="Message..."
-                            className="w-full p-2 border border-gray-300 rounded mb-2 h-24"
+                            className="textarea w-full h-24"
                         />
                         <button
                             onClick={() => {
                                 const xssFlag = testXSS(form.comment);
                                 setFeedback(xssFlag ? 'Flag: FLAG-XSS-123' : 'Message envoyé.');
                             }}
-                            className="px-4 py-2 bg-blue-600 text-white rounded"
+                            className="button défenseurs mt-2"
                         >
                             Envoyer
                         </button>
                         {game.selectedTeam === 'defenders' && !website.vulnerabilities.xss?.fixed && (
                             <button
                                 onClick={() => setMiniGame('xss')}
-                                className="px-4 py-2 bg-green-500 text-white rounded ml-2"
+                                className="button défenseurs mt-2"
                             >
                                 Corriger XSS
                             </button>
@@ -858,223 +1086,64 @@ const CyberWarGame = () => {
         );
     };
 
-    const WaitingRoomScreen = () => {
-        const currentPlayer = connectedPlayers.find((p) => p.userId === user.id) || {
-            id: playerId,
-            userId: user.id,
-            name: user.username,
-            team: game.selectedTeam || 'unknown',
-            roleName: game.selectedRole ? roles[game.selectedTeam]?.find((r) => r.id === game.selectedRole)?.name || 'Non assigné' : 'Non assigné',
-            roleIcon: game.selectedRole ? roles[game.selectedTeam]?.find((r) => r.id === game.selectedRole)?.icon || '' : '',
-        };
-
-        return (
-            <div className="bg-gray-900 min-h-screen p-8 text-white text-center">
-                {errorMessage && (
-                    <div className="bg-red-500 p-4 rounded-lg mb-5">
-                        <p>{errorMessage}</p>
-                        <button
-                            onClick={handleReconnect}
-                            disabled={reconnectAttempts >= 10}
-                            className="px-5 py-2 bg-blue-600 text-white rounded mt-3"
-                        >
-                            Réessayer
-                        </button>
-                    </div>
-                )}
-                <h1 className="text-3xl text-blue-500 mb-5">Salle d'Attente - Technetron Bank CyberWar</h1>
-                <p className={`text-lg mb-5 ${connectionStatus === 'connected' ? 'text-green-500' : 'text-red-500'}`}>
-                    Statut : {connectionStatus === 'connected' ? `Connecté en tant que ${currentPlayer.name}` : 'En attente de connexion...'}
-                </p>
-                <div className="bg-gray-800 p-5 rounded-lg mb-5 max-w-2xl mx-auto">
-                    <h3 className="text-blue-500 mb-4">Joueurs connectés ({connectedPlayers.length})</h3>
-                    <div className="grid grid-cols-2 gap-5">
-                        <div>
-                            <h4 className="text-red-500 mb-3">🔥 Attaquants</h4>
-                            {connectedPlayers
-                                .filter((p) => p.team === 'attackers')
-                                .map((player) => (
-                                    <div key={player.id} className={`p-2 rounded mb-2 ${player.userId === user.id ? 'bg-yellow-500 text-black' : 'bg-red-500 text-white'}`}>
-                                        {player.name} - {player.roleName} {player.roleIcon} {player.userId === user.id ? '(Vous)' : ''}
-                                    </div>
-                                ))}
-                        </div>
-                        <div>
-                            <h4 className="text-green-500 mb-3">🛡️ Défenseurs</h4>
-                            {connectedPlayers
-                                .filter((p) => p.team === 'defenders')
-                                .map((player) => (
-                                    <div key={player.id} className={`p-2 rounded mb-2 ${player.userId === user.id ? 'bg-yellow-500 text-black' : 'bg-green-500 text-black'}`}>
-                                        {player.name} - {player.roleName} {player.roleIcon} {player.userId === user.id ? '(Vous)' : ''}
-                                    </div>
-                                ))}
-                        </div>
-                    </div>
-                    <p className="text-gray-400 text-lg mt-4">
-                        La partie démarrera automatiquement lorsqu'il y aura au moins un joueur dans chaque équipe.
-                    </p>
-                </div>
-            </div>
-        );
-    };
-
-    const GameInterfaceScreen = () => {
-        const role = roles[game.selectedTeam]?.find((r) => r.id === game.selectedRole);
-
-        return (
-            <div className="bg-gray-900 min-h-screen p-5 text-white font-sans">
-                {connectionStatus === 'disconnected' && (
-                    <div className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50">
-                        <div className="bg-gray-800 p-5 rounded-lg text-center">
-                            <h3 className="text-red-500">Connexion perdue</h3>
-                            <p>Tentative de reconnexion ({10 - reconnectAttempts} restantes)</p>
-                            <button
-                                onClick={handleReconnect}
-                                disabled={reconnectAttempts >= 10}
-                                className="px-5 py-2 bg-blue-600 text-white rounded mt-3"
-                            >
-                                Réessayer
-                            </button>
-                        </div>
-                    </div>
-                )}
-                <header className="flex justify-between items-center bg-gray-800 p-4 rounded-lg mb-5">
-                    <h1 className="text-2xl text-blue-500">Technetron Bank - CyberWar</h1>
-                    <div className="flex gap-5 items-center">
-                        <GameTimer onTimeUp={() => dispatch({ type: 'SET_STATE', payload: 'results' })} />
-                        <div className="text-lg">
-                            Score : <span className="text-red-500">{game.scores.attackers}</span> - <span className="text-green-500">{game.scores.defenders}</span>
-                        </div>
-                        <button
-                            onClick={() => dispatch({ type: 'SET_STATE', payload: 'role-details' })}
-                            className="px-4 py-2 bg-blue-600 text-white rounded flex items-center"
-                        >
-                            <Info className="mr-2" /> Mission
-                        </button>
-                    </div>
-                </header>
-                <main className="flex gap-5">
-                    <aside className="w-80 flex flex-col gap-4">
-                        <div className="bg-gray-800 p-4 rounded-lg">
-                            <h3 className="text-lg mb-1">{role?.name} {role?.icon}</h3>
-                            <p className="text-gray-400">{role?.specialty}</p>
-                        </div>
-                        {game.selectedTeam === 'attackers' && (
-                            <FlagSubmission onSubmitFlag={handleSubmitFlag} submittedFlags={game.submittedFlags} />
-                        )}
-                        <div className="bg-gray-800 p-4 rounded-lg max-h-80 overflow-y-auto">
-                            <h3 className="text-lg mb-2">Logs</h3>
-                            {game.logs.map((log, idx) => (
-                                <p key={idx} className="text-sm text-gray-300 mb-1">{log}</p>
-                            ))}
-                        </div>
-                    </aside>
-                    <div className="flex-1">
-                        <div className="flex gap-3 mb-4">
-                            <button
-                                onClick={() => dispatch({ type: 'SET_ACTIVE_TAB', payload: 'website' })}
-                                className={`px-4 py-2 rounded ${game.activeTab === 'website' ? 'bg-blue-600 text-white' : 'bg-gray-600 text-white'}`}
-                            >
-                                Site Web
-                            </button>
-                            <button
-                                onClick={() => dispatch({ type: 'SET_ACTIVE_TAB', payload: 'network' })}
-                                className={`px-4 py-2 rounded ${game.activeTab === 'network' ? 'bg-blue-600 text-white' : 'bg-gray-600 text-white'}`}
-                            >
-                                Réseau
-                            </button>
-                        </div>
-                        {game.activeTab === 'website' ? (
-                            <WebsiteInterface />
-                        ) : (
-                            <TerminalInterface
-                                role={role}
-                                team={game.selectedTeam}
-                                serverState={server}
-                                setServerState={setServer}
-                                handleAction={handleAction}
-                                addLog={addLog}
-                            />
-                        )}
-                    </div>
-                </main>
-            </div>
-        );
-    };
-
-    const RoleDetailsScreen = () => {
-        const role = roles[game.selectedTeam]?.find((r) => r.id === game.selectedRole);
-
-        return (
-            <div className="bg-gray-900 min-h-screen p-8 text-white">
-                <h1 className="text-3xl text-blue-500 mb-5 text-center">Détails de la Mission</h1>
-                <div className={`p-5 rounded-lg max-w-2xl mx-auto ${game.selectedTeam === 'attackers' ? 'bg-red-500' : 'bg-green-500'}`}>
-                    <h2 className="text-2xl mb-3">{role?.name} {role?.icon}</h2>
-                    <p className="text-lg mb-3"><strong>Équipe :</strong> {game.selectedTeam === 'attackers' ? 'Attaquants' : 'Défenseurs'}</p>
-                    <p className="text-lg mb-3"><strong>Spécialité :</strong> {role?.specialty}</p>
-                    <p className="text-base mb-4"><strong>Description :</strong> {role?.description}</p>
-                    <h3 className="text-lg mb-3">Tâches :</h3>
-                    <ul className="list-disc text-left mx-auto mb-5 pl-5">
-                        {role?.tasks.map((task, idx) => (
-                            <li key={idx} className="mb-2">{task}</li>
-                        ))}
-                    </ul>
-                    <button
-                        onClick={() => dispatch({ type: 'SET_STATE', payload: 'game' })}
-                        className="px-5 py-2 bg-blue-600 text-white rounded-lg text-base"
-                    >
-                        Retour à la partie
-                    </button>
-                </div>
-            </div>
-        );
-    };
-
-    const ResultsScreen = () => {
-        const winner = game.scores.attackers > game.scores.defenders ? 'Attaquants' : game.scores.defenders > game.scores.attackers ? 'Défenseurs' : 'Égalité';
-
-        return (
-            <div className="bg-gray-900 min-h-screen p-8 text-white text-center">
-                <h1 className="text-3xl text-blue-500 mb-5">Partie Terminée</h1>
-                <div className="bg-gray-800 p-5 rounded-lg max-w-2xl mx-auto">
-                    <h2 className="text-2xl mb-4">Résultats</h2>
-                    <p className="text-lg mb-3"><strong>Gagnant :</strong> {winner}</p>
-                    <p className="text-lg mb-3"><strong>Scores :</strong> Attaquants : {game.scores.attackers} | Défenseurs : {game.scores.defenders}</p>
-                    <button
-                        onClick={handleReset}
-                        className="px-5 py-2 bg-blue-600 text-white rounded-lg text-base"
-                    >
-                        Nouvelle Partie
-                    </button>
-                </div>
-            </div>
-        );
+    const currentPlayer = connectedPlayers.find((p) => p.userId === user.id) || {
+        id: playerId,
+        userId: user.id,
+        name: user.username,
+        team: game.selectedTeam || 'unknown',
+        roleName: game.selectedRole?.name || 'Unknown',
+        roleIcon: game.selectedRole?.icon || '',
     };
 
     return (
         <AnimatePresence>
-            {game.state === 'waiting' && <WaitingRoomScreen key="waiting" />}
+            {game.state === 'waiting' && (
+                <WaitingRoomScreen
+                    connectedPlayers={connectedPlayers}
+                    currentPlayer={currentPlayer}
+                    connectionStatus={connectionStatus}
+                    errorMessage={errorMessage}
+                    handleReconnect={handleReconnect}
+                    reconnectAttempts={reconnectAttempts}
+                />
+            )}
             {game.state === 'intro' && game.selectedRole && (
                 <IntroAnimation
-                    key="intro"
-                    role={roles[game.selectedTeam]?.find((r) => r.id === game.selectedRole)}
+                    role={game.selectedRole}
                     team={game.selectedTeam}
                     onComplete={() => dispatch({ type: 'SET_STATE', payload: 'game' })}
                 />
             )}
-            {game.state === 'game' && <GameInterfaceScreen key="game" />}
-            {game.state === 'role-details' && <RoleDetailsScreen key="role-details" />}
-            {game.state === 'results' && <ResultsScreen key="results" />}
-            {!['waiting', 'intro', 'game', 'role-details', 'results'].includes(game.state) && (
-                <div key="error" className="text-red-500 text-center p-24">
-                    <h2>État non reconnu : {game.state}</h2>
-                    <button
-                        onClick={() => dispatch({ type: 'SET_STATE', payload: 'waiting' })}
-                        className="px-5 py-2 bg-blue-600 text-white rounded mt-3"
-                    >
-                        Retour à la salle d'attente
-                    </button>
-                </div>
+            {game.state === 'game' && game.selectedRole && (
+                <GameInterfaceScreen
+                    game={game}
+                    dispatch={dispatch}
+                    role={game.selectedRole}
+                    connectionStatus={connectionStatus}
+                    reconnectAttempts={reconnectAttempts}
+                    handleReconnect={handleReconnect}
+                    handleSubmitFlag={handleSubmitFlag}
+                    handleAction={handleAction}
+                    addLog={addLog}
+                    server={server}
+                    setServer={setServer}
+                    website={website}
+                    updateVuln={updateVuln}
+                    setMiniGame={setMiniGame}
+                />
+            )}
+            {game.state === 'role-details' && game.selectedRole && (
+                <RoleDetailsScreen
+                    game={game}
+                    dispatch={dispatch}
+                    role={game.selectedRole}
+                />
+            )}
+            {game.state === 'results' && (
+                <ResultsScreen
+                    game={game}
+                    handleReset={handleReset}
+                />
             )}
         </AnimatePresence>
     );
