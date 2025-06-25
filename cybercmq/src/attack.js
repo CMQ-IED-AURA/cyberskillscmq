@@ -794,13 +794,12 @@ const CyberWarGame = () => {
                         <h3 className="text-blue-600 mb-2">Connexion</h3>
                         <input
                             type="text"
-                            value={祁
-
-                                form.user}
+                            value={form.user}
                             onChange={(e) => setForm({ ...form, user: e.target.value })}
                             placeholder="Utilisateur"
                             className="w-full p-2 border border-gray-300 rounded mb-2"
                         />
+
                         <input
                             type="text"
                             value={form.pass}
