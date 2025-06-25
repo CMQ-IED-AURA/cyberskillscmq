@@ -17,10 +17,9 @@ function getSocket(token) {
             reconnectionDelay: 1000,
             reconnectionDelayMax: 5000,
             randomizationFactor: 0.5,
-            timeout: 30000, // Augmenté pour éviter les timeouts sur Render
+            timeout: 30000,
         });
 
-        // Gestion des erreurs de reconnexion
         let reconnectFailureCount = 0;
         const maxReconnectFailures = 5;
 
@@ -55,15 +54,26 @@ function Game() {
     const [error, setError] = useState(null);
     const [loading, setLoading] = useState(false);
 
-    // Valider le token via une requête API
     const validateToken = async (token) => {
+        console.log('Validation du token:', token ? 'Token présent' : 'Token absent');
+        if (!token) {
+            console.log('Aucun token fourni');
+            return false;
+        }
         try {
-            const res = await fetch('https://cyberskills.onrender.com/auth/validate', {
+            console.log('Envoi de la requête à /api/auth/validate');
+            const res = await fetch('https://cyberskills.onrender.com/api/auth/validate', {
                 headers: { 'Authorization': `Bearer ${token}` },
             });
+            console.log('Réponse reçue:', res.status, res.statusText);
+            if (!res.ok) {
+                throw new Error(`Erreur HTTP: ${res.status} ${res.statusText}`);
+            }
             const data = await res.json();
+            console.log('Données reçues:', data);
             return data.success;
-        } catch {
+        } catch (error) {
+            console.error('Erreur validateToken:', error);
             return false;
         }
     };
@@ -71,9 +81,12 @@ function Game() {
     const fetchMatches = useCallback(async (token) => {
         setLoading(true);
         try {
-            const res = await fetch('https://cyberskills.onrender.com/match/list', {
+            const res = await fetch('https://cyberskills.onrender.com/api/match/list', {
                 headers: { 'Authorization': `Bearer ${token}` },
             });
+            if (!res.ok) {
+                throw new Error(`Erreur HTTP: ${res.status}`);
+            }
             const data = await res.json();
             if (data.success) {
                 setMatches(data.matches || []);
@@ -99,9 +112,12 @@ function Game() {
     const fetchTeamMembers = useCallback(async (matchId, token) => {
         if (!matchId) return;
         try {
-            const res = await fetch(`https://cyberskills.onrender.com/match/${matchId}/teams`, {
+            const res = await fetch(`https://cyberskills.onrender.com/api/match/${matchId}/teams`, {
                 headers: { 'Authorization': `Bearer ${token}` },
             });
+            if (!res.ok) {
+                throw new Error(`Erreur HTTP: ${res.status}`);
+            }
             const data = await res.json();
             if (data.success) {
                 setTeamMembersByMatch((prev) => ({
@@ -122,9 +138,12 @@ function Game() {
 
     const fetchUsers = useCallback(async (token) => {
         try {
-            const res = await fetch('https://cyberskills.onrender.com/match/users', {
+            const res = await fetch('https://cyberskills.onrender.com/api/match/users', {
                 headers: { 'Authorization': `Bearer ${token}` },
             });
+            if (!res.ok) {
+                throw new Error(`Erreur HTTP: ${res.status}`);
+            }
             const data = await res.json();
             if (data.success) {
                 setUsers(data.users || []);
@@ -148,13 +167,16 @@ function Game() {
                 navigate('/login');
                 return;
             }
-            const res = await fetch('https://cyberskills.onrender.com/match/create', {
+            const res = await fetch('https://cyberskills.onrender.com/api/match/create', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`,
                 },
             });
+            if (!res.ok) {
+                throw new Error(`Erreur HTTP: ${res.status}`);
+            }
             const data = await res.json();
             if (!data.success) {
                 setError(data.message || 'Erreur lors de la création du match');
@@ -182,13 +204,16 @@ function Game() {
                 navigate('/login');
                 return;
             }
-            const res = await fetch(`https://cyberskills.onrender.com/match/${matchId}`, {
+            const res = await fetch(`https://cyberskills.onrender.com/api/match/${matchId}`, {
                 method: 'DELETE',
                 headers: {
                     'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json',
                 },
             });
+            if (!res.ok) {
+                throw new Error(`Erreur HTTP: ${res.status}`);
+            }
             const data = await res.json();
             if (!data.success) {
                 setError(data.message || 'Erreur lors de la suppression du match');
@@ -220,7 +245,7 @@ function Game() {
                 navigate('/login');
                 return;
             }
-            const res = await fetch('https://cyberskills.onrender.com/match/assign-team', {
+            const res = await fetch('https://cyberskills.onrender.com/api/match/assign-team', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -228,6 +253,9 @@ function Game() {
                 },
                 body: JSON.stringify({ userId, teamId, matchId }),
             });
+            if (!res.ok) {
+                throw new Error(`Erreur HTTP: ${res.status}`);
+            }
             const data = await res.json();
             if (!data.success) {
                 setError(data.message || 'Erreur lors de l\'assignation de l\'équipe');
@@ -690,7 +718,7 @@ function Game() {
                                                         teamMembersByMatch[match.id].redTeam.map((user) => (
                                                             <li key={user.id}>
                                                                 {user.username}
-                                                                {user.id === userId && ' (vous)'}
+                                                                {user.id || ' (vous)'}
                                                             </li>
                                                         ))
                                                     ) : (
