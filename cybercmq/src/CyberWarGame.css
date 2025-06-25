@@ -229,9 +229,7 @@ body {
 }
 
 .tab.active.attaquants {
-    background: var第
-
-    --accent-red);
+    background: var(--accent-red);
     border-color: var(--accent-red);
     box-shadow: 0 0 20px var(--neon-glow-red);
 }
