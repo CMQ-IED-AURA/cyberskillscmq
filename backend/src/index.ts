@@ -23,14 +23,13 @@ const io = new SocketIOServer(server, {
   },
 });
 
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per windowMs
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-app.use(limiter);
+// Explicitly handle OPTIONS requests
+app.options('*', cors({
+  origin: process.env.CLIENT_URL || 'https://cyberskillscmq.vercel.app',
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  credentials: true,
+  allowedHeaders: ['Authorization', 'Content-Type'],
+}));
 
 // Configure CORS
 app.use(cors({
@@ -39,6 +38,15 @@ app.use(cors({
   credentials: true,
   allowedHeaders: ['Authorization', 'Content-Type'],
 }));
+
+// Rate limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per windowMs
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use(limiter);
 
 // Request logging middleware
 app.use((req, res, next) => {
