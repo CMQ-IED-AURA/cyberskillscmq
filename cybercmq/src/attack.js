@@ -272,7 +272,7 @@ const XssGame = ({ onComplete }) => {
 
 const PasswordGame = ({ onComplete }) => {
     const [length, setLength] = useState(0);
-    const [feedback, setFeedback] = useState('');
+    const [feedback, setFeedback] = use-lhes
 
     const handleSubmit = () => {
         if (length >= 8) {
@@ -445,9 +445,17 @@ const CyberWarGame = () => {
         const newSocket = getSocket(token);
         setSocket(newSocket);
         setReconnectAttempts((prev) => prev + 1);
-        if (playerId && gameId && user.id) {
-            newSocket.emit('rejoin-game', { gameId, playerId, userId: user.id, username: user.username });
+        if (playerId && gameId && user.id && user.username) {
+            newSocket.emit('rejoin-game', {
+                gameId,
+                playerId,
+                userId: user.id,
+                playerName: user.username || `Player_${Math.random().toString(36).substr(2, 9)}`
+            });
             addLog('Tentative de reconnexion...');
+        } else {
+            setErrorMessage('Erreur: informations utilisateur manquantes pour la reconnexion.');
+            addLog('Échec de la reconnexion: informations utilisateur manquantes.');
         }
     }, [reconnectAttempts, playerId, gameId, user, addLog]);
 
@@ -455,6 +463,7 @@ const CyberWarGame = () => {
         const token = Cookies.get('token');
         if (!token) {
             setErrorMessage('Token d’authentification manquant. Veuillez vous reconnecter.');
+            addLog('Échec de la jointure: token manquant.');
             return;
         }
 
@@ -470,12 +479,13 @@ const CyberWarGame = () => {
                 newSocket.emit('join-game', {
                     gameId,
                     userId: user.id,
-                    username: user.username,
+                    playerName: user.username || `Player_${Math.random().toString(36).substr(2, 9)}`,
                 });
+                addLog(`Connecté au serveur en tant que ${user.username}.`);
             } else {
                 setErrorMessage('Erreur: informations utilisateur manquantes.');
+                addLog('Échec de la jointure: informations utilisateur manquantes.');
             }
-            addLog(`Connecté au serveur en tant que ${user.username}.`);
             console.log('WebSocket connected:', newSocket.id);
         });
 
@@ -493,6 +503,7 @@ const CyberWarGame = () => {
 
         newSocket.on('authError', (error) => {
             setErrorMessage('Erreur d’authentification: ' + error.message);
+            addLog(`Erreur d’authentification: ${error.message}`);
             Cookies.remove('token');
         });
 
@@ -501,7 +512,7 @@ const CyberWarGame = () => {
                 const updated = [...prev.filter((p) => p.id !== player.id), {
                     id: player.id,
                     userId: player.userId,
-                    name: player.username,
+                    name: player.playerName, // Changed from username to playerName
                     team: player.team === 'attackers' ? 'attackers' : 'defenders',
                     roleId: player.roleId,
                     roleName: roles[player.team === 'attackers' ? 'attackers' : 'defenders']?.find((r) => r.id === player.roleId)?.name || 'Unknown',
@@ -510,7 +521,7 @@ const CyberWarGame = () => {
                 console.log('Player joined:', updated);
                 return updated;
             });
-            addLog(`Joueur ${player.username} a rejoint (${player.team}).`);
+            addLog(`Joueur ${player.playerName} a rejoint (${player.team}).`);
         });
 
         newSocket.on('player-left', (player) => {
@@ -519,7 +530,7 @@ const CyberWarGame = () => {
                 console.log('Player left:', updated);
                 return updated;
             });
-            addLog(`Joueur ${player.username} a quitté.`);
+            addLog(`Joueur ${player.playerName} a quitté.`);
         });
 
         newSocket.on('role-assigned', (data) => {
@@ -527,13 +538,13 @@ const CyberWarGame = () => {
             dispatch({ type: 'SET_ROLE', payload: data.roleId });
             dispatch({ type: 'SET_ROLE_ASSIGNED' });
             setPlayerId(data.playerId);
-            setUser((prev) => ({ ...prev, username: data.username }));
+            setUser((prev) => ({ ...prev, username: data.playerName }));
             setAssignedRoles((prev) => [...new Set([...prev, data.roleId])]);
             setConnectedPlayers((prev) => {
                 const updated = [...prev.filter((p) => p.id !== data.playerId), {
                     id: data.playerId,
                     userId: data.userId,
-                    name: data.username,
+                    name: data.playerName,
                     team: data.team === 'attackers' ? 'attackers' : 'defenders',
                     roleId: data.roleId,
                     roleName: roles[data.team === 'attackers' ? 'attackers' : 'defenders']?.find((r) => r.id === data.roleId)?.name || 'Unknown',
@@ -549,7 +560,7 @@ const CyberWarGame = () => {
             setConnectedPlayers(gameState.players.map((p) => ({
                 id: p.id,
                 userId: p.userId,
-                name: p.username,
+                name: p.playerName,
                 team: p.team === 'attackers' ? 'attackers' : 'defenders',
                 roleId: p.roleId,
                 roleName: roles[p.team === 'attackers' ? 'attackers' : 'defenders']?.find((r) => r.id === p.roleId)?.name || 'Unknown',
@@ -565,7 +576,7 @@ const CyberWarGame = () => {
         });
 
         newSocket.on('player-action', (actionData) => {
-            addLog(`${actionData.username}: ${actionData.message}`);
+            addLog(`${actionData.playerName}: ${actionData.message}`);
             if (actionData.type === 'vulnerability-exploited') {
                 setWebsite((prev) => ({
                     ...prev,
@@ -605,12 +616,12 @@ const CyberWarGame = () => {
             dispatch({ type: 'SET_ROLE', payload: data.roleId });
             dispatch({ type: 'SET_ROLE_ASSIGNED' });
             setPlayerId(data.playerId);
-            setUser((prev) => ({ ...prev, username: data.username }));
+            setUser((prev) => ({ ...prev, username: data.playerName }));
             setConnectedPlayers((prev) => {
                 const updated = [...prev.filter((p) => p.id !== data.playerId), {
                     id: data.playerId,
                     userId: data.userId,
-                    name: data.username,
+                    name: data.playerName,
                     team: data.team === 'attackers' ? 'attackers' : 'defenders',
                     roleId: data.roleId,
                     roleName: roles[data.team === 'attackers' ? 'attackers' : 'defenders']?.find((r) => r.id === data.roleId)?.name || 'Unknown',
@@ -624,7 +635,7 @@ const CyberWarGame = () => {
 
         newSocket.on('error', (data) => {
             setErrorMessage(data.message || 'Erreur inconnue du serveur.');
-            addLog(`Erreur serveur: ${data.message}`);
+            addLog(`Erreur serveur: ${data.message} (Attendu: playerName, Reçu: undefined)`);
         });
 
         return () => {
@@ -643,7 +654,7 @@ const CyberWarGame = () => {
                     gameId,
                     type: actionType,
                     data: actionData,
-                    username: user.username,
+                    playerName: user.username,
                     timestamp: Date.now(),
                 });
             } else {
@@ -688,7 +699,7 @@ const CyberWarGame = () => {
         socket.emit('join-game', {
             gameId,
             userId: user.id,
-            username: user.username,
+            playerName: user.username || `Player_${Math.random().toString(36).substr(2, 9)}`,
         });
     }, [socket, gameId, user]);
 
@@ -783,7 +794,9 @@ const CyberWarGame = () => {
                         <h3 className="text-blue-600 mb-2">Connexion</h3>
                         <input
                             type="text"
-                            value={form.user}
+                            value={祁
+
+                                form.user}
                             onChange={(e) => setForm({ ...form, user: e.target.value })}
                             placeholder="Utilisateur"
                             className="w-full p-2 border border-gray-300 rounded mb-2"
@@ -941,7 +954,7 @@ const CyberWarGame = () => {
                         </button>
                     </div>
                 </header>
-                <main className="flex gap sano-5">
+                <main className="flex gap-5">
                     <aside className="w-80 flex flex-col gap-4">
                         <div className="bg-gray-800 p-4 rounded-lg">
                             <h3 className="text-lg mb-1">{role?.name} {role?.icon}</h3>

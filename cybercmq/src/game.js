@@ -207,56 +207,36 @@ function Game() {
         }
     }, [loading, selectedMatch, navigate]);
 
-    const handleResetGame = useCallback(async (matchId) => {
-        if (!matchId || loading) {
-            setError('Match non sélectionné ou invalide.');
-            return;
+    // Fonction pour vérifier si l'utilisateur peut rejoindre un match
+    const canJoinMatch = useCallback((matchId) => {
+        // L'admin peut rejoindre n'importe quel match
+        if (role === 'ADMIN') {
+            return true;
         }
-        if (!window.confirm('Êtes-vous sûr de vouloir réinitialiser ce match ?')) return;
-        setLoading(true);
-        setError(null);
-        try {
-            const token = Cookies.get('token');
-            if (!token) {
-                setError('Token d\'authentification manquant. Veuillez vous reconnecter.');
-                navigate('/login');
-                return;
-            }
-            console.log(`Tentative de réinitialisation du match ${matchId}`);
-            const res = await fetch(`https://cyberskills.onrender.com/match/${matchId}/reset`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json',
-                },
-            });
-            const data = await res.json();
-            if (!data.success) {
-                setError(data.message || 'Erreur lors de la réinitialisation du match');
-                console.log(`Échec de la réinitialisation: ${data.message}`);
-            } else {
-                console.log(`Match ${matchId} réinitialisé avec succès`);
-                setError('Match réinitialisé. Essayez de lancer à nouveau.');
-                // Forcer la récupération des matchs pour s'assurer que l'état est à jour
-                fetchMatches(token);
-            }
-        } catch (error) {
-            setError('Erreur serveur lors de la réinitialisation du match.');
-            console.error('Erreur handleResetGame:', error);
-        } finally {
-            setLoading(false);
-        }
-    }, [loading, navigate, fetchMatches]);
 
-    const handleLaunchMatch = useCallback(() => {
-        if (!selectedMatch || loading) {
-            setError('Veuillez sélectionner un match.');
+        // Vérifier si l'utilisateur est dans une des équipes du match
+        const matchTeams = teamMembersByMatch[matchId];
+        if (!matchTeams) return false;
+
+        const isInRedTeam = matchTeams.redTeam?.some(user => user.id === userId);
+        const isInBlueTeam = matchTeams.blueTeam?.some(user => user.id === userId);
+
+        return isInRedTeam || isInBlueTeam;
+    }, [role, teamMembersByMatch, userId]);
+
+    const handleJoinMatch = useCallback((matchId) => {
+        const match = matches.find(m => m.id === matchId);
+        if (!match) {
+            setError('Match introuvable.');
             return;
         }
-        if (!teamMembersByMatch[selectedMatch.id]?.redTeam?.length || !teamMembersByMatch[selectedMatch.id]?.blueTeam?.length) {
-            setError('Chaque équipe doit avoir au moins un joueur.');
+
+        // Vérifier si l'utilisateur peut rejoindre ce match
+        if (!canJoinMatch(matchId)) {
+            setError('Vous devez être assigné à une équipe pour rejoindre ce match.');
             return;
         }
+
         const token = Cookies.get('token');
         if (!token) {
             setError('Token d\'authentification manquant. Veuillez vous reconnecter.');
@@ -264,50 +244,9 @@ function Game() {
             return;
         }
         if (socket && socket.connected) {
-            console.log('Émission de start-game pour gameId:', selectedMatch.id, 'socketId:', socket.id);
-            socket.emit('start-game', { gameId: selectedMatch.id });
-            socket.once('error', (data) => {
-                console.log('Erreur reçue lors de start-game:', data);
-                if (data.message === 'Partie non disponible ou déjà commencée') {
-                    setError('Le match est déjà en cours ou terminé. Veuillez réinitialiser le match avant de relancer.');
-                } else {
-                    setError(data.message || 'Erreur inconnue lors du lancement du match.');
-                }
-            });
-            socket.once('game-started', ({ gameId }) => {
-                console.log('Événement game-started reçu pour gameId:', gameId);
-                localStorage.setItem('selectedGameId', gameId);
-                socket.emit('join-game', { gameId, playerName: username || 'Joueur' });
-                navigate('/attack');
-            });
-        } else {
-            setError('Impossible de lancer le match: non connecté au serveur. Tentative de reconnexion...');
-            const newSocket = getSocket(token);
-            newSocket.on('connect', () => {
-                console.log('Reconnexion réussie, nouvelle tentative de lancement');
-                newSocket.emit('start-game', { gameId: selectedMatch.id });
-            });
-            newSocket.on('connect_error', (error) => {
-                setError('Échec de la reconnexion au serveur: ' + error.message);
-            });
-        }
-    }, [selectedMatch, loading, socket, teamMembersByMatch, navigate, username]);
-
-    const handleJoinMatch = useCallback(() => {
-        if (!selectedMatch) {
-            setError('Veuillez sélectionner un match.');
-            return;
-        }
-        const token = Cookies.get('token');
-        if (!token) {
-            setError('Token d\'authentification manquant. Veuillez vous reconnecter.');
-            navigate('/login');
-            return;
-        }
-        if (socket && socket.connected) {
-            console.log('Rejoindre le match, émission de join-game pour gameId:', selectedMatch.id);
-            localStorage.setItem('selectedGameId', selectedMatch.id);
-            socket.emit('join-game', { gameId: selectedMatch.id, playerName: username || 'Joueur' });
+            console.log('Rejoindre le match, émission de join-game pour gameId:', matchId);
+            localStorage.setItem('selectedGameId', matchId);
+            socket.emit('join-game', { gameId: matchId, playerName: username || 'Joueur' });
             socket.once('role-assigned', (data) => {
                 console.log('Rôle assigné:', data);
                 navigate('/attack');
@@ -319,7 +258,7 @@ function Game() {
         } else {
             setError('Impossible de rejoindre le match: non connecté au serveur.');
         }
-    }, [selectedMatch, navigate, socket, username]);
+    }, [matches, canJoinMatch, navigate, socket, username]);
 
     useEffect(() => {
         const token = Cookies.get('token');
@@ -423,12 +362,6 @@ function Game() {
                 localStorage.setItem('selectedGameId', gameId);
                 newSocket.emit('join-game', { gameId, playerName: username || 'Joueur' });
                 navigate('/attack');
-            });
-
-            newSocket.on('game-reset', ({ matchId }) => {
-                console.log('Événement game-reset reçu pour matchId:', matchId);
-                setError('Match réinitialisé par le serveur. Essayez de lancer à nouveau.');
-                fetchMatches(token); // Rafraîchir les matchs après réinitialisation
             });
 
             fetchMatches(token);
@@ -581,20 +514,6 @@ function Game() {
                                 >
                                     {loading ? 'Création...' : 'Créer un nouveau match'}
                                 </button>
-                                <button
-                                    onClick={handleLaunchMatch}
-                                    disabled={!selectedMatch || loading}
-                                    className="btn-modern btn-cyber"
-                                >
-                                    Lancer le match
-                                </button>
-                                <button
-                                    onClick={() => handleResetGame(selectedMatch?.id)}
-                                    disabled={!selectedMatch || loading}
-                                    className="btn-modern btn-cyber btn-reset"
-                                >
-                                    Réinitialiser le match
-                                </button>
                                 <select
                                     value={selectedMatch?.id || ''}
                                     onChange={(e) => {
@@ -661,6 +580,16 @@ function Game() {
                                                 </div>
                                             </div>
                                             <div className="match-actions">
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleJoinMatch(match.id);
+                                                    }}
+                                                    disabled={loading}
+                                                    className="btn-modern btn-cyber"
+                                                >
+                                                    Rejoindre le match
+                                                </button>
                                                 <button
                                                     onClick={(e) => {
                                                         e.stopPropagation();
@@ -733,12 +662,13 @@ function Game() {
                                             <button
                                                 onClick={(e) => {
                                                     e.stopPropagation();
-                                                    handleJoinMatch();
+                                                    handleJoinMatch(match.id);
                                                 }}
-                                                disabled={!selectedMatch || loading}
+                                                disabled={!canJoinMatch(match.id) || loading}
                                                 className="btn-modern btn-cyber"
+                                                title={!canJoinMatch(match.id) ? "Vous devez être assigné à une équipe pour rejoindre ce match" : ""}
                                             >
-                                                Rejoindre le match
+                                                {canJoinMatch(match.id) ? 'Rejoindre le match' : 'Non autorisé'}
                                             </button>
                                         </div>
                                     </div>
