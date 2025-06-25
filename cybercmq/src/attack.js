@@ -703,7 +703,7 @@ const CyberWarGame = () => {
         const token = Cookies.get('token');
         const newSocket = getSocket(token);
         setSocket(newSocket);
-        setTimeoutReconnectAttempts((prev) => prev + 1);
+        setReconnectAttempts((prev) => prev + 1); // Fix: Changed setTimeoutReconnectAttempts to setReconnectAttempts
         if (playerId && gameId && user.id && user.username) {
             newSocket.emit('rejoin-game', {
                 gameId: gameId,
@@ -735,7 +735,7 @@ const CyberWarGame = () => {
 
         newSocket.on('connect', () => {
             setConnectionStatus('connected');
-            setTimeoutReconnectAttempts(0);
+            setReconnectAttempts(0); // Fix: Changed setTimeoutReconnectAttempts to setReconnectAttempts
             setErrorMessage('');
             console.log('DEBUG: WebSocket connected, ID:', newSocket.id);
             newSocket.emit('authenticate', token);
