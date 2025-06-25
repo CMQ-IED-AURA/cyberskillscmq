@@ -81,7 +81,7 @@ function Game() {
     const fetchMatches = useCallback(async (token) => {
         setLoading(true);
         try {
-            const res = await fetch('https://cyberskills.onrender.com/api/match/list', {
+            const res = await fetch('https://cyberskills.onrender.com/match/list', {
                 headers: { 'Authorization': `Bearer ${token}` },
             });
             if (!res.ok) {
@@ -112,7 +112,7 @@ function Game() {
     const fetchTeamMembers = useCallback(async (matchId, token) => {
         if (!matchId) return;
         try {
-            const res = await fetch(`https://cyberskills.onrender.com/api/match/${matchId}/teams`, {
+            const res = await fetch(`https://cyberskills.onrender.com/match/${matchId}/teams`, {
                 headers: { 'Authorization': `Bearer ${token}` },
             });
             if (!res.ok) {
@@ -138,7 +138,7 @@ function Game() {
 
     const fetchUsers = useCallback(async (token) => {
         try {
-            const res = await fetch('https://cyberskills.onrender.com/api/match/users', {
+            const res = await fetch('https://cyberskills.onrender.com/match/users', {
                 headers: { 'Authorization': `Bearer ${token}` },
             });
             if (!res.ok) {
@@ -167,7 +167,7 @@ function Game() {
                 navigate('/login');
                 return;
             }
-            const res = await fetch('https://cyberskills.onrender.com/api/match/create', {
+            const res = await fetch('https://cyberskills.onrender.com/match/create', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -204,7 +204,7 @@ function Game() {
                 navigate('/login');
                 return;
             }
-            const res = await fetch(`https://cyberskills.onrender.com/api/match/${matchId}`, {
+            const res = await fetch(`https://cyberskills.onrender.com/match/${matchId}`, {
                 method: 'DELETE',
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -245,7 +245,7 @@ function Game() {
                 navigate('/login');
                 return;
             }
-            const res = await fetch('https://cyberskills.onrender.com/api/match/assign-team', {
+            const res = await fetch('https://cyberskills.onrender.com/match/assign-team', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -340,7 +340,7 @@ function Game() {
             if (!isValid) {
                 Cookies.remove('token');
                 setError('Token invalide ou expiré. Veuillez vous reconnecter.');
-                navigate('/login');
+                navigate('/auth');
                 return;
             }
 
@@ -351,7 +351,7 @@ function Game() {
                 if (Date.now() >= exp) {
                     Cookies.remove('token');
                     setError('Session expirée. Veuillez vous reconnecter.');
-                    navigate('/login');
+                    navigate('/auth');
                     return;
                 }
                 setRole(decoded.role);
@@ -376,7 +376,7 @@ function Game() {
                     validateToken(token).then((isValid) => {
                         if (!isValid) {
                             Cookies.remove('token');
-                            navigate('/login');
+                            navigate('/auth');
                         } else {
                             newSocket.emit('authenticate', token);
                         }
@@ -460,7 +460,7 @@ function Game() {
                 console.error('Erreur d\'authentification:', error);
                 setError('Erreur d\'authentification, veuillez vous reconnecter.');
                 Cookies.remove('token');
-                navigate('/login');
+                navigate('/auth');
             }
         });
     }, [navigate, fetchMatches, fetchUsers, fetchTeamMembers, selectedMatch]);
@@ -480,7 +480,7 @@ function Game() {
                     <button
                         onClick={() => {
                             Cookies.remove('token');
-                            navigate('/login');
+                            navigate('/auth');
                         }}
                         className="btn btn-modern"
                     >
@@ -622,7 +622,7 @@ function Game() {
                                     matches.map((match) => (
                                         <div
                                             key={match.id}
-                                            className={`match-card ${selectedMatch?.id === match.id ? 'matched' : ''}`}
+                                            className={`match-card ${selectedMatch?.id === match.id ? 'selected' : ''}`}
                                             onClick={() => {
                                                 setSelectedMatch(match);
                                                 localStorage.setItem('selectedGameId', match.id);
@@ -701,7 +701,7 @@ function Game() {
                                 matches.map((match) => (
                                     <div
                                         key={match.id}
-                                        className={`match-card ${selectedMatch?.id === match.id ? 'matched' : ''}`}
+                                        className={`match-card ${selectedMatch?.id === match.id ? 'selected' : ''}`}
                                         onClick={() => {
                                             setSelectedMatch(match);
                                             localStorage.setItem('selectedGameId', match.id);
@@ -718,7 +718,7 @@ function Game() {
                                                         teamMembersByMatch[match.id].redTeam.map((user) => (
                                                             <li key={user.id}>
                                                                 {user.username}
-                                                                {user.id || ' (vous)'}
+                                                                {user.id === userId && ' (vous)'}
                                                             </li>
                                                         ))
                                                     ) : (
