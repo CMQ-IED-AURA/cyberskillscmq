@@ -20,7 +20,7 @@ function getSocket() {
 }
 
 const initialGameState = {
-    state: 'waiting',
+    state: 'team-selection', // Changed from 'waiting' to ensure team/role selection
     selectedTeam: null,
     selectedRole: null,
     scores: { attackers: 0, defenders: 0 },
@@ -349,6 +349,50 @@ const FirewallGame = ({ onComplete }) => {
     );
 };
 
+// New Team Selection Screen
+const TeamSelectionScreen = ({ onTeamSelect }) => {
+    return (
+        <div className="bg-gray-900 min-h-screen p-8 text-white text-center">
+            <h1 className="text-3xl text-blue-500 mb-5">Choisir votre équipe</h1>
+            <div className="flex gap-5 justify-center">
+                <button
+                    onClick={() => onTeamSelect('attackers')}
+                    className="px-6 py-3 bg-red-500 text-white rounded-lg text-lg"
+                >
+                    Attaquants (Équipe Rouge)
+                </button>
+                <button
+                    onClick={() => onTeamSelect('defenders')}
+                    className="px-6 py-3 bg-green-500 text-white rounded-lg text-lg"
+                >
+                    Défenseurs (Équipe Bleue)
+                </button>
+            </div>
+        </div>
+    );
+};
+
+// New Role Selection Screen
+const RoleSelectionScreen = ({ team, onRoleSelect }) => {
+    return (
+        <div className="bg-gray-900 min-h-screen p-8 text-white text-center">
+            <h1 className="text-3xl text-blue-500 mb-5">Choisir votre rôle</h1>
+            <div className="grid grid-cols-3 gap-5 max-w-4xl mx-auto">
+                {roles[team].map((role) => (
+                    <button
+                        key={role.id}
+                        onClick={() => onRoleSelect(role.id)}
+                        className={`p-4 rounded-lg ${team === 'attackers' ? 'bg-red-500' : 'bg-green-500'} text-white`}
+                    >
+                        <h3 className="text-lg mb-2">{role.name} {role.icon}</h3>
+                        <p className="text-sm">{role.specialty}</p>
+                    </button>
+                ))}
+            </div>
+        </div>
+    );
+};
+
 const CyberWarGame = () => {
     const [game, dispatch] = useReducer(gameReducer, initialGameState);
     const [website, setWebsite] = useState(websiteInitialState);
@@ -357,7 +401,12 @@ const CyberWarGame = () => {
     const [socket, setSocket] = useState(null);
     const [gameId] = useState(localStorage.getItem('selectedGameId') || 'default-game');
     const [playerId, setPlayerId] = useState(null);
-    const [playerName, setPlayerName] = useState(`Player_${Math.random().toString(36).substr(2, 9)}`);
+    // Assume user is authenticated and we have their data (e.g., from a context or localStorage)
+    const [user, setUser] = useState(() => {
+        // Replace with actual authentication logic (e.g., JWT decode or API call)
+        const storedUser = localStorage.getItem('user');
+        return storedUser ? JSON.parse(storedUser) : { id: null, username: `Player_${Math.random().toString(36).substr(2, 9)}` };
+    });
     const [connectedPlayers, setConnectedPlayers] = useState([]);
     const [gameStatus, setGameStatus] = useState('waiting');
     const [connectionStatus, setConnectionStatus] = useState('disconnected');
@@ -386,13 +435,15 @@ const CyberWarGame = () => {
         const newSocket = getSocket();
         setSocket(newSocket);
         setReconnectAttempts((prev) => prev + 1);
-        if (playerId && gameId) {
-            newSocket.emit('rejoin-game', { gameId, playerId, playerName });
+        if (playerId && gameId && user.id) {
+            newSocket.emit('rejoin-game', { gameId, playerId, userId: user.id, username: user.username });
             addLog('Tentative de reconnexion...');
         }
-    }, [reconnectAttempts, playerId, gameId, playerName, addLog]);
+    }, [reconnectAttempts, playerId, gameId, user, addLog]);
 
     useEffect(() => {
+        if (!game.selectedTeam || !game.selectedRole) return; // Wait for team and role selection
+
         const newSocket = getSocket();
         setSocket(newSocket);
 
@@ -402,11 +453,12 @@ const CyberWarGame = () => {
             setErrorMessage('');
             newSocket.emit('join-game', {
                 gameId,
-                playerName,
-                team: game.selectedTeam,
+                userId: user.id, // Include authenticated user ID
+                username: user.username, // Use authenticated username
+                team: game.selectedTeam === 'attackers' ? 'redTeam' : 'blueTeam', // Map to Prisma team names
                 roleId: game.selectedRole,
             });
-            addLog(`Connecté au serveur en tant que ${playerName}.`);
+            addLog(`Connecté au serveur en tant que ${user.username}.`);
             console.log('WebSocket connected:', newSocket.id);
         });
 
@@ -419,11 +471,19 @@ const CyberWarGame = () => {
 
         newSocket.on('player-joined', (player) => {
             setConnectedPlayers((prev) => {
-                const updated = [...prev.filter((p) => p.id !== player.id), player];
+                const updated = [...prev.filter((p) => p.id !== player.id), {
+                    id: player.id,
+                    userId: player.userId,
+                    name: player.username,
+                    team: player.team === 'redTeam' ? 'attackers' : 'defenders', // Map back to client team names
+                    roleId: player.roleId,
+                    roleName: roles[player.team === 'redTeam' ? 'attackers' : 'defenders']?.find((r) => r.id === player.roleId)?.name || 'Unknown',
+                    roleIcon: roles[player.team === 'redTeam' ? 'attackers' : 'defenders']?.find((r) => r.id === player.roleId)?.icon || '',
+                }];
                 console.log('Player joined:', updated);
                 return updated;
             });
-            addLog(`Joueur ${player.name} a rejoint (${player.team}).`);
+            addLog(`Joueur ${player.username} a rejoint (${player.team}).`);
         });
 
         newSocket.on('player-left', (player) => {
@@ -432,24 +492,25 @@ const CyberWarGame = () => {
                 console.log('Player left:', updated);
                 return updated;
             });
-            addLog(`Joueur ${player.name} a quitté.`);
+            addLog(`Joueur ${player.username} a quitté.`);
         });
 
         newSocket.on('role-assigned', (data) => {
-            dispatch({ type: 'SET_TEAM', payload: data.team });
+            dispatch({ type: 'SET_TEAM', payload: data.team === 'redTeam' ? 'attackers' : 'defenders' });
             dispatch({ type: 'SET_ROLE', payload: data.roleId });
             dispatch({ type: 'SET_ROLE_ASSIGNED' });
             setPlayerId(data.playerId);
-            setPlayerName(data.playerName);
+            setUser((prev) => ({ ...prev, username: data.username }));
             setAssignedRoles((prev) => [...new Set([...prev, data.roleId])]);
             setConnectedPlayers((prev) => {
                 const updated = [...prev.filter((p) => p.id !== data.playerId), {
                     id: data.playerId,
-                    name: data.playerName,
-                    team: data.team,
+                    userId: data.userId,
+                    name: data.username,
+                    team: data.team === 'redTeam' ? 'attackers' : 'defenders',
                     roleId: data.roleId,
-                    roleName: roles[data.team]?.find((r) => r.id === data.roleId)?.name || 'Unknown',
-                    roleIcon: roles[data.team]?.find((r) => r.id === data.roleId)?.icon || '',
+                    roleName: roles[data.team === 'redTeam' ? 'attackers' : 'defenders']?.find((r) => r.id === data.roleId)?.name || 'Unknown',
+                    roleIcon: roles[data.team === 'redTeam' ? 'attackers' : 'defenders']?.find((r) => r.id === data.roleId)?.icon || '',
                 }];
                 console.log('Role assigned, updated players:', updated);
                 return updated;
@@ -458,7 +519,15 @@ const CyberWarGame = () => {
         });
 
         newSocket.on('game-state-update', (gameState) => {
-            setConnectedPlayers(gameState.players || []);
+            setConnectedPlayers(gameState.players.map((p) => ({
+                id: p.id,
+                userId: p.userId,
+                name: p.username,
+                team: p.team === 'redTeam' ? 'attackers' : 'defenders',
+                roleId: p.roleId,
+                roleName: roles[p.team === 'redTeam' ? 'attackers' : 'defenders']?.find((r) => r.id === p.roleId)?.name || 'Unknown',
+                roleIcon: roles[p.team === 'redTeam' ? 'attackers' : 'defenders']?.find((r) => r.id === p.roleId)?.icon || '',
+            })) || []);
             setGameStatus(gameState.status);
             const rolesAssigned = gameState.players.map((p) => p.roleId);
             setAssignedRoles([...new Set(rolesAssigned)]);
@@ -469,7 +538,7 @@ const CyberWarGame = () => {
         });
 
         newSocket.on('player-action', (actionData) => {
-            addLog(`${actionData.playerName}: ${actionData.message}`);
+            addLog(`${actionData.username}: ${actionData.message}`);
             if (actionData.type === 'vulnerability-exploited') {
                 setWebsite((prev) => ({
                     ...prev,
@@ -499,19 +568,20 @@ const CyberWarGame = () => {
         });
 
         newSocket.on('rejoin-success', (data) => {
-            dispatch({ type: 'SET_TEAM', payload: data.team });
+            dispatch({ type: 'SET_TEAM', payload: data.team === 'redTeam' ? 'attackers' : 'defenders' });
             dispatch({ type: 'SET_ROLE', payload: data.roleId });
             dispatch({ type: 'SET_ROLE_ASSIGNED' });
             setPlayerId(data.playerId);
-            setPlayerName(data.playerName);
+            setUser((prev) => ({ ...prev, username: data.username }));
             setConnectedPlayers((prev) => {
                 const updated = [...prev.filter((p) => p.id !== data.playerId), {
                     id: data.playerId,
-                    name: data.playerName,
-                    team: data.team,
+                    userId: data.userId,
+                    name: data.username,
+                    team: data.team === 'redTeam' ? 'attackers' : 'defenders',
                     roleId: data.roleId,
-                    roleName: roles[data.team]?.find((r) => r.id === data.roleId)?.name || 'Unknown',
-                    roleIcon: roles[data.team]?.find((r) => r.id === data.roleId)?.icon || '',
+                    roleName: roles[data.team === 'redTeam' ? 'attackers' : 'defenders']?.find((r) => r.id === data.roleId)?.name || 'Unknown',
+                    roleIcon: roles[data.team === 'redTeam' ? 'attackers' : 'defenders']?.find((r) => r.id === data.roleId)?.icon || '',
                 }];
                 console.log('Rejoin success, updated players:', updated);
                 return updated;
@@ -523,24 +593,25 @@ const CyberWarGame = () => {
             newSocket.close();
             setConnectionStatus('disconnected');
         };
-    }, [addLog, gameId, game.state, game.selectedTeam, game.selectedRole, playerName]);
+    }, [addLog, gameId, game.state, game.selectedTeam, game.selectedRole, user]);
 
     const sendAction = useCallback(
         (actionType, actionData) => {
             if (socket && socket.connected) {
                 socket.emit('player-action', {
                     playerId,
+                    userId: user.id,
                     gameId,
                     type: actionType,
                     data: actionData,
-                    playerName,
+                    username: user.username,
                     timestamp: Date.now(),
                 });
             } else {
                 addLog('Impossible d’envoyer l’action: non connecté.');
             }
         },
-        [socket, playerId, gameId, playerName, addLog]
+        [socket, playerId, gameId, user, addLog]
     );
 
     const handleAction = useCallback(
@@ -573,13 +644,14 @@ const CyberWarGame = () => {
         setMiniGame(null);
         setGameStatus('waiting');
         setAssignedRoles([]);
-        const newPlayerName = `Player_${Math.random().toString(36).substr(2, 9)}`;
-        setPlayerName(newPlayerName);
         socket.emit('join-game', {
             gameId,
-            playerName: newPlayerName,
+            userId: user.id,
+            username: user.username,
+            team: game.selectedTeam === 'attackers' ? 'redTeam' : 'blueTeam',
+            roleId: game.selectedRole,
         });
-    }, [socket, gameId]);
+    }, [socket, gameId, user, game.selectedTeam, game.selectedRole]);
 
     const startGame = useCallback(() => {
         if (socket && socket.connected) {
@@ -760,9 +832,10 @@ const CyberWarGame = () => {
             roles.attackers.every((r) => assignedRoles.includes(r.id)) &&
             roles.defenders.every((r) => assignedRoles.includes(r.id));
 
-        const currentPlayer = connectedPlayers.find((p) => p.id === playerId) || {
+        const currentPlayer = connectedPlayers.find((p) => p.userId === user.id) || {
             id: playerId,
-            name: playerName,
+            userId: user.id,
+            name: user.username,
             team: game.selectedTeam || 'unknown',
             roleName: game.selectedRole ? roles[game.selectedTeam]?.find((r) => r.id === game.selectedRole)?.name || 'Non assigné' : 'Non assigné',
             roleIcon: game.selectedRole ? roles[game.selectedTeam]?.find((r) => r.id === game.selectedRole)?.icon || '' : '',
@@ -794,8 +867,8 @@ const CyberWarGame = () => {
                             {connectedPlayers
                                 .filter((p) => p.team === 'attackers')
                                 .map((player) => (
-                                    <div key={player.id} className={`p-2 rounded mb-2 ${player.id === playerId ? 'bg-yellow-500 text-black' : 'bg-red-500 text-white'}`}>
-                                        {player.name} - {player.roleName} {player.roleIcon} {player.id === playerId ? '(Vous)' : ''}
+                                    <div key={player.id} className={`p-2 rounded mb-2 ${player.userId === user.id ? 'bg-yellow-500 text-black' : 'bg-red-500 text-white'}`}>
+                                        {player.name} - {player.roleName} {player.roleIcon} {player.userId === user.id ? '(Vous)' : ''}
                                     </div>
                                 ))}
                         </div>
@@ -804,8 +877,8 @@ const CyberWarGame = () => {
                             {connectedPlayers
                                 .filter((p) => p.team === 'defenders')
                                 .map((player) => (
-                                    <div key={player.id} className={`p-2 rounded mb-2 ${player.id === playerId ? 'bg-yellow-500 text-black' : 'bg-green-500 text-black'}`}>
-                                        {player.name} - {player.roleName} {player.roleIcon} {player.id === playerId ? '(Vous)' : ''}
+                                    <div key={player.id} className={`p-2 rounded mb-2 ${player.userId === user.id ? 'bg-yellow-500 text-black' : 'bg-green-500 text-black'}`}>
+                                        {player.name} - {player.roleName} {player.roleIcon} {player.userId === user.id ? '(Vous)' : ''}
                                     </div>
                                 ))}
                         </div>
@@ -963,6 +1036,25 @@ const CyberWarGame = () => {
 
     return (
         <AnimatePresence>
+            {game.state === 'team-selection' && (
+                <TeamSelectionScreen
+                    key="team-selection"
+                    onTeamSelect={(team) => {
+                        dispatch({ type: 'SET_TEAM', payload: team });
+                        dispatch({ type: 'SET_STATE', payload: 'role-selection' });
+                    }}
+                />
+            )}
+            {game.state === 'role-selection' && (
+                <RoleSelectionScreen
+                    key="role-selection"
+                    team={game.selectedTeam}
+                    onRoleSelect={(roleId) => {
+                        dispatch({ type: 'SET_ROLE', payload: roleId });
+                        dispatch({ type: 'SET_STATE', payload: 'waiting' });
+                    }}
+                />
+            )}
             {game.state === 'waiting' && <WaitingRoomScreen key="waiting" />}
             {game.state === 'intro' && game.selectedRole && (
                 <IntroAnimation
@@ -975,14 +1067,14 @@ const CyberWarGame = () => {
             {game.state === 'game' && <GameInterfaceScreen key="game" />}
             {game.state === 'role-details' && <RoleDetailsScreen key="role-details" />}
             {game.state === 'results' && <ResultsScreen key="results" />}
-            {!['waiting', 'intro', 'game', 'role-details', 'results'].includes(game.state) && (
+            {!['team-selection', 'role-selection', 'waiting', 'intro', 'game', 'role-details', 'results'].includes(game.state) && (
                 <div key="error" className="text-red-500 text-center p-24">
                     <h2>État non reconnu : {game.state}</h2>
                     <button
-                        onClick={() => dispatch({ type: 'SET_STATE', payload: 'waiting' })}
+                        onClick={() => dispatch({ type: 'SET_STATE', payload: 'team-selection' })}
                         className="px-5 py-2 bg-blue-600 text-white rounded mt-3"
                     >
-                        Retour à la salle d'attente
+                        Retour au choix de l'équipe
                     </button>
                 </div>
             )}
