@@ -341,6 +341,54 @@ function Game() {
         }
     };
 
+    // Fonction pour vérifier si un utilisateur peut rejoindre un match
+    const canJoinMatch = (match) => {
+        if (role === 'ADMIN') {
+            return true; // L'admin peut rejoindre n'importe quel match
+        }
+
+        // Pour les joueurs, vérifier s'ils sont dans une équipe de ce match
+        const redTeam = teamMembersByMatch[match.id]?.redTeam || [];
+        const blueTeam = teamMembersByMatch[match.id]?.blueTeam || [];
+
+        return redTeam.some(user => user.id === userId) || blueTeam.some(user => user.id === userId);
+    };
+
+    // Fonction pour déterminer le rôle du joueur dans un match
+    const getPlayerRole = (match) => {
+        if (role === 'ADMIN') {
+            return 'admin'; // L'admin peut choisir son rôle
+        }
+
+        const redTeam = teamMembersByMatch[match.id]?.redTeam || [];
+        const blueTeam = teamMembersByMatch[match.id]?.blueTeam || [];
+
+        if (redTeam.some(user => user.id === userId)) {
+            return 'attack'; // Équipe rouge = attaque
+        } else if (blueTeam.some(user => user.id === userId)) {
+            return 'defense'; // Équipe bleue = défense
+        }
+
+        return null;
+    };
+
+    // Fonction pour rejoindre un match
+    const handleJoinMatch = (match) => {
+        const playerRole = getPlayerRole(match);
+        if (!playerRole) {
+            setError('Vous ne pouvez pas rejoindre ce match.');
+            return;
+        }
+
+        // Naviguer vers /attack avec les paramètres nécessaires
+        const searchParams = new URLSearchParams({
+            matchId: match.id,
+            role: playerRole
+        });
+
+        navigate(`/attack?${searchParams.toString()}`);
+    };
+
     // Filtrer les utilisateurs pour n'afficher que :
     // - Les utilisateurs connectés (isConnected: true)
     // - Les utilisateurs déconnectés (isConnected: false) qui sont dans une équipe (teamId non null)
@@ -558,6 +606,17 @@ function Game() {
                                                 <button
                                                     onClick={(e) => {
                                                         e.stopPropagation();
+                                                        handleJoinMatch(match);
+                                                    }}
+                                                    disabled={!canJoinMatch(match)}
+                                                    className="btn-modern btn-join"
+                                                    title={canJoinMatch(match) ? 'Rejoindre la partie' : 'Vous devez être dans une équipe pour rejoindre ce match'}
+                                                >
+                                                    Rejoindre la partie
+                                                </button>
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
                                                         handleDeleteMatch(match.id);
                                                     }}
                                                     disabled={loading}
@@ -621,6 +680,19 @@ function Game() {
                                                     )}
                                                 </ul>
                                             </div>
+                                        </div>
+                                        <div className="match-actions">
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleJoinMatch(match);
+                                                }}
+                                                disabled={!canJoinMatch(match)}
+                                                className="btn-modern btn-join"
+                                                title={canJoinMatch(match) ? 'Rejoindre la partie' : 'Vous devez être dans une équipe pour rejoindre ce match'}
+                                            >
+                                                Rejoindre la partie
+                                            </button>
                                         </div>
                                     </div>
                                 ))
