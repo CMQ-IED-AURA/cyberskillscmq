@@ -61,8 +61,8 @@ function Game() {
             return false;
         }
         try {
-            console.log('Envoi de la requête à /api/auth/validate');
-            const res = await fetch('https://cyberskills.onrender.com/api/auth/validate', {
+            console.log('Envoi de la requête à /auth/verify');
+            const res = await fetch('https://cyberskills.onrender.com/auth/verify', {
                 headers: { 'Authorization': `Bearer ${token}` },
             });
             console.log('Réponse reçue:', res.status, res.statusText);
